@@ -1,1 +1,1 @@
-export { sourceDigest } from '../../engine/sourceDigest.js';
+export { sourceDigest } from '../../engine/core.js';

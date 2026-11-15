@@ -1,5 +1,4 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { AnimationClip, DeepReadonly } from '../../engine/data.js';
 
 /** A derived row points to its sole character document. It never owns a second set of keys. */
 export interface AnimationLibraryEntry {

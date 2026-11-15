@@ -1,5 +1,12 @@
 import { assert, test, vi } from 'vitest';
-import { AnimationPlayer, Joint, type PlaybackLifecycleEvent, type PlaybackStatus, Rig } from '../src/engine/core.js';
+import {
+  AnimationPlayer,
+  Joint,
+  type AnimationPlayerOptions,
+  type PlaybackLifecycleEvent,
+  type PlaybackStatus,
+  Rig,
+} from '../src/engine/core.js';
 import { Puppet } from '../src/engine/runtime.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
@@ -10,10 +17,10 @@ vi.mock('phaser', () => ({
   },
 }));
 
-function fixture() {
+function fixture(options?: AnimationPlayerOptions) {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const joints = new Map([['root', new Joint('root', rig.getBone('root'))]]);
-  const player = new AnimationPlayer(rig, joints);
+  const player = new AnimationPlayer(rig, joints, [], options);
   for (const [name, x] of [
     ['a', 0],
     ['b', 100],
@@ -362,7 +369,14 @@ test('lifecycle listeners use stable snapshots, removable subscriptions and inde
 });
 
 test('authored markers keep their order and observe final synchronized poses before completion', () => {
-  const { player, joints } = fixture();
+  const order: string[] = [];
+  const syncLabels = ['sync-start', 'sync-end'];
+  let syncCalls = 0;
+  const { player, joints } = fixture({
+    poseHooks: {
+      synchronize: () => order.push(syncLabels[syncCalls++] ?? 'sync'),
+    },
+  });
   player.addAnimation({
     name: 'markers',
     duration: 100,
@@ -379,15 +393,14 @@ test('authored markers keep their order and observe final synchronized poses bef
       { time: 50, name: 'mid' },
     ],
   });
-  const order: string[] = [];
   player.onPlaybackLifecycle((event) => order.push(event.type));
   player.onAnimationEvent((event) => {
     order.push(event.name);
     assert.equal(joints.get('root')!.pose.x, event.time === 0 ? 0 : 100);
   });
   player.onAnimationComplete(() => order.push('legacy'));
-  player.play('markers', {}, undefined, () => order.push('sync-start'));
-  player.update(1000, undefined, () => order.push('sync-end'));
+  player.play('markers');
+  player.update(1000);
   assert.deepEqual(order, ['sync-start', 'started', 'zero', 'sync-end', 'mid', 'end', 'completed', 'legacy']);
 });
 

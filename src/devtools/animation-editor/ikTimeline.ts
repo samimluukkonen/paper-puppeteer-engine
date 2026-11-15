@@ -1,5 +1,5 @@
-import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import type { Rig } from '../../engine/Rig.js';
+import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { AnimationData } from './keyframeTargets.js';
 import { toSeconds, type Seconds } from './timeUnits.js';
 

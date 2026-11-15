@@ -1,5 +1,4 @@
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
+import { equalJsonData, freezeData, type DeepReadonly } from '../../engine/core.js';
 import {
   animationPreviewPreferencesSchema,
   type AnimationPreviewPreferences,

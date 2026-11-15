@@ -1,7 +1,5 @@
-import { createMeshBindPose } from '../../engine/meshBindPose.js';
-import { normalizeBoneInfluences } from '../../engine/meshSkinning.js';
-import { identifierSchema } from '../../engine/schemas.js';
-import type { BoneDefinition, RigDefinition } from '../../engine/types.js';
+import { createMeshBindPose, normalizeBoneInfluences, identifierSchema } from '../../engine/core.js';
+import type { BoneDefinition, RigDefinition } from '../../engine/data.js';
 import type { RigEditorState } from './RigEditorState.js';
 
 type StructureState = Pick<

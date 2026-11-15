@@ -1,5 +1,5 @@
-import type { SceneImageDefinition, SceneLayerDefinition } from '../../engine/SceneDefinition.js';
-import { sceneLayers } from '../../engine/sceneLayers.js';
+import { sceneLayers } from '../../engine/core.js';
+import type { SceneImageDefinition, SceneLayerDefinition } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 type CommandState = Pick<

@@ -1,5 +1,11 @@
 import { assert, test, vi } from 'vitest';
-import { AnimationPlayer, Joint, Rig, type PlaybackLifecycleEvent } from '../src/engine/core.js';
+import {
+  AnimationPlayer,
+  Joint,
+  Rig,
+  type AnimationPlayerOptions,
+  type PlaybackLifecycleEvent,
+} from '../src/engine/core.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { puppetScene } from './helpers/puppetScene.js';
 
@@ -10,9 +16,9 @@ vi.mock('phaser', () => ({
   },
 }));
 
-function fixture() {
+function fixture(options?: AnimationPlayerOptions) {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
-  const player = new AnimationPlayer(rig, new Map([['root', new Joint('root', rig.getBone('root'))]]));
+  const player = new AnimationPlayer(rig, new Map([['root', new Joint('root', rig.getBone('root'))]]), [], options);
   for (const name of ['a', 'b'])
     player.addAnimation({ name, duration: 100, loop: false, tracks: {}, events: [{ time: 100, name: 'end' }] });
   return player;
@@ -52,19 +58,25 @@ test('a failing IK provider still settles completed waits and advances queued pl
 test.each(['replace', 'restart', 'clear'] as const)(
   '%s settles the outgoing wait despite a synchronization failure',
   async (operation) => {
-    const player = fixture();
+    const failure = new Error('synchronization failed');
+    let failing = false;
+    const player = fixture({
+      poseHooks: {
+        synchronize: () => {
+          if (failing) throw failure;
+        },
+      },
+    });
     const layer = operation === 'clear' ? 'overlay' : 'base';
     const waiting = player.playAndWait('a', { layer });
-    const failure = new Error('synchronization failed');
-    const synchronize = (): void => {
-      throw failure;
-    };
     try {
+      failing = true;
       assert.throws(() => {
-        if (operation === 'replace') player.play('b', {}, undefined, synchronize);
-        else if (operation === 'restart') player.restart(undefined, synchronize);
-        else player.clearLayer(layer, undefined, synchronize);
+        if (operation === 'replace') player.play('b');
+        else if (operation === 'restart') player.restart();
+        else player.clearLayer(layer);
       }, /synchronization failed/);
+      failing = false;
       assert.equal((await waiting).status, operation === 'clear' ? 'stopped' : 'interrupted');
       if (operation !== 'clear') {
         const successor = player.waitForPlayback();
@@ -78,8 +90,15 @@ test.each(['replace', 'restart', 'clear'] as const)(
 );
 
 test('completion delivers markers and lifecycle once and retains synchronization and listener errors', async () => {
-  const player = fixture();
   const poseFailure = new Error('pose failed');
+  let failing = false;
+  const player = fixture({
+    poseHooks: {
+      synchronize: () => {
+        if (failing) throw poseFailure;
+      },
+    },
+  });
   const listenerFailure = new Error('listener failed');
   const lifecycle: PlaybackLifecycleEvent[] = [];
   const markers: string[] = [];
@@ -91,14 +110,14 @@ test('completion delivers markers and lifecycle once and retains synchronization
   const waiting = player.playAndWait('a');
   try {
     try {
-      player.update(100, undefined, () => {
-        throw poseFailure;
-      });
+      failing = true;
+      player.update(100);
       assert.fail('Both failures must be reported.');
     } catch (error) {
       assert.instanceOf(error, AggregateError);
       assert.deepEqual(error.errors, [poseFailure, listenerFailure]);
     }
+    failing = false;
     assert.equal((await waiting).status, 'completed');
     player.update(100);
     assert.deepEqual(markers, ['end']);

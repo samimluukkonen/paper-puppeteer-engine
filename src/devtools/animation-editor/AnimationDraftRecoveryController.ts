@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { inspectAnimationDefinition } from '../../engine/externalData.js';
-import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
+import { inspectAnimationDefinition, JsonWorkloadBudget } from '../../engine/core.js';
 import type { DraftRecovery } from '../shared/DraftRecovery.js';
 import { draftSource, sameDraftSource } from '../shared/draftSource.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';

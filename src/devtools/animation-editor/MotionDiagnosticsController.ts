@@ -1,5 +1,4 @@
-import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import type { TransformProperty } from '../../engine/types.js';
+import type { IKAnimationProperty, TransformProperty } from '../../engine/data.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import {

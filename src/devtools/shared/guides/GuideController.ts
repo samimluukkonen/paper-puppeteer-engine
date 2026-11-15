@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../../engine/notifications.js';
+import { dispatchListeners, throwNotificationErrors } from '../../../engine/core.js';
 import { freezeData } from '../editorData.js';
 import { getGuideAvailability, type GuideRegistry, guideRegistry } from './registry.js';
 import type {

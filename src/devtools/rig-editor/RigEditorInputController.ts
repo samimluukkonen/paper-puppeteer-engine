@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import type { Puppet } from '../../engine/Puppet.js';
+import type { Puppet } from '../../engine/runtime.js';
 import { blocksEditorShortcut, historyShortcut, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { textureOriginAt } from './artworkAlignment.js';

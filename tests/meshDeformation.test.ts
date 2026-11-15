@@ -737,14 +737,14 @@ test('runtime and editor-source rendering consume live channels without creating
   const sourceReads = vi.spyOn(source, 'meshDeformation', 'get');
   source.play(clip.name);
   source.sample(500);
-  puppet.setMeshDeformationSource(source);
+  const detach = puppet.attachPoseSource(source);
   puppet.syncPose();
   assert.equal(sourceReads.mock.calls.length, 0);
   assert.deepEqual(puppet.meshDeformation.get('mesh')!.get('top-left'), { x: 6, y: -4 });
   assert.equal(sourceReads.mock.calls.length, 1);
   snapshotReads.mockRestore();
   sourceReads.mockRestore();
-  puppet.setMeshDeformationSource(undefined);
+  detach();
   source.dispose();
   puppet.destroy();
 });

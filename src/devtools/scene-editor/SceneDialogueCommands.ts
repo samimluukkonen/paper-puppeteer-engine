@@ -1,4 +1,4 @@
-import type { SceneDialogueLine } from '../../engine/sceneDialogue.js';
+import type { SceneDialogueLine } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 export type SceneDialoguePatch = Partial<Omit<SceneDialogueLine, 'id' | 'actorId' | 'speakerName' | 'voiceClipId'>> & {

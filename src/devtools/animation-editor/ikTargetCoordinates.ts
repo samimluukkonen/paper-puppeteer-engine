@@ -1,4 +1,4 @@
-import { localToWorld, worldToLocal, type Affine, type Point } from '../../engine/affineMath.js';
+import { localToWorld, worldToLocal, type Affine, type Point } from '../../engine/core.js';
 import type { GroundGuide } from '../shared/groundGuide.js';
 
 /** Camera projection first, then the full puppet placement/facing/enclosing-container inverse. */

@@ -1,5 +1,5 @@
-import { isFullyFrozen, type DeepReadonly } from '../../engine/readonlyData.js';
-import type { SceneDefinition } from '../../engine/SceneDefinition.js';
+import { isFullyFrozen, type DeepReadonly } from '../../engine/core.js';
+import type { SceneDefinition } from '../../engine/data.js';
 import { draftSource } from './draftSource.js';
 
 const fingerprints = new WeakMap<object, string>();

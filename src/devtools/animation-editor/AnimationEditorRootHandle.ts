@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import type { Affine, Point } from '../../engine/affineMath.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import { sampleRootMotion } from '../../engine/rootMotion.js';
+import { sampleRootMotion } from '../../engine/core.js';
+import type { Affine, Point } from '../../engine/data.js';
+import type { Puppet } from '../../engine/runtime.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { pointerToRootPosition, rootMotionMatrix, rootPositionToWorld } from './rootMotionCoordinates.js';
 

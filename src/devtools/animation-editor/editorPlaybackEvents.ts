@@ -1,6 +1,11 @@
-import { compileValidatedClip, type CompiledClip } from '../../engine/AnimationClip.js';
-import { advanceAnimationTime, AnimationEventBudget, collectAnimationEvents } from '../../engine/animationTimeline.js';
-import type { Rig } from '../../engine/Rig.js';
+import {
+  compileValidatedClip,
+  advanceAnimationTime,
+  AnimationEventBudget,
+  collectAnimationEvents,
+  type CompiledClip,
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { toMilliseconds, type Milliseconds, type Seconds } from './timeUnits.js';
 import { getValidatedEditorAnimation } from './validatedAnimation.js';

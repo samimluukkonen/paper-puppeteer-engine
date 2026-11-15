@@ -1,6 +1,5 @@
-import { propertyKeyframe, withoutKeyframeProperty } from '../../engine/animationCurves.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { RootMotionProperty } from '../../engine/rootMotion.js';
+import { propertyKeyframe, withoutKeyframeProperty } from '../../engine/core.js';
+import type { Rig, RootMotionProperty } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { validateEditedAnimation } from './validatedAnimation.js';
 

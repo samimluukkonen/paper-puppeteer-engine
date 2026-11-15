@@ -1,5 +1,5 @@
-import { worldToLocal, type Affine } from '../../engine/affineMath.js';
-import type { RootMotionDefinition } from '../../engine/rootMotion.js';
+import { worldToLocal, type Affine } from '../../engine/core.js';
+import type { RootMotionDefinition } from '../../engine/data.js';
 import { evaluatePreviewDisplacement, validPreviewPositionKeys, type MotionPreviewSettings } from './motionPreview.js';
 import { rootMotionMatrix } from './rootMotionCoordinates.js';
 

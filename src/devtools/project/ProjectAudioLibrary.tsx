@@ -4,8 +4,12 @@ import Square from 'lucide-react/icons/square';
 import Trash2 from 'lucide-react/icons/trash-2';
 import Upload from 'lucide-react/icons/upload';
 import { useEffect, useRef, useState } from 'react';
-import { AUDIO_CATEGORIES, type AudioAssetDefinition, type AudioCategory } from '../../engine/AudioAsset.js';
-import { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
+import {
+  AUDIO_CATEGORIES,
+  AudioAssetLoader,
+  type AudioAssetDefinition,
+  type AudioCategory,
+} from '../../engine/core.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 

@@ -1,7 +1,11 @@
-import { serializeSkinDefinition } from '../../engine/authoredSerialization.js';
-import { identifierSchema, attachmentSchema } from '../../engine/schemas.js';
-import type { SkinDefinition, AttachmentDefinition } from '../../engine/types.js';
-import { checkSkinReferences, throwValidationIssue } from '../../engine/validation.js';
+import {
+  serializeSkinDefinition,
+  identifierSchema,
+  attachmentSchema,
+  checkSkinReferences,
+  throwValidationIssue,
+} from '../../engine/core.js';
+import type { SkinDefinition, AttachmentDefinition } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { RigEditorState } from './RigEditorState.js';

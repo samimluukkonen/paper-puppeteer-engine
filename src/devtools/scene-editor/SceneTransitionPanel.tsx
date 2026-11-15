@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SceneTransition } from '../../engine/sceneTransitions.js';
+import type { SceneTransition } from '../../engine/data.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 

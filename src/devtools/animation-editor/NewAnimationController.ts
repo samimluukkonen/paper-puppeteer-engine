@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
 

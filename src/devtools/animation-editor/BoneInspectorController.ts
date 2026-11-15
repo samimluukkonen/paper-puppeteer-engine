@@ -1,4 +1,4 @@
-import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
+import { transformProperties, type JointTransform, type TransformProperty } from '../../engine/core.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';

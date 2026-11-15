@@ -1,7 +1,5 @@
-import { copyAnimationEvent, type AnimationEvent } from '../../engine/AnimationClip.js';
-import type { MeshDeformationKey } from '../../engine/meshDeformation.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { copyAnimationEvent, type AnimationEvent } from '../../engine/core.js';
+import type { MeshDeformationKey, DeepReadonly, Rig } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import {

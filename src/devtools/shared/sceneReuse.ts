@@ -1,16 +1,16 @@
 import { z } from 'zod';
-import { canonicalJson } from '../../engine/authoredSerialization.js';
-import { CAMERA_PROPERTIES } from '../../engine/cameraAnimation.js';
-import { checkJson } from '../../engine/jsonData.js';
-import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
 import {
+  canonicalJson,
+  CAMERA_PROPERTIES,
+  checkJson,
+  assertJsonInputSize,
   parseSceneDefinition,
   sceneDefinitionSchema,
   sceneActionDuration,
   type SceneDefinition,
   type SceneValidationOptions,
-} from '../../engine/SceneDefinition.js';
+} from '../../engine/core.js';
+import type { DeepReadonly } from '../../engine/data.js';
 
 const identity = z.string().min(1).max(200).regex(/\S/);
 const point = z.strictObject({ x: z.number(), y: z.number() });

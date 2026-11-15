@@ -1,4 +1,4 @@
-import { preflightIKBakeSelection } from '../../engine/ik/IKBakeBudget.js';
+import { preflightIKBakeSelection } from '../../engine/core.js';
 import { startWorkerTask } from '../shared/workerTask.js';
 import type { IKBakePlanningRequest, IKBakePlanningResult } from './ikBakePlanning.js';
 

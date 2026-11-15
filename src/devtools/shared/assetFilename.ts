@@ -1,1 +1,1 @@
-export { safeFilename, assetFilename } from '../../engine/assetFilename.js';
+export { safeFilename, assetFilename } from '../../engine/core.js';

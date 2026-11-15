@@ -1,9 +1,12 @@
-import { localToWorld, worldToLocal, type Affine } from '../../engine/affineMath.js';
-import { getFootContactWorldPosition } from '../../engine/footContactMarkers.js';
-import { setIKPropertyKeyframe } from '../../engine/ik/animationKeyframes.js';
-import { IsolatedIKSampler } from '../../engine/ik/IsolatedIKSampler.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { FootContactMarker } from '../../engine/types.js';
+import {
+  localToWorld,
+  worldToLocal,
+  getFootContactWorldPosition,
+  setIKPropertyKeyframe,
+  IsolatedIKSampler,
+  type Affine,
+} from '../../engine/core.js';
+import type { Rig, FootContactMarker } from '../../engine/data.js';
 import { DEFAULT_CONTACT_TOLERANCE } from '../shared/footContactGround.js';
 import type { AnimationData } from './keyframeTargets.js';
 import { getCompiledPreviewClip } from './previewClip.js';

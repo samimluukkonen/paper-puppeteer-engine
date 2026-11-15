@@ -1,4 +1,4 @@
-import type { AnimationLibraryMetadata } from '../../engine/AnimationClip.js';
+import type { AnimationLibraryMetadata } from '../../engine/data.js';
 import { independentAnimationName, type AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';

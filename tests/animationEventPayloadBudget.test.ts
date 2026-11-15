@@ -2,7 +2,11 @@ import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
 import { dispatchAnimationEvents } from '../src/engine/animationNotifications.js';
-import { AnimationPlayer, type FiredAnimationEvent } from '../src/engine/AnimationPlayer.js';
+import {
+  AnimationPlayer,
+  type AnimationPlayerOptions,
+  type FiredAnimationEvent,
+} from '../src/engine/AnimationPlayer.js';
 import { MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK } from '../src/engine/animationTimeline.js';
 import { Joint } from '../src/engine/Joint.js';
 import { copyJsonData, jsonDataCopyWork } from '../src/engine/jsonData.js';
@@ -11,8 +15,8 @@ import { Rig } from '../src/engine/Rig.js';
 
 afterEach(() => vi.restoreAllMocks());
 const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
-function fixture(clip: AnimationClip) {
-  return new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [compileClip(clip, rig)]);
+function fixture(clip: AnimationClip, options?: AnimationPlayerOptions) {
+  return new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [compileClip(clip, rig)], options);
 }
 function payloadClip(time = 0.5, data: unknown = Array.from({ length: 10_000 }, (_, index) => index)): AnimationClip {
   return { name: 'payload', duration: 1, loop: true, tracks: {}, events: [{ time, name: 'marker', data }] };
@@ -42,14 +46,17 @@ test('small imported clips cannot amplify JSON payload copies across a large loo
 test.each(['start', 'queue'] as const)(
   'oversized payload %s rejection retains the selected playback and queue',
   (operation) => {
-    const player = fixture(payloadClip(0, 'x'.repeat(MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK)));
+    const prepare = vi.fn();
+    const player = fixture(payloadClip(0, 'x'.repeat(MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK)), {
+      poseHooks: { prepare },
+    });
     player.addAnimation({ name: 'existing', duration: 100, loop: false, tracks: {} });
     player.play('existing');
     const before = player.getPlaybackStatus();
-    const prepare = vi.fn();
+    prepare.mockClear();
     try {
       assert.throws(() => {
-        if (operation === 'start') player.play('payload', {}, prepare);
+        if (operation === 'start') player.play('payload');
         else {
           player.addAnimation({
             ...payloadClip(0, 'x'.repeat(MAXIMUM_ANIMATION_EVENT_PAYLOAD_WORK)),
@@ -91,14 +98,15 @@ test('payload work combines all layers and listener copies before any clock or f
 });
 
 test('restart budgets time-zero payloads across layers before resetting playback', () => {
-  const player = fixture(payloadClip(0, 'x'.repeat(600_000)));
+  const prepare = vi.fn();
+  const player = fixture(payloadClip(0, 'x'.repeat(600_000)), { poseHooks: { prepare } });
   player.play('payload');
   player.play('payload', { layer: 'upper' });
   player.update(0.25);
   const before = [player.getPlaybackStatus(), player.getPlaybackStatus('upper')];
-  const prepare = vi.fn();
+  prepare.mockClear();
   try {
-    assert.throws(() => player.restart(prepare), /restart.*payload copy budget/);
+    assert.throws(() => player.restart(), /restart.*payload copy budget/);
     assert.deepEqual([player.getPlaybackStatus(), player.getPlaybackStatus('upper')], before);
     assert.equal(prepare.mock.calls.length, 0);
   } finally {

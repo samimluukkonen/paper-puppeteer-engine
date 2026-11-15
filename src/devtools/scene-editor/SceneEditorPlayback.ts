@@ -1,8 +1,5 @@
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import type { SceneAudioOptions } from '../../engine/SceneAudioController.js';
-import { sceneActorDepth, sceneLayer } from '../../engine/sceneLayers.js';
-import type { SceneRunnerOptions } from '../../engine/SceneRunner.js';
-import { SceneRunner } from '../../engine/SceneRunner.js';
+import { equalJsonData, sceneActorDepth, sceneLayer, SceneRunner } from '../../engine/core.js';
+import type { SceneAudioOptions, SceneRunnerOptions } from '../../engine/data.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
 

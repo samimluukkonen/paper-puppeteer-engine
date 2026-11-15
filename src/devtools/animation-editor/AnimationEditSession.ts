@@ -1,5 +1,5 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
-import type { Rig } from '../../engine/Rig.js';
+import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEventRef } from './animationEvents.js';

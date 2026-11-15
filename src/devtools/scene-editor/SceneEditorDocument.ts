@@ -1,35 +1,35 @@
-import type { AudioAssetDefinition, AudioCategory } from '../../engine/AudioAsset.js';
 import {
   CAMERA_PROPERTIES,
   evaluateCameraAtTime,
-  type CameraProperty,
-  type CameraKeyframe,
-} from '../../engine/cameraAnimation.js';
-import {
   cameraForBounds,
   DEFAULT_CINEMATIC_CAMERA,
-  type CameraViewport,
-  type CinematicCameraState,
-} from '../../engine/cinematicCamera.js';
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
-import type { SceneAudioClip } from '../../engine/sceneAudio.js';
-import {
+  equalJsonData,
+  freezeData,
   createEmptyScene,
   parseSceneDefinition,
   parseSceneJson,
   SceneValidationError,
   serializeSceneDefinition,
+  type CameraProperty,
+  type CameraKeyframe,
+  type CameraViewport,
+  type CinematicCameraState,
+  type DeepReadonly,
   type SceneActorDefinition,
   type SceneImageDefinition,
   type SceneLayerDefinition,
   type SceneActionDefinition,
   type SceneDefinition,
   type SceneValidationOptions,
-} from '../../engine/SceneDefinition.js';
-import type { SceneDialogueLine } from '../../engine/sceneDialogue.js';
-import type { SceneTransition } from '../../engine/sceneTransitions.js';
-import type { ValidationIssue } from '../../engine/validation.js';
+} from '../../engine/core.js';
+import type {
+  AudioAssetDefinition,
+  AudioCategory,
+  SceneAudioClip,
+  SceneDialogueLine,
+  SceneTransition,
+  ValidationIssue,
+} from '../../engine/data.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { emptySceneReuseLibrary, parseSceneReuseLibrary, type SceneReuseLibrary } from '../shared/sceneReuse.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';

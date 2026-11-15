@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';

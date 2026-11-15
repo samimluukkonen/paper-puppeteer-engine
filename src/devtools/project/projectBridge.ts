@@ -1,6 +1,4 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { AnimationClip, CharacterDefinition, DeepReadonly } from '../../engine/data.js';
 import type { SceneEditorDocument, ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
 import type { SceneImageRegistry } from '../scene-editor/SceneImageRegistry.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';

@@ -1,8 +1,5 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssue } from '../../engine/externalData.js';
-import type { PoseDefinition } from '../../engine/Pose.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssue } from '../../engine/core.js';
+import type { AnimationClip, PoseDefinition, DeepReadonly, Rig } from '../../engine/data.js';
 import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';

@@ -1,5 +1,4 @@
-import type { Rig } from '../../engine/Rig.js';
-import type { TransformProperty } from '../../engine/types.js';
+import type { Rig, TransformProperty } from '../../engine/data.js';
 import type { BoneSymmetryMapping } from '../shared/boneSymmetry.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';

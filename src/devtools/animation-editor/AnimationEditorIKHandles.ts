@@ -1,7 +1,6 @@
 import type Phaser from 'phaser';
-import { localToWorld, worldToLocal, type Point } from '../../engine/affineMath.js';
-import { IK_EPSILON } from '../../engine/ik/solveTwoBoneIK.js';
-import type { Puppet } from '../../engine/Puppet.js';
+import { localToWorld, worldToLocal, IK_EPSILON, type Point } from '../../engine/core.js';
+import type { Puppet } from '../../engine/runtime.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import type { GroundGuide } from '../shared/groundGuide.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';

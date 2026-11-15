@@ -1,8 +1,6 @@
 import { z } from 'zod';
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import { AnimationValidationError } from '../../engine/externalData.js';
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
-import type { Rig } from '../../engine/Rig.js';
+import { AnimationValidationError, dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import type { AnimationPose, Rig } from '../../engine/data.js';
 import {
   type BoneSymmetryPair,
   type BoneSymmetryMapping,

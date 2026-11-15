@@ -1,4 +1,4 @@
-import { sceneLayers } from '../../engine/sceneLayers.js';
+import { sceneLayers } from '../../engine/core.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 

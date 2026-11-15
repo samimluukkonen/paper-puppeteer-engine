@@ -1,13 +1,18 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { ValidationIssue } from '../../engine/externalData.js';
-import { preflightIKBakeSelection } from '../../engine/ik/IKBakeBudget.js';
-import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
-import { generateBakedBoneKeys, type IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
-import type { IKBakeMotionFidelity } from '../../engine/ik/IKBakeMotionFidelity.js';
-import { sampleIKBake } from '../../engine/ik/IKBakeSampling.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import { Rig } from '../../engine/Rig.js';
-import type { RigDefinition } from '../../engine/types.js';
+import {
+  preflightIKBakeSelection,
+  commitIKBake,
+  generateBakedBoneKeys,
+  sampleIKBake,
+  Rig,
+  type IKBakePlan,
+} from '../../engine/core.js';
+import type {
+  AnimationClip,
+  ValidationIssue,
+  IKBakeMotionFidelity,
+  DeepReadonly,
+  RigDefinition,
+} from '../../engine/data.js';
 
 export interface IKBakePlanningRequest {
   readonly rig: RigDefinition;

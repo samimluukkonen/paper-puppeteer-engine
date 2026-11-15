@@ -1,4 +1,4 @@
-import { Rig } from '../../engine/Rig.js';
+import { Rig } from '../../engine/core.js';
 import { sourceDigest } from './sourceDigest.js';
 
 const digestPrefix = 'sha256-v1:';

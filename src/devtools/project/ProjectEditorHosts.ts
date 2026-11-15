@@ -1,10 +1,11 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import { characterManifestSchema } from '../../engine/CharacterDefinition.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { inspectImageHeader } from '../../engine/imageHeader.js';
-import { throwNotificationErrors } from '../../engine/notifications.js';
-import { rigCompatibilityRevision } from '../../engine/rigBoneMapping.js';
-import { parseSceneJson } from '../../engine/SceneDefinition.js';
+import {
+  characterManifestSchema,
+  inspectImageHeader,
+  throwNotificationErrors,
+  rigCompatibilityRevision,
+  parseSceneJson,
+} from '../../engine/core.js';
+import type { AnimationClip, CharacterDefinition } from '../../engine/data.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { buildCharacterPackage, openPackageRuntime, packageJson } from '../shared/package/characterPackage.js';
 import type { ProjectEditorContext, ProjectRenderer } from './projectBridge.js';

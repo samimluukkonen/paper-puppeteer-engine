@@ -1,4 +1,4 @@
-import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
+import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/core.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
 export interface IKInspectorField {

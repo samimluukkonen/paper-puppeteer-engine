@@ -1,4 +1,4 @@
-import { animationClipSchema } from '../../engine/schemas.js';
+import { animationClipSchema } from '../../engine/core.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { selectedInterpolationControl } from './interpolationPresentation.js';

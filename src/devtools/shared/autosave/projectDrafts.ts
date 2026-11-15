@@ -1,6 +1,4 @@
-import { canonicalJson } from '../../../engine/authoredSerialization.js';
-import { validatePackageFiles } from '../../../engine/packageZip.js';
-import { serializeSceneDefinition } from '../../../engine/SceneDefinition.js';
+import { canonicalJson, validatePackageFiles, serializeSceneDefinition } from '../../../engine/core.js';
 import { parseProjectDefinition, type ProjectDefinition } from '../../project/ProjectDefinition.js';
 import { characterFileFetcher } from '../../project/projectPackage.js';
 import type { ProjectCharacter, ProjectWorkspace } from '../../project/ProjectWorkspace.js';

@@ -1,5 +1,4 @@
-import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
-import { transformProperties } from '../../engine/types.js';
+import { ikAnimationProperties, transformProperties } from '../../engine/core.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { getAnimationEventReferences, type AnimationEventRef } from './animationEvents.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';

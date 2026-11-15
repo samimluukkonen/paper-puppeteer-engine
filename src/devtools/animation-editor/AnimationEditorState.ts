@@ -1,24 +1,31 @@
-import type { Point } from '../../engine/affineMath.js';
+import {
+  commitIKBake,
+  getMeshDeformationTrack,
+  transformProperties,
+  type MeshDeformationKey,
+  type VertexOffset,
+  type JointTransform,
+  type TransformProperty,
+} from '../../engine/core.js';
 import type {
+  Point,
   AnimationClip,
   AnimationLibraryMetadata,
   AnimationEvent,
   AnimationPlaybackMode,
   Interpolation,
   PropertyKeyframe,
-} from '../../engine/AnimationClip.js';
-import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import type { ValidationIssue } from '../../engine/externalData.js';
-import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import { commitIKBake } from '../../engine/ik/IKBakeCommit.js';
-import type { IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
-import { getMeshDeformationTrack, type MeshDeformationKey, type VertexOffset } from '../../engine/meshDeformation.js';
-import type { PoseDefinition } from '../../engine/Pose.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { RootMotionProperty, RootMotionOffset } from '../../engine/rootMotion.js';
-import { type JointTransform, type TransformProperty, transformProperties } from '../../engine/types.js';
+  FiredAnimationEvent,
+  AnimationPose,
+  ValidationIssue,
+  IKAnimationProperty,
+  IKBakePlan,
+  PoseDefinition,
+  DeepReadonly,
+  Rig,
+  RootMotionProperty,
+  RootMotionOffset,
+} from '../../engine/data.js';
 import {
   type BoneSymmetryIssue,
   type BoneSymmetryMapping,

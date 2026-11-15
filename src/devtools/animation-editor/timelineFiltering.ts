@@ -1,6 +1,5 @@
-import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
-import type { Rig } from '../../engine/Rig.js';
-import { transformProperties } from '../../engine/types.js';
+import { ikAnimationProperties, transformProperties } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
 import { ikTrackKey } from './ikTimeline.js';
 import { getAuthoredBoneProperties } from './keyframeQueries.js';

@@ -1,7 +1,5 @@
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { CharacterLoader } from '../../engine/CharacterLoader.js';
-import { sceneCharacterAssetPath } from '../../engine/SceneAssets.js';
-import { sceneCharacterReferenceSchema } from '../../engine/SceneDefinition.js';
+import { CharacterLoader, sceneCharacterAssetPath, sceneCharacterReferenceSchema } from '../../engine/core.js';
+import type { CharacterDefinition } from '../../engine/data.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';
 

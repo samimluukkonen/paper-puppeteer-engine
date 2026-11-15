@@ -1,6 +1,5 @@
-import type { RigJsonDefinition } from '../../engine/externalData.js';
-import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import type { RigDefinition } from '../../engine/types.js';
+import { assertJsonInputSize } from '../../engine/core.js';
+import type { RigJsonDefinition, RigDefinition } from '../../engine/data.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 
 // Rounding these fields can collapse transforms, reorder artwork, or change a frame id.

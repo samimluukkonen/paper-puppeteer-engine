@@ -36,7 +36,7 @@ export {
   type ChoreographyActionResult,
 } from './ChoreographySequence.js';
 export * from './core.js';
-export type { PuppetOptions, SyncPoseOptions } from './Puppet.js';
+export type { PoseSource, PuppetOptions, SyncPoseOptions } from './Puppet.js';
 export { Puppet } from './Puppet.js';
 export {
   SceneRunner,

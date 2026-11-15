@@ -1,5 +1,5 @@
-import type { AnimationEvent } from '../../engine/AnimationClip.js';
-import { wrapAnimationTime } from '../../engine/animationTimeline.js';
+import { wrapAnimationTime } from '../../engine/core.js';
+import type { AnimationEvent } from '../../engine/data.js';
 import { clampTime } from './timeline.js';
 import { type Milliseconds, type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 

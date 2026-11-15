@@ -1,6 +1,5 @@
-import { createIKConstraint } from '../../engine/ik/ikAuthoring.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import type { RigDefinition } from '../../engine/types.js';
+import { createIKConstraint } from '../../engine/core.js';
+import type { TwoBoneIKDefinition, RigDefinition } from '../../engine/data.js';
 
 /** Enumerate topology, never character-specific bone names. Full model validation still runs at commit. */
 export function rigIKChains(rig: RigDefinition) {

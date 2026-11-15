@@ -1,6 +1,5 @@
-import { type AnimationClip, type CompiledClip, compileValidatedClip } from '../../engine/AnimationClip.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { compileValidatedClip, type AnimationClip, type CompiledClip } from '../../engine/core.js';
+import type { DeepReadonly, Rig } from '../../engine/data.js';
 import { getValidatedEditorAnimation } from './validatedAnimation.js';
 
 type AnimationData = DeepReadonly<AnimationClip>;

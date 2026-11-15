@@ -55,9 +55,11 @@ export {
 export { rootMotionDefinitionSchema, rootMotionKeySchema } from './schemas.js';
 export type {
   AnimationCompletion,
+  AnimationPlayerOptions,
   FiredAnimationEvent,
   PlayAnimationOptions,
   PlayAndWaitOptions,
+  PoseHooks,
   SampleAnimationOptions,
   WaitForPlaybackOptions,
 } from './AnimationPlayer.js';
@@ -367,3 +369,108 @@ export type {
 
 export { buildStoryPackage, validateStoryPackage, storyScenePackage } from './StoryPackage.js';
 export type { StoryPackage } from './StoryPackage.js';
+// Editor-facing re-exports: outside src/engine only the core/runtime/data barrels are importable.
+export {
+  inspectAnimationDefinition,
+  shapeIssues,
+  checkJson,
+  inspectRigDefinition,
+  inspectVersion,
+} from './externalData.js';
+export type { ValidationResult } from './externalData.js';
+export { JsonWorkloadBudget } from './jsonWorkloadLimits.js';
+export { dispatchListeners, throwNotificationErrors } from './notifications.js';
+export { computeBonePosition, computeRenderOrder } from './Rig.js';
+export { getMeshDeformationTrack } from './meshDeformation.js';
+export { copyAnimationEvent, compileValidatedClip } from './AnimationClip.js';
+export { freezeData, isFullyFrozen, readonlyMap } from './readonlyData.js';
+export { assertJsonInputSize, readJsonFile, validateInputLimit } from './jsonInput.js';
+export { PuppetRenderer } from './PuppetRenderer.js';
+export { transformProperties, createTransform, assertFinite } from './types.js';
+export { localToWorld, worldToLocal, composeAffine, transformToAffine } from './affineMath.js';
+export type { Point, Affine } from './affineMath.js';
+export { IK_EPSILON } from './ik/solveTwoBoneIK.js';
+export {
+  wrapAnimationTime,
+  collectAnimationStartEvents,
+  advanceAnimationTime,
+  AnimationEventBudget,
+  collectAnimationEvents,
+} from './animationTimeline.js';
+export { dispatchAnimationEvents } from './animationNotifications.js';
+export { ClipPoseBuffer } from './AnimationPose.js';
+export { equalJsonData } from './equalJsonData.js';
+export { SceneImageLayer } from './SceneImageLayer.js';
+export { getIKBakeRuntimeIssues } from './ik/IKBakeSampling.js';
+export { IsolatedIKSampler } from './ik/IsolatedIKSampler.js';
+export type { IKTargetValues } from './ik/IsolatedIKSampler.js';
+export {
+  copyPropertyCurve,
+  propertyKeyframe,
+  withoutKeyframeProperty,
+  evaluateCurveProgress,
+} from './animationCurves.js';
+export { identifierSchema, skinFileSchema } from './schemas.js';
+export { canonicalJson } from './authoredSerialization.js';
+export {
+  quantizePlaybackTime,
+  shortestRotationDelta,
+  interpolateNumber,
+  DEFAULT_ANIMATION_FPS,
+} from './animationMath.js';
+export { preflightIKBakeSelection } from './ik/IKBakeBudget.js';
+export {
+  replacePropertyAtTime,
+  setTrackPropertyKeyframes,
+  normalizeKeyframeTime,
+  KEYFRAME_TIME_TOLERANCE_MS,
+  keyframeTimesMatch,
+  matchingRow,
+} from './keyframeAuthoring.js';
+export type { SparseKeyframe } from './keyframeAuthoring.js';
+export {
+  getValidatedAnimation,
+  isDataRecord,
+  isValidatedAnimation,
+  rememberValidatedAnimation,
+} from './validatedAnimation.js';
+export { mergeSkins } from './mergeSkins.js';
+export { AudioAssetLoader } from './AudioAssetLoader.js';
+export type { AudioBackend } from './AudioAssetLoader.js';
+export { packagePath, PACKAGE_MAX_BYTES, validatePackageFiles, PACKAGE_MAX_FILE_BYTES } from './packageZip.js';
+export { inspectImageHeader, IMAGE_HEADER_BYTES } from './imageHeader.js';
+export {
+  sceneImageReferenceSchema,
+  checkSceneCollectionLimits,
+  checkSceneDefinitionDomains,
+  createSceneDefinitionSchema,
+  SceneValidationCache,
+} from './SceneDefinition.js';
+export { abortable } from './abortable.js';
+export { safeFilename, assetFilename } from './assetFilename.js';
+export { DialogueKeyboardInput } from './DialogueKeyboardInput.js';
+export type { StandaloneStorySource } from './StandaloneStoryPlayer.js';
+export { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from './characterTextureLimits.js';
+export { assertMeshImageSize } from './meshGeometry.js';
+export { checkSkinReferences, throwValidationIssue } from './validation.js';
+export { decodeImage } from './decodeImage.js';
+export { assertIKConstraintChangesAllowed } from './ik/ikAuthoring.js';
+export { assertInfluenceLimit } from './meshWeightPainting.js';
+export { normalizeBoneDirection } from './boneMath.js';
+export { Actor } from './Actor.js';
+export { sceneActorDepth, sceneLayer, sceneLayers } from './sceneLayers.js';
+export { assertSceneInstanceBudget } from './sceneWorkloadLimits.js';
+export { sceneCharacterAssetPath } from './SceneAssets.js';
+export { compareDialogueLines } from './sceneDialogue.js';
+export type { SceneAudioOptions } from './SceneAudioController.js';
+export { SceneRunner } from './SceneRunner.js';
+export type { SceneRunnerOptions } from './SceneRunner.js';
+export { readSceneResource } from './sceneResource.js';
+export { createSceneTextureBudget } from './sceneTextureBudget.js';
+export { SceneDialogueOverlay } from './SceneDialogueOverlay.js';
+export { SceneTransitionOverlay } from './SceneTransitionOverlay.js';
+export { replacementOriginScale } from './artworkReplacement.js';
+export type { ArtworkAlignmentPolicy, ArtworkReference, ArtworkReplacement } from './artworkReplacement.js';
+export { readResponseBytes, withResourceResponse } from './resourceInput.js';
+export { sourceDigest } from './sourceDigest.js';
+export { isTypingTarget } from './keyboardTarget.js';

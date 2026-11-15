@@ -1,34 +1,31 @@
-import { abortable } from '../../engine/abortable.js';
-import { safeFilename } from '../../engine/assetFilename.js';
 import {
+  abortable,
+  safeFilename,
   validateAudioAssetData,
-  type AudioAssetDefinition,
-  type AudioCategory,
   inspectAudioData,
   AUDIO_MAX_FILE_BYTES,
-} from '../../engine/AudioAsset.js';
-import type { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
-import { canonicalJson } from '../../engine/authoredSerialization.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import { mergeSkins } from '../../engine/mergeSkins.js';
-import { validatePackageFiles } from '../../engine/packageZip.js';
-import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
-import {
+  canonicalJson,
+  equalJsonData,
+  mergeSkins,
+  validatePackageFiles,
+  freezeData,
   rigBoneMappingSchema,
   validateRigBoneMapping,
-  type RigBoneMapping,
-  type IdentifiedRig,
-} from '../../engine/rigBoneMapping.js';
-import { analyzeRigCompatibility } from '../../engine/rigCompatibility.js';
-import {
+  analyzeRigCompatibility,
   createEmptyScene,
   parseSceneDefinition,
+  identifierSchema,
+  parseStoryDefinition,
+  type AudioAssetDefinition,
+  type AudioCategory,
+  type DeepReadonly,
+  type RigBoneMapping,
+  type IdentifiedRig,
   type SceneCharacterAssets,
   type SceneDefinition,
-} from '../../engine/SceneDefinition.js';
-import { identifierSchema } from '../../engine/schemas.js';
-import { parseStoryDefinition, type StoryDefinition } from '../../engine/StoryDefinition.js';
+  type StoryDefinition,
+} from '../../engine/core.js';
+import type { AudioAssetLoader, CharacterDefinition } from '../../engine/data.js';
 import { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import {
@@ -212,7 +209,7 @@ export class ProjectWorkspace {
   setStorySceneTransition(
     id: string,
     entryId: string,
-    transition: import('../../engine/StoryDefinition.js').StoryEntryTransition,
+    transition: import('../../engine/data.js').StoryEntryTransition,
   ): void {
     const story = this.story(id);
     if (!story.scenes.some((entry) => entry.id === entryId)) throw new Error(`Unknown story entry "${entryId}".`);

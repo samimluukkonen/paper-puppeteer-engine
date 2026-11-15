@@ -1,4 +1,4 @@
-import type { SceneTransition } from '../../engine/sceneTransitions.js';
+import type { SceneTransition } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 type CommandState = Pick<SceneEditorDocument, 'replaceScene' | 'selectTransition' | 'workingScene'>;

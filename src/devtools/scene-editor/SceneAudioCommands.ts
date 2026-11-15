@@ -1,5 +1,4 @@
-import type { AudioAssetDefinition, AudioCategory } from '../../engine/AudioAsset.js';
-import type { SceneAudioClip } from '../../engine/sceneAudio.js';
+import type { AudioAssetDefinition, AudioCategory, SceneAudioClip } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 type State = Pick<

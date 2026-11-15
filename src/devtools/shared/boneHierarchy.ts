@@ -1,5 +1,4 @@
-import type { Rig } from '../../engine/Rig.js';
-import type { RigDefinition } from '../../engine/types.js';
+import type { Rig, RigDefinition } from '../../engine/data.js';
 
 /** Runtime rigs sort parents first; authored arrays keep their own stable order. */
 export function sameRigTopology(a: RigDefinition, b: RigDefinition): boolean {

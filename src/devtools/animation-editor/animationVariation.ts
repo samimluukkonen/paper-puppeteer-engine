@@ -1,5 +1,5 @@
-import { AnimationValidationError } from '../../engine/externalData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { AnimationValidationError } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
 export interface AnimationVariationOptions {

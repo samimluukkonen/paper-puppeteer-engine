@@ -1,7 +1,13 @@
-import { withoutKeyframeProperty, type PropertyCurve } from '../../engine/animationCurves.js';
-import { replacePropertyAtTime, setTrackPropertyKeyframes } from '../../engine/keyframeAuthoring.js';
-import type { Rig } from '../../engine/Rig.js';
-import { assertFinite, type TransformProperty, transformProperties } from '../../engine/types.js';
+import {
+  withoutKeyframeProperty,
+  replacePropertyAtTime,
+  setTrackPropertyKeyframes,
+  assertFinite,
+  transformProperties,
+  type PropertyCurve,
+  type TransformProperty,
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { type AnimationData, assertTarget, matchingRow } from './keyframeTargets.js';
 import { type Milliseconds } from './timeUnits.js';

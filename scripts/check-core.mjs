@@ -257,14 +257,16 @@ assert.deepEqual(getRootMotionDelta(rootClip, 1100, 900, { loop: true }), { x: -
 const placement = { x: 100, y: 200 };
 let origin = { ...placement };
 const rootPlayer = new AnimationPlayer(rig, new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)])), [], {
-  validate() {},
-  begin() {
-    origin = { ...placement };
-  },
-  apply(displacement) {
-    // A host transforms canonical offsets once; this example faces left at scale 2.
-    placement.x = origin.x - displacement.x * 2;
-    placement.y = origin.y + displacement.y * 2;
+  rootMotion: {
+    validate() {},
+    begin() {
+      origin = { ...placement };
+    },
+    apply(displacement) {
+      // A host transforms canonical offsets once; this example faces left at scale 2.
+      placement.x = origin.x - displacement.x * 2;
+      placement.y = origin.y + displacement.y * 2;
+    },
   },
 });
 rootPlayer.addAnimation(rootClip);

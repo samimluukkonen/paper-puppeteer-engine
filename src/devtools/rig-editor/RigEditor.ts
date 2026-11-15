@@ -1,15 +1,24 @@
 import Phaser from 'phaser';
-import { localToWorld } from '../../engine/affineMath.js';
-import type { CompiledClip } from '../../engine/AnimationClip.js';
-import { evaluateClip } from '../../engine/AnimationPose.js';
-import type { RigJsonDefinition } from '../../engine/externalData.js';
-import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
-import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { IKTarget, TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import { meshDeformationIssues } from '../../engine/meshDeformation.js';
-import { Puppet } from '../../engine/Puppet.js';
-import { computeBonePosition, computeRenderOrder, Rig } from '../../engine/Rig.js';
-import { createTransform, type RigDefinition } from '../../engine/types.js';
+import {
+  localToWorld,
+  evaluateClip,
+  meshDeformationIssues,
+  computeBonePosition,
+  computeRenderOrder,
+  Rig,
+  createTransform,
+  type RigDefinition,
+} from '../../engine/core.js';
+import type {
+  CompiledClip,
+  RigJsonDefinition,
+  CreateIKConstraintOptions,
+  IKConstraintPatch,
+  TwoBoneIKConstraint,
+  IKTarget,
+  TwoBoneIKDefinition,
+} from '../../engine/data.js';
+import { Puppet } from '../../engine/runtime.js';
 import { sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData } from '../shared/editorData.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
@@ -34,7 +43,7 @@ export class RigEditor {
   private artworkDraft: { id: string; attachment: boolean; values: Partial<Record<SpriteField, number>> } | undefined;
   private previewClip: CompiledClip | undefined;
   private appliedCatalog: RigDefinition | undefined;
-  private appliedSkins: readonly import('../../engine/types.js').SkinDefinition[] | undefined;
+  private appliedSkins: readonly import('../../engine/data.js').SkinDefinition[] | undefined;
   previewTime = 0;
   weightPreviewEnabled = false;
   weightPreviewBoneId = '';

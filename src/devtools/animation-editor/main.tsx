@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
-import { canonicalJson } from '../../engine/authoredSerialization.js';
+import { canonicalJson } from '../../engine/core.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { bindExportShortcut, blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { bindCharacterSelection, selectedCharacterId } from '../../ui/characterSelection.js';

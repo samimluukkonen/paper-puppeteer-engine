@@ -3,7 +3,7 @@ import { localToWorld, worldToLocal } from './affineMath.js';
 import { type AnimationClip, type AnimationPlaybackMode, type CompiledClip, compileClip } from './AnimationClip.js';
 import {
   type AnimationCompletion,
-  AnimationPlayer,
+  type AnimationPlayer,
   type FiredAnimationEvent,
   type PlayAnimationOptions,
   type PlayAndWaitOptions,
@@ -28,9 +28,9 @@ import type {
   PlaybackWaitResult,
 } from './PlaybackLifecycle.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
+import { PosePipeline, type PoseSource, type SyncPoseOptions } from './PosePipeline.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
-import { PuppetPoseController, type SyncPoseOptions } from './PuppetPoseController.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
 import { Rig } from './Rig.js';
 import type { RootMotionOffset } from './rootMotion.js';
@@ -39,7 +39,7 @@ import { SlotState } from './SlotState.js';
 import type { AttachmentOptions, Facing, RigDefinition, SkinDefinition, AttachmentDefinition } from './types.js';
 import { assertFinite } from './types.js';
 
-export type { SyncPoseOptions } from './PuppetPoseController.js';
+export type { PoseSource, SyncPoseOptions } from './PosePipeline.js';
 
 interface PuppetSettings {
   x?: number;
@@ -81,13 +81,8 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly renderedSlotDefinitions = new Map<string, Readonly<AttachmentDefinition>>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
-  private readonly poseController: PuppetPoseController;
+  private readonly posePipeline: PosePipeline;
   private readonly idleSync: 'always' | 'dirty';
-  private poseRevision = 0;
-  private synchronizedPoseRevision = -1;
-  private ikAnimationSource: Pick<AnimationPlayer, 'ikAnimation'> | undefined;
-  private readonly prepareAnimationPose = (): void => this.preparePose();
-  private readonly synchronizeAnimationPose = (): void => this.syncPose();
   private readonly ikContext: IKTransformContext = {
     puppetToWorld: (target) => localToWorld(target, this.container.getWorldTransformMatrix()),
     worldToPuppet: (target) => worldToLocal(target, this.container.getWorldTransformMatrix(), 0),
@@ -174,45 +169,50 @@ export class Puppet {
       parent.add(bone.container);
     }
     for (const bone of this.bones.values()) bone.container.sort('depth');
-    this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones, () => {
-      const source = this.meshDeformationSource ?? this.animationPlayer;
-      return source instanceof AnimationPlayer ? source.getMeshDeformationForRendering() : source.meshDeformation;
-    });
+    this.renderer = new PuppetRenderer(scene, this.container, this.rig, this.bones, () =>
+      this.posePipeline.getMeshDeformationForRendering(),
+    );
     this.attachments = new PuppetAttachments(
       scene,
       (id) => this.getBone(id).container,
       (id, slotId) => (slotId === undefined ? this.renderer.getMount(id) : this.renderer.getSlotMount(slotId)),
     );
-    this.animationPlayer = new AnimationPlayer(this.rig, this.bones, compiledAnimations, {
-      validate: () => {
-        if (this.movementTranslation)
-          throw new Error('Root motion conflicts with active moveTo/walkTo translation. Cancel movement first.');
-        for (const value of [
-          this.container.x,
-          this.container.y,
-          this.container.rotation,
-          this.container.scaleX,
-          this.container.scaleY,
-        ])
-          assertFinite(value, 'Root motion starting transform');
+    this.posePipeline = new PosePipeline({
+      rig: this.rig,
+      bones: this.bones,
+      clips: compiledAnimations,
+      ikConstraints: this.ikConstraints,
+      ikContext: this.ikContext,
+      renderer: this.renderer,
+      updateDebugViews: (constraints) => this.updateDebugViews(constraints),
+      poseHooks: {
+        prepare: () => this.preparePose(),
+        synchronize: () => this.syncPose(),
       },
-      begin: () => {
-        const { x, y, rotation, scaleX, scaleY } = this.container;
-        const cos = Math.cos(rotation),
-          sin = Math.sin(rotation);
-        this.rootMotionOrigin = { x, y, a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY };
+      rootMotion: {
+        validate: () => {
+          if (this.movementTranslation)
+            throw new Error('Root motion conflicts with active moveTo/walkTo translation. Cancel movement first.');
+          for (const value of [
+            this.container.x,
+            this.container.y,
+            this.container.rotation,
+            this.container.scaleX,
+            this.container.scaleY,
+          ])
+            assertFinite(value, 'Root motion starting transform');
+        },
+        begin: () => {
+          const { x, y, rotation, scaleX, scaleY } = this.container;
+          const cos = Math.cos(rotation),
+            sin = Math.sin(rotation);
+          this.rootMotionOrigin = { x, y, a: cos * scaleX, b: sin * scaleX, c: -sin * scaleY, d: cos * scaleY };
+        },
+        apply: (displacement) => this.applyRootMotion(displacement),
       },
-      apply: (displacement) => this.applyRootMotion(displacement),
     });
+    this.animationPlayer = this.posePipeline.player;
     this.renderSlots();
-    this.poseController = new PuppetPoseController(
-      this.bones,
-      this.ikConstraints,
-      this.ikContext,
-      this.renderer,
-      (constraints) => this.updateDebugViews(constraints),
-      () => (this.ikAnimationSource ?? this.animationPlayer).ikAnimation,
-    );
     for (const definition of ikDefinitions) this.addIK(definition);
     this.setFacing(this.facing);
     this.setDebug(options.debug ?? false);
@@ -361,28 +361,28 @@ export class Puppet {
     const mix = options.mix ?? 1;
     if (!Number.isFinite(mix) || mix < 0 || mix > 1) throw new Error('Pose mix must be between 0 and 1.');
     this.preparePose();
-    this.poseController.setActivePose(pose, mix);
+    this.posePipeline.setActivePose(pose, mix);
     this.syncPose();
     return this;
   }
 
   clearPose(): this {
     this.preparePose();
-    this.poseController.clearActivePose();
+    this.posePipeline.clearActivePose();
     this.syncPose();
     return this;
   }
 
   /** Keep the visible authored preset values and enter direct manual editing. */
   commitPoseForEditing(): this {
-    this.poseController.commitPoseForEditing();
+    this.posePipeline.commitPoseForEditing();
     this.syncPose();
     return this;
   }
 
   /** Snapshot authored transforms without changing the held pose, rendering, or IK state. */
   exportPose(name: string, options?: { epsilon?: number; onlyChanged?: boolean }): PoseDefinition {
-    return this.poseController.exportPose(name, options);
+    return this.posePipeline.exportPose(name, options);
   }
 
   /** Data only: normalized rig values, including pivots, slots and sprite offsets. */
@@ -409,13 +409,13 @@ export class Puppet {
   }
 
   play(name: string, options?: PlayAnimationOptions): this {
-    this.animationPlayer.play(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    this.animationPlayer.play(name, options);
     return this;
   }
 
   /** Await this finite instance; aborting cancels only the wait unless stopOnAbort is enabled. */
   playAndWait(name: string, options?: PlayAndWaitOptions): Promise<PlaybackWaitResult> {
-    return this.animationPlayer.playAndWait(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    return this.animationPlayer.playAndWait(name, options);
   }
 
   /** Await current playback without restarting it or changing queue/controller ownership. */
@@ -425,7 +425,7 @@ export class Puppet {
 
   /** Append a nonlooping request on the base channel; starts immediately when idle. */
   queue(name: string, options?: QueueAnimationOptions): this {
-    this.animationPlayer.queue(name, options, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    this.animationPlayer.queue(name, options);
     return this;
   }
 
@@ -445,7 +445,7 @@ export class Puppet {
   }
 
   replaceQueue(requests: readonly AnimationQueueRequest[]): this {
-    this.animationPlayer.replaceQueue(requests, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    this.animationPlayer.replaceQueue(requests);
     return this;
   }
 
@@ -485,7 +485,7 @@ export class Puppet {
     return this;
   }
   setAnimationPlaybackMode(mode: AnimationPlaybackMode): this {
-    this.animationPlayer.setPlaybackMode(mode, this.prepareAnimationPose);
+    this.animationPlayer.setPlaybackMode(mode);
     this.syncPose();
     return this;
   }
@@ -493,17 +493,17 @@ export class Puppet {
     return this.setAnimationPlaybackMode({ mode: 'stepped', fps });
   }
   setLayerMask(name: string, bones: readonly string[]): this {
-    this.animationPlayer.setLayerMask(name, bones, this.prepareAnimationPose);
+    this.animationPlayer.setLayerMask(name, bones);
     this.syncPose();
     return this;
   }
   setLayerWeight(name: string, weight: number): this {
-    this.animationPlayer.setLayerWeight(name, weight, this.prepareAnimationPose);
+    this.animationPlayer.setLayerWeight(name, weight);
     this.syncPose();
     return this;
   }
   clearLayer(name: string): this {
-    this.animationPlayer.clearLayer(name, this.prepareAnimationPose, this.synchronizeAnimationPose);
+    this.animationPlayer.clearLayer(name);
     return this;
   }
 
@@ -513,7 +513,7 @@ export class Puppet {
   }
 
   restart(): this {
-    this.animationPlayer.restart(this.prepareAnimationPose, this.synchronizeAnimationPose);
+    this.animationPlayer.restart();
     return this;
   }
 
@@ -521,30 +521,30 @@ export class Puppet {
    * Restore temporary pose/IK changes before sampling, then synchronize presets, IK, and rendering.
    */
   sampleAnimation(time: number, options: SampleAnimationOptions = {}): this {
-    this.animationPlayer.sample(time, options, this.prepareAnimationPose);
+    this.animationPlayer.sample(time, options);
     this.syncPose();
     return this;
   }
 
   /** @internal Scene-owned presentation; never advances the Puppet/Actor update clock. */
   beginDialogueIdle(name: string): void {
-    this.animationPlayer.beginDialogueIdle(name, this.prepareAnimationPose);
+    this.animationPlayer.beginDialogueIdle(name);
     this.syncPose();
   }
   /** @internal */
   sampleDialogueIdle(elapsed: number): void {
-    this.animationPlayer.sampleDialogueIdle(elapsed, this.prepareAnimationPose);
+    this.animationPlayer.sampleDialogueIdle(elapsed);
     this.syncPose();
   }
   /** @internal */
   endDialogueIdle(): void {
-    this.animationPlayer.endDialogueIdle(this.prepareAnimationPose);
+    this.animationPlayer.endDialogueIdle();
     this.syncPose();
   }
 
   resetPose(): this {
     this.preparePose();
-    this.poseController.clearActivePose();
+    this.posePipeline.clearActivePose();
     this.stop();
     this.animationPlayer.resetPose();
     this.syncPose();
@@ -553,7 +553,7 @@ export class Puppet {
 
   resetToBindPose(): this {
     this.preparePose();
-    this.poseController.clearActivePose();
+    this.posePipeline.clearActivePose();
     this.animationPlayer.stop();
     this.animationPlayer.clearAllLayers();
     this.animationPlayer.resetPose();
@@ -783,7 +783,7 @@ export class Puppet {
     if (enabled) this.ikDebugView ??= new IKDebug(this.scene, this.bones);
     if (this.ikDebugView) {
       this.ikDebugView.container.setDepth(this.container.depth + 2).setVisible(enabled);
-      this.ikDebugView.update(this.poseController.getOrderedConstraints());
+      this.ikDebugView.update(this.posePipeline.getOrderedConstraints());
     }
     this.markPoseDirty();
     return this;
@@ -801,19 +801,6 @@ export class Puppet {
     return this;
   }
 
-  private shouldSyncIdlePose(): boolean {
-    if (
-      this.idleSync === 'always' ||
-      this.poseRevision !== this.synchronizedPoseRevision ||
-      this.ikAnimationSource ||
-      this.meshDeformationSource
-    )
-      return true;
-    // Providers may change their result (including from undefined) without a host edit.
-    for (const constraint of this.ikConstraints.values()) if (constraint.targetProvider) return true;
-    return false;
-  }
-
   update(delta: number): void {
     if (this.destroyed) return;
     assertFinite(delta, 'Animation delta');
@@ -821,8 +808,8 @@ export class Puppet {
     const errors: unknown[] = [];
     try {
       if (!this.destroyed) {
-        const evaluated = this.animationPlayer.update(delta, this.prepareAnimationPose, this.synchronizeAnimationPose);
-        if (!evaluated && this.shouldSyncIdlePose()) this.syncPose();
+        const evaluated = this.animationPlayer.update(delta);
+        if (!evaluated && this.posePipeline.shouldSyncIdlePose(this.idleSync)) this.syncPose();
       }
     } catch (error) {
       errors.push(error);
@@ -865,8 +852,6 @@ export class Puppet {
     this.updateListeners.clear();
     this.movementTranslation = undefined;
     this.rootMotionOrigin = undefined;
-    this.ikAnimationSource = undefined;
-    this.meshDeformationSource = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onSceneUpdate, this);
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
@@ -881,7 +866,7 @@ export class Puppet {
         errors.push(error);
       }
     };
-    release(() => this.animationPlayer.dispose());
+    release(() => this.posePipeline.destroy());
     release(() => this.debugView?.destroy());
     release(() => this.ikDebugView?.destroy());
     release(() => this.slotDebugView?.destroy());
@@ -904,7 +889,6 @@ export class Puppet {
     this.bones.clear();
     for (const constraint of this.ikConstraints.values()) release(() => constraint.dispose());
     this.ikConstraints.clear();
-    release(() => this.poseController.destroy());
     errors.push(...dispatchListeners(this.destroyListeners, (listener) => listener()));
     this.destroyListeners.clear();
     throwNotificationErrors(errors, 'Puppet cleanup failed.');
@@ -916,8 +900,7 @@ export class Puppet {
 
   /** Restore the pre-IK pose before externally sampling animation or editing it. */
   preparePose(): void {
-    this.markPoseDirty();
-    this.poseController.preparePose();
+    this.posePipeline.preparePose();
   }
 
   /** Schedule one full synchronization on the next update in idleSync: 'dirty' mode.
@@ -925,38 +908,31 @@ export class Puppet {
    * syncPose() remains available for immediate projection.
    */
   markPoseDirty(): this {
-    this.poseRevision += 1;
+    this.posePipeline.markPoseDirty();
     return this;
   }
 
-  private meshDeformationSource: Pick<AnimationPlayer, 'meshDeformation'> | undefined;
-  get meshDeformation() {
-    return (this.meshDeformationSource ?? this.animationPlayer).meshDeformation;
-  }
-  setMeshDeformationSource(source: Pick<AnimationPlayer, 'meshDeformation'> | undefined): void {
-    this.meshDeformationSource = source;
-    this.markPoseDirty();
+  /** Attach external pose channels for previews; the returned function detaches them.
+   * Absent channels fall back to the runtime player, so detaching restores runtime behavior.
+   */
+  attachPoseSource(source?: PoseSource): () => void {
+    return this.posePipeline.attachPoseSource(source);
   }
 
-  /** @internal Editor preview bridge; undefined restores the runtime player's IK channels. */
-  setIKAnimationSource(player: Pick<AnimationPlayer, 'ikAnimation'> | undefined): void {
-    if (this.destroyed) throw new Error('Puppet has been destroyed.');
-    this.ikAnimationSource = player;
-    this.markPoseDirty();
+  /** Preview a clip at milliseconds: the pipeline owns prepare → sample → project internally.
+   * Runtime clocks, events and root motion are never advanced.
+   */
+  previewClip(clip: AnimationClip | CompiledClip, timeMs: number): void {
+    this.posePipeline.previewClip(clip, timeMs);
+  }
+
+  get meshDeformation() {
+    return this.posePipeline.meshDeformation;
   }
 
   /** Apply the evaluated pose, solve IK in priority order, then project rendering. */
   syncPose(options: SyncPoseOptions = {}): void {
-    if (this.destroyed) return;
-    const revision = this.poseRevision;
-    try {
-      this.poseController.syncPose(options);
-      this.synchronizedPoseRevision = revision;
-    } catch (error) {
-      // Retry incomplete projection even when this was an explicit sync of a clean pose.
-      this.markPoseDirty();
-      throw error;
-    }
+    this.posePipeline.syncPose(options);
   }
 
   /** Rerun constraints after changing targets, mix, enabled state, offsets, bend direction, or priorities.
@@ -964,18 +940,12 @@ export class Puppet {
    * Retains active pose presets and projects only the restored/solved IK joints.
    */
   syncIK(options: SyncPoseOptions = {}): void {
-    if (this.destroyed) return;
-    try {
-      this.poseController.syncIK(options);
-    } catch (error) {
-      this.markPoseDirty();
-      throw error;
-    }
+    this.posePipeline.syncIK(options);
   }
 
   /** Refresh overlays from the final synchronized pose without running animation or IK again. */
   refreshDebugViews(): void {
-    if (!this.destroyed) this.updateDebugViews(this.poseController.getOrderedConstraints());
+    if (!this.destroyed) this.updateDebugViews(this.posePipeline.getOrderedConstraints());
   }
 
   private updateDebugViews(constraints: readonly TwoBoneIKConstraint[]): void {

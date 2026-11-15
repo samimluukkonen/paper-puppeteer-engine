@@ -1,10 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import type { PropertyCurve } from '../../engine/animationCurves.js';
-import {
-  CINEMATIC_CAMERA_MAX_ZOOM,
-  CINEMATIC_CAMERA_MIN_ZOOM,
-  DEFAULT_CINEMATIC_CAMERA,
-} from '../../engine/cinematicCamera.js';
+import { CINEMATIC_CAMERA_MAX_ZOOM, CINEMATIC_CAMERA_MIN_ZOOM, DEFAULT_CINEMATIC_CAMERA } from '../../engine/core.js';
+import type { PropertyCurve } from '../../engine/data.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';

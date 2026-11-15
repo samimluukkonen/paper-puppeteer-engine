@@ -1,7 +1,5 @@
-import { evaluateClip, type AnimationPose } from '../../engine/AnimationPose.js';
-import { AnimationValidationError } from '../../engine/externalData.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { TransformProperty } from '../../engine/types.js';
+import { evaluateClip, AnimationValidationError, type AnimationPose } from '../../engine/core.js';
+import type { Rig, TransformProperty } from '../../engine/data.js';
 import { validateBoneSymmetryMapping, type BoneSymmetryMapping } from '../shared/boneSymmetry.js';
 import { mirrorPose, type MirrorDirection } from '../shared/poseMirroring.js';
 import { getEvaluatedAnimationPose } from './animationValues.js';

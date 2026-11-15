@@ -1,11 +1,10 @@
-import type { ValidationIssue } from '../../engine/externalData.js';
 import {
   getMeshDeformationTrack,
   meshDeformationIssues,
   type MeshDeformationKey,
   type VertexOffset,
-} from '../../engine/meshDeformation.js';
-import type { Rig } from '../../engine/Rig.js';
+} from '../../engine/core.js';
+import type { ValidationIssue, Rig } from '../../engine/data.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEditActions } from './AnimationEditSession.js';

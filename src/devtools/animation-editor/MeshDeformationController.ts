@@ -1,6 +1,5 @@
-import type { MeshDeformationKey, VertexOffset } from '../../engine/meshDeformation.js';
-import { getMeshDeformationTrack, sampleMeshDeformation } from '../../engine/meshDeformation.js';
-import type { MeshAttachmentDefinition } from '../../engine/types.js';
+import { getMeshDeformationTrack, sampleMeshDeformation } from '../../engine/core.js';
+import type { MeshDeformationKey, VertexOffset, MeshAttachmentDefinition } from '../../engine/data.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { timeToTimelineX } from './timeline.js';
 

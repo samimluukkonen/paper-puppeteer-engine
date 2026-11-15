@@ -1,5 +1,5 @@
-import type { Keyframe } from '../../engine/AnimationClip.js';
-import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
+import { ikAnimationProperties } from '../../engine/core.js';
+import type { Keyframe } from '../../engine/data.js';
 import { setAttribute } from '../../shared/domUpdates.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef } from './animationEvents.js';

@@ -1,16 +1,15 @@
 import { z } from 'zod';
-import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
+  normalizeBoneDirection,
   checkJson,
   inspectRigDefinition,
+  JsonWorkloadBudget,
+  skinFileSchema,
+  checkSkinReferences,
   type RigJsonDefinition,
   type ValidationIssue,
-} from '../../engine/externalData.js';
-import { JsonWorkloadBudget } from '../../engine/jsonWorkloadLimits.js';
-import type { Rig } from '../../engine/Rig.js';
-import { skinFileSchema } from '../../engine/schemas.js';
-import type { RigDefinition, SkinDefinition } from '../../engine/types.js';
-import { checkSkinReferences } from '../../engine/validation.js';
+} from '../../engine/core.js';
+import type { Rig, RigDefinition, SkinDefinition } from '../../engine/data.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData } from '../shared/editorData.js';
 
 export type AuthoredRigData = RigDefinition & { name?: string };

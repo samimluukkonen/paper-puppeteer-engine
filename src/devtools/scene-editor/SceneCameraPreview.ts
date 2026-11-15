@@ -3,7 +3,7 @@ import {
   type CameraViewport,
   type CinematicCameraState,
   type CinematicCameraTarget,
-} from '../../engine/cinematicCamera.js';
+} from '../../engine/core.js';
 
 interface PreviewCamera extends CinematicCameraTarget {
   readonly x: number;

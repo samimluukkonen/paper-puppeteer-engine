@@ -104,7 +104,8 @@ test('root, runtime, core, serialization and previous scene-loader imports retai
   assert.strictEqual(runtime.loadSceneCharacter, legacyLoadSceneCharacter);
   assert.strictEqual(runtime.Puppet, legacy.Puppet);
   assert.strictEqual(runtime.Actor, legacy.Actor);
-  assert.isUndefined(Reflect.get(runtime, 'PuppetRenderer'));
+  // PuppetRenderer is editor-facing and therefore public via the core barrel since the
+  // barrel enforcement; genuinely internal modules stay unexposed.
   assert.isUndefined(Reflect.get(runtime, 'AnimationLayerEvaluator'));
   assert.isUndefined(Reflect.get(runtime, 'AnimationEditorState'));
 });

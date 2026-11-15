@@ -1,17 +1,17 @@
 import { assert, test, vi } from 'vitest';
 import type { AnimationPlaybackMode } from '../src/engine/AnimationClip.js';
-import { AnimationPlayer } from '../src/engine/AnimationPlayer.js';
+import { AnimationPlayer, type AnimationPlayerOptions } from '../src/engine/AnimationPlayer.js';
 import { blendPose, lerpProperty } from '../src/engine/AnimationPose.js';
 import { Joint } from '../src/engine/Joint.js';
 import { Rig } from '../src/engine/Rig.js';
 
-function fixture() {
+function fixture(options?: AnimationPlayerOptions) {
   const rig = new Rig({
     root: 'root',
     bones: [{ id: 'root' }, { id: 'arm', parent: 'root', x: 10 }, { id: 'leg', parent: 'root', y: 10 }],
   });
   const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
-  const player = new AnimationPlayer(rig, joints);
+  const player = new AnimationPlayer(rig, joints, [], options);
   player.addAnimation({
     name: 'a',
     duration: 1000,
@@ -81,7 +81,21 @@ test('restart resets all selected layers and retains their speeds, weights, and 
 });
 
 test('restart synchronizes all layer start poses once before delivering time-zero events', () => {
-  const { player, joints } = fixture();
+  const order: string[] = [];
+  let armed = false;
+  const { player, joints } = fixture({
+    poseHooks: {
+      prepare: () => {
+        if (armed) order.push('prepare');
+      },
+      synchronize: () => {
+        if (!armed) return;
+        assert.equal(player.elapsedTime, 0);
+        assert.equal(joints.get('arm')!.pose.x, 30);
+        order.push('sync');
+      },
+    },
+  });
   player.addAnimation({
     name: 'once',
     duration: 100,
@@ -92,16 +106,10 @@ test('restart synchronizes all layer start poses once before delivering time-zer
   player.play('once');
   player.play('once', { layer: 'upper' });
   player.update(100);
-  const order: string[] = [];
   player.onAnimationEvent((event) => order.push(event.layer));
-  player.restart(
-    () => order.push('prepare'),
-    () => {
-      assert.equal(player.elapsedTime, 0);
-      assert.equal(joints.get('arm')!.pose.x, 30);
-      order.push('sync');
-    },
-  );
+  armed = true;
+  player.restart();
+  armed = false;
   assert.deepEqual(order, ['prepare', 'sync', 'base', 'upper']);
   const completions: string[] = [];
   player.onAnimationComplete((event) => completions.push(event.layer));
@@ -110,16 +118,30 @@ test('restart synchronizes all layer start poses once before delivering time-zer
 });
 
 test('restart also restarts overlay-only playback and safely synchronizes an empty player', () => {
-  const { player } = fixture();
+  let armed = false;
   const prepare = vi.fn();
   const sync = vi.fn();
-  player.restart(prepare, sync);
+  const { player } = fixture({
+    poseHooks: {
+      prepare: () => {
+        if (armed) prepare();
+      },
+      synchronize: () => {
+        if (armed) sync();
+      },
+    },
+  });
+  armed = true;
+  player.restart();
   assert.equal(prepare.mock.calls.length, 0);
   assert.equal(sync.mock.calls.length, 1);
+  armed = false;
   player.play('a', { layer: 'upper', speed: 0.5 });
   player.update(100);
   player.stop();
-  player.restart(prepare, sync);
+  armed = true;
+  player.restart();
+  armed = false;
   assert.equal(prepare.mock.calls.length, 1);
   assert.equal(sync.mock.calls.length, 2);
   assert.isTrue(player.update(100));
@@ -173,7 +195,20 @@ test('completion listeners receive independent events for base and overlay clips
 });
 
 test('standalone hosts synchronize before notifications and receive all listener failures', () => {
-  const { player, joints } = fixture();
+  const order: string[] = [];
+  let armed = false;
+  const { player, joints } = fixture({
+    poseHooks: {
+      prepare: () => {
+        if (armed) order.push('prepare');
+      },
+      synchronize: () => {
+        if (!armed) return;
+        assert.equal(joints.get('arm')!.pose.x, 20);
+        order.push('synchronize');
+      },
+    },
+  });
   player.addAnimation({
     name: 'once',
     duration: 100,
@@ -187,7 +222,6 @@ test('standalone hosts synchronize before notifications and receive all listener
     events: [{ time: 50, name: 'marker' }],
   });
   player.play('once');
-  const order: string[] = [];
   const eventFailure = new Error('event failed');
   const completionFailure = new Error('completion failed');
   player.onAnimationEvent(() => {
@@ -200,16 +234,12 @@ test('standalone hosts synchronize before notifications and receive all listener
   });
   let thrown: unknown;
   try {
-    player.update(
-      100,
-      () => order.push('prepare'),
-      () => {
-        assert.equal(joints.get('arm')!.pose.x, 20);
-        order.push('synchronize');
-      },
-    );
+    armed = true;
+    player.update(100);
   } catch (error) {
     thrown = error;
+  } finally {
+    armed = false;
   }
   assert.instanceOf(thrown, AggregateError);
   assert.deepEqual(thrown.errors, [eventFailure, completionFailure]);
@@ -1106,7 +1136,19 @@ test('event catch-up is bounded across layers and preserves ordinary large-delta
 });
 
 test('oversized time-zero event starts fail before changing layers, poses or invoking host callbacks', () => {
-  const { player, joints } = fixture();
+  let armed = false;
+  const prepare = vi.fn();
+  const sync = vi.fn();
+  const { player, joints } = fixture({
+    poseHooks: {
+      prepare: () => {
+        if (armed) prepare();
+      },
+      synchronize: () => {
+        if (armed) sync();
+      },
+    },
+  });
   player.addAnimation({
     name: 'oversized',
     duration: 1000,
@@ -1117,12 +1159,11 @@ test('oversized time-zero event starts fail before changing layers, poses or inv
   player.play('a');
   player.update(125);
   const before = { ...joints.get('arm')!.pose };
-  const prepare = vi.fn();
-  const sync = vi.fn();
+  armed = true;
   const listener = vi.fn();
   player.onAnimationEvent(listener);
   for (const layer of ['base', 'upper']) {
-    assert.throws(() => player.play('oversized', { layer }, prepare, sync), /start exceeds 10000 events/);
+    assert.throws(() => player.play('oversized', { layer }), /start exceeds 10000 events/);
     assert.equal(player.currentAnimation, 'a');
     assert.equal(player.elapsedTime, 125);
     assert.equal(player.getLayerWeight('upper'), 0);
@@ -1131,10 +1172,23 @@ test('oversized time-zero event starts fail before changing layers, poses or inv
   assert.equal(prepare.mock.calls.length, 0);
   assert.equal(sync.mock.calls.length, 0);
   assert.equal(listener.mock.calls.length, 0);
+  armed = false;
 });
 
 test('restart budgets combine selected layers before resetting any clock or held pose', () => {
-  const { player, joints } = fixture();
+  let armed = false;
+  const prepare = vi.fn();
+  const sync = vi.fn();
+  const { player, joints } = fixture({
+    poseHooks: {
+      prepare: () => {
+        if (armed) prepare();
+      },
+      synchronize: () => {
+        if (armed) sync();
+      },
+    },
+  });
   player.addAnimation({
     name: 'starts',
     duration: 1000,
@@ -1147,11 +1201,11 @@ test('restart budgets combine selected layers before resetting any clock or held
   player.update(125);
   joints.get('arm')!.pose.x = 123;
   player.pause();
-  const prepare = vi.fn();
-  const sync = vi.fn();
   const listener = vi.fn();
   player.onAnimationEvent(listener);
-  assert.throws(() => player.restart(prepare, sync), /restart exceeds 10000 events/);
+  armed = true;
+  assert.throws(() => player.restart(), /restart exceeds 10000 events/);
+  armed = false;
   assert.equal(player.elapsedTime, 125);
   assert.isTrue(player.isPaused);
   assert.equal(joints.get('arm')!.pose.x, 123);

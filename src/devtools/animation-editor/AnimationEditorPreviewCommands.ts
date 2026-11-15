@@ -1,6 +1,4 @@
-import type { PoseDefinition } from '../../engine/Pose.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import type { PoseDefinition, DeepReadonly, Rig } from '../../engine/data.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEditActions } from './AnimationEditSession.js';

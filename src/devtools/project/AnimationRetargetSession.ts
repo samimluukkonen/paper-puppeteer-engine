@@ -1,8 +1,13 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import { retargetAnimation, type RetargetOptions, type RetargetResult } from '../../engine/animationRetargeting.js';
-import { parseAnimationClip } from '../../engine/externalData.js';
-import { Rig } from '../../engine/Rig.js';
-import { rigCompatibilityRevision, type RigBoneMapping } from '../../engine/rigBoneMapping.js';
+import {
+  retargetAnimation,
+  parseAnimationClip,
+  Rig,
+  rigCompatibilityRevision,
+  type RetargetOptions,
+  type RetargetResult,
+  type RigBoneMapping,
+} from '../../engine/core.js';
+import type { AnimationClip } from '../../engine/data.js';
 import type { AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import type { AnimationPreviewLease } from '../shared/AnimationLibraryPreviewDialog.js';
 import type { GroundGuide } from '../shared/groundGuide.js';

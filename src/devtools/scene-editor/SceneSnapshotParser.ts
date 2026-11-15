@@ -1,19 +1,21 @@
 import { z } from 'zod';
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import { inspectVersion, shapeIssues } from '../../engine/externalData.js';
-import { checkJson } from '../../engine/jsonData.js';
-import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
 import {
+  equalJsonData,
+  inspectVersion,
+  shapeIssues,
+  checkJson,
+  freezeData,
   checkSceneCollectionLimits,
   checkSceneDefinitionDomains,
   createSceneDefinitionSchema,
   SCENE_FORMAT_VERSION,
   SceneValidationCache,
   SceneValidationError,
+  type DeepReadonly,
   type SceneDefinition,
   type SceneValidationOptions,
-} from '../../engine/SceneDefinition.js';
-import type { ValidationIssue } from '../../engine/validation.js';
+} from '../../engine/core.js';
+import type { ValidationIssue } from '../../engine/data.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 
 const isObject = (value: unknown): value is object => value !== null && typeof value === 'object';

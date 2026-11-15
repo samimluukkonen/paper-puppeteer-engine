@@ -1,4 +1,4 @@
-import type { Affine } from '../../engine/affineMath.js';
+import type { Affine } from '../../engine/data.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import type { MotionPreviewController } from './MotionPreviewController.js';

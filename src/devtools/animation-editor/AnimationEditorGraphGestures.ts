@@ -1,4 +1,4 @@
-import type { Rig } from '../../engine/Rig.js';
+import type { Rig } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditActions } from './AnimationEditSession.js';
 import { editGraphKey, graphKeys, type GraphKeyEdit, type GraphKeyRef } from './graphEditor.js';

@@ -1,1 +1,1 @@
-export { type Affine, localToWorld, type Point, worldToLocal } from '../../engine/affineMath.js';
+export { localToWorld, worldToLocal, type Affine, type Point } from '../../engine/core.js';

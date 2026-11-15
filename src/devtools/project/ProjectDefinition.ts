@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import { audioAssetDefinitionSchema } from '../../engine/AudioAsset.js';
-import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import { packagePath } from '../../engine/packageZip.js';
-import { rigBoneMappingSchema } from '../../engine/rigBoneMapping.js';
-import { parseStoryDefinition, storyDefinitionSchema } from '../../engine/StoryDefinition.js';
+import {
+  audioAssetDefinitionSchema,
+  assertJsonInputSize,
+  packagePath,
+  rigBoneMappingSchema,
+  parseStoryDefinition,
+  storyDefinitionSchema,
+} from '../../engine/core.js';
 import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
 import { parseSceneReuseLibrary, sceneReuseLibrarySchema } from '../shared/sceneReuse.js';
 

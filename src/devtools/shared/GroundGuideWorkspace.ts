@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { throwNotificationErrors } from '../../engine/notifications.js';
+import { throwNotificationErrors } from '../../engine/core.js';
 import {
   defaultGroundGuide,
   groundGuideSchema,

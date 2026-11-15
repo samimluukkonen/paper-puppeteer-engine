@@ -1,5 +1,4 @@
-import type { Affine } from '../../engine/affineMath.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
+import type { Affine, DeepReadonly } from '../../engine/data.js';
 import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import {

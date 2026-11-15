@@ -1,4 +1,4 @@
-import { type TransformProperty, transformProperties } from '../../engine/types.js';
+import { transformProperties, type TransformProperty } from '../../engine/core.js';
 import type { AnimationEditorDocument } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';

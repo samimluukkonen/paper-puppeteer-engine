@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { validatePackageFiles } from '../../../engine/packageZip.js';
+import { validatePackageFiles } from '../../../engine/core.js';
 import type { PackageFiles } from '../package/characterPackage.js';
 import { notifySubscribers } from '../subscriberNotifications.js';
 

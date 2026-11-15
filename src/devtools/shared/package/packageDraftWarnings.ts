@@ -1,4 +1,4 @@
-import { mergeSkins } from '../../../engine/mergeSkins.js';
+import { mergeSkins } from '../../../engine/core.js';
 import type { PackageSnapshot } from './characterPackage.js';
 
 /** Content guidance only. Sparse/hidden artwork and animation-free rigs remain valid runtime data. */

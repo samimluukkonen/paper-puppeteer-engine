@@ -1,6 +1,5 @@
-import type { MeshDeformationKey, VertexOffset } from '../../engine/meshDeformation.js';
-import { getMeshDeformationTrack, sampleMeshDeformation } from '../../engine/meshDeformation.js';
-import type { Rig } from '../../engine/Rig.js';
+import { getMeshDeformationTrack, sampleMeshDeformation } from '../../engine/core.js';
+import type { MeshDeformationKey, VertexOffset, Rig } from '../../engine/data.js';
 import { validateEditedAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
 /** Exact times, like graph edits. A move never silently overwrites a neighboring shape. */

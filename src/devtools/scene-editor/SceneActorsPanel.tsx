@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import type { CharacterDefinition } from '../../engine/data.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';

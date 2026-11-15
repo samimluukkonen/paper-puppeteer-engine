@@ -1,6 +1,5 @@
-import type { Keyframe, PropertyKeyframe } from '../../engine/AnimationClip.js';
-import { copyPropertyCurve, propertyKeyframe } from '../../engine/animationCurves.js';
-import { type TransformProperty, transformProperties } from '../../engine/types.js';
+import { copyPropertyCurve, propertyKeyframe, transformProperties, type TransformProperty } from '../../engine/core.js';
+import type { Keyframe, PropertyKeyframe } from '../../engine/data.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, keyframeTimesMatch, matchingRow } from './keyframeTargets.js';
 import { type Milliseconds } from './timeUnits.js';

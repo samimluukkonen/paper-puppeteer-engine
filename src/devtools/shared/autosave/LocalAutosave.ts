@@ -181,4 +181,4 @@ export class LocalAutosave {
     void this.storage.release(this.key, this.owner).catch(() => {});
   }
 }
-import { abortable } from '../../../engine/abortable.js';
+import { abortable } from '../../../engine/core.js';

@@ -1,8 +1,5 @@
-import type { AnimationClip, Keyframe } from '../../engine/AnimationClip.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import { isFullyFrozen } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import { type TransformProperty, transformProperties } from '../../engine/types.js';
+import { isFullyFrozen, transformProperties, type TransformProperty } from '../../engine/core.js';
+import type { AnimationClip, Keyframe, DeepReadonly, Rig } from '../../engine/data.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
 import { buildIKTimelineTracks, type IKTimelineRow } from './ikTimeline.js';
 import { getAuthoredBoneProperties } from './keyframeQueries.js';

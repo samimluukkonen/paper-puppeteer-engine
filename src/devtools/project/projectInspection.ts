@@ -1,19 +1,21 @@
-import { validateAudioAssetData } from '../../engine/AudioAsset.js';
-import { canonicalJson } from '../../engine/authoredSerialization.js';
-import { validateCharacterDefinition, type CharacterManifest } from '../../engine/CharacterDefinition.js';
-import { CharacterTextureBudget } from '../../engine/characterTextureLimits.js';
-import { shapeIssues } from '../../engine/externalData.js';
-import { IMAGE_HEADER_BYTES } from '../../engine/imageHeader.js';
-import { assertMeshImageSize } from '../../engine/meshGeometry.js';
-import { packagePath, validatePackageFiles } from '../../engine/packageZip.js';
-import { validateRigBoneMapping } from '../../engine/rigBoneMapping.js';
 import {
+  validateAudioAssetData,
+  canonicalJson,
+  validateCharacterDefinition,
+  CharacterTextureBudget,
+  shapeIssues,
+  IMAGE_HEADER_BYTES,
+  assertMeshImageSize,
+  packagePath,
+  validatePackageFiles,
+  validateRigBoneMapping,
   sceneDefinitionSchema,
   validateSceneDefinition,
+  validateStoryDefinition,
+  type CharacterManifest,
   type SceneCharacterAssets,
-} from '../../engine/SceneDefinition.js';
-import { validateStoryDefinition } from '../../engine/StoryDefinition.js';
-import type { ValidationIssue } from '../../engine/validation.js';
+} from '../../engine/core.js';
+import type { ValidationIssue } from '../../engine/data.js';
 import { inspectSpriteHeader } from '../shared/artwork/spriteImport.js';
 import type { PackageFiles, PackageSnapshot } from '../shared/package/characterPackage.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';

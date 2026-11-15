@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { meshDeformationIssues } from '../../engine/meshDeformation.js';
-import { Rig } from '../../engine/Rig.js';
+import { CharacterDefinition, meshDeformationIssues, Rig } from '../../engine/core.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
 import { AnimationEditorState } from '../animation-editor/AnimationEditorState.js';
 import { RigEditorState, type RigEditorStateOptions } from '../rig-editor/RigEditorState.js';

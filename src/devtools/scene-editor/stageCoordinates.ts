@@ -1,4 +1,4 @@
-import type { Point } from '../../engine/affineMath.js';
+import type { Point } from '../../engine/data.js';
 import { editorWorldViewport, type EditorViewportCamera } from '../shared/editorCamera.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 

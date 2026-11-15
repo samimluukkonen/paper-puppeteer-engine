@@ -1,5 +1,5 @@
-import { ANIMATION_FORMAT_VERSION, AnimationValidationError } from '../../engine/externalData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { ANIMATION_FORMAT_VERSION, AnimationValidationError } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackCommands.js';
 import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 

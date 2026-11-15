@@ -1,6 +1,10 @@
-import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
-import { trimSceneAudioClip, type SceneAudioClip } from '../../engine/sceneAudio.js';
-import { sceneActionDuration } from '../../engine/SceneDefinition.js';
+import {
+  CAMERA_PROPERTIES,
+  trimSceneAudioClip,
+  sceneActionDuration,
+  type CameraProperty,
+  type SceneAudioClip,
+} from '../../engine/core.js';
 import { resolveTimelineSnap } from '../animation-editor/timelineSnapping.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
 

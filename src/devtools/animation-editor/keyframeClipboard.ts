@@ -1,8 +1,5 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import { copyPropertyCurve, type PropertyCurve } from '../../engine/animationCurves.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import { assertFinite, type TransformProperty } from '../../engine/types.js';
+import { copyPropertyCurve, assertFinite, type PropertyCurve, type TransformProperty } from '../../engine/core.js';
+import type { AnimationClip, DeepReadonly, Rig } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';

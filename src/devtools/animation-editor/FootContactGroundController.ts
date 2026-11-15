@@ -1,9 +1,6 @@
-import type { Affine } from '../../engine/affineMath.js';
-import { getIKBakeRuntimeIssues } from '../../engine/ik/IKBakeSampling.js';
-import { IsolatedIKSampler } from '../../engine/ik/IsolatedIKSampler.js';
-import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import { transformProperties } from '../../engine/types.js';
+import { getIKBakeRuntimeIssues, IsolatedIKSampler, transformProperties } from '../../engine/core.js';
+import type { Affine, TwoBoneIKConstraint } from '../../engine/data.js';
+import type { Puppet } from '../../engine/runtime.js';
 import {
   contactGroundDistance,
   DEFAULT_CONTACT_TOLERANCE,

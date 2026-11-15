@@ -1,6 +1,5 @@
-import type { Interpolation } from '../../engine/AnimationClip.js';
-import type { PropertyCurve } from '../../engine/animationCurves.js';
-import { animationClipSchema } from '../../engine/schemas.js';
+import { animationClipSchema } from '../../engine/core.js';
+import type { Interpolation, PropertyCurve } from '../../engine/data.js';
 import type { InterpolationSelectionState, InterpolationUnavailableReason } from './interpolation.js';
 
 /** Derive options from the authoritative authored schema, independently of playback sampling modes. */

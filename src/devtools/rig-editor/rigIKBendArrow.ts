@@ -1,5 +1,4 @@
-import type { Affine, Point } from '../../engine/affineMath.js';
-import type { BendDirection } from '../../engine/ik/types.js';
+import type { Affine, Point, BendDirection } from '../../engine/data.js';
 
 /** Screen-sized signed-turn indicator in the start bone's basis, including reflection/shear.
  * `basis` maps start-bone vectors to the screen; translation is deliberately unused.

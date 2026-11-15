@@ -1,4 +1,4 @@
-import { quantizePlaybackTime } from '../../engine/animationMath.js';
+import { quantizePlaybackTime } from '../../engine/core.js';
 import { clampTime, timelineXToTime, timeToTimelineX } from './timeline.js';
 import { type Seconds, toMilliseconds, toSeconds } from './timeUnits.js';
 

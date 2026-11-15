@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { FootContactMarker } from '../../engine/types.js';
+import type { FootContactMarker } from '../../engine/data.js';
 import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';

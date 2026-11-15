@@ -1,5 +1,4 @@
-import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
+import type { TwoBoneIKConstraint, TwoBoneIKDefinition } from '../../engine/data.js';
 
 /** Presentation of the existing solver result; never evaluates or modifies a constraint. */
 export function rigIKFeedback(

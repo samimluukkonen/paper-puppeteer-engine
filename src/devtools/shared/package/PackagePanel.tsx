@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { CharacterDefinition } from '../../../engine/CharacterDefinition.js';
-import { Puppet } from '../../../engine/Puppet.js';
+import type { CharacterDefinition } from '../../../engine/data.js';
+import { Puppet } from '../../../engine/runtime.js';
 import { loadSceneCharacter } from '../../../shared/loadSceneCharacter.js';
 import { createEditorGame, destroyEditorGame } from '../editorGame.js';
 import { GUIDE_TARGETS } from '../guides/anchors.js';

@@ -1,9 +1,12 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import { findIKPropertyKeyframe } from '../../engine/ik/animationKeyframes.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { JointTransform, TransformProperty } from '../../engine/types.js';
+import { findIKPropertyKeyframe } from '../../engine/core.js';
+import type {
+  AnimationClip,
+  IKAnimationProperty,
+  DeepReadonly,
+  Rig,
+  JointTransform,
+  TransformProperty,
+} from '../../engine/data.js';
 import { findAnimationEvent, type AnimationEventRef } from './animationEvents.js';
 import { type IKKeyframeSelection } from './ikTimeline.js';
 import { findAdjacentBonePropertyKeyframe } from './keyframeQueries.js';

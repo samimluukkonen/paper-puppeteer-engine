@@ -1,17 +1,27 @@
-import type { AnimationClip } from '../../../engine/AnimationClip.js';
-import { canonicalJson } from '../../../engine/authoredSerialization.js';
-import { CharacterDefinition, type CharacterManifest } from '../../../engine/CharacterDefinition.js';
-import { CharacterLoader } from '../../../engine/CharacterLoader.js';
-import { CharacterTextureBudget, DEFAULT_CHARACTER_TEXTURE_LIMITS } from '../../../engine/characterTextureLimits.js';
-import type { RigJsonDefinition } from '../../../engine/externalData.js';
-import { IMAGE_HEADER_BYTES } from '../../../engine/imageHeader.js';
-import { assertJsonInputSize } from '../../../engine/jsonInput.js';
-import { assertMeshImageSize } from '../../../engine/meshGeometry.js';
-import type { PoseDefinition } from '../../../engine/Pose.js';
-import { isFullyFrozen, type DeepReadonly } from '../../../engine/readonlyData.js';
-import { readResponseBytes, withResourceResponse } from '../../../engine/resourceInput.js';
-import { identifierSchema } from '../../../engine/schemas.js';
-import type { SkinDefinition, SpriteDefinition, AttachmentDefinition } from '../../../engine/types.js';
+import {
+  canonicalJson,
+  CharacterDefinition,
+  CharacterLoader,
+  CharacterTextureBudget,
+  DEFAULT_CHARACTER_TEXTURE_LIMITS,
+  IMAGE_HEADER_BYTES,
+  assertJsonInputSize,
+  assertMeshImageSize,
+  isFullyFrozen,
+  readResponseBytes,
+  withResourceResponse,
+  identifierSchema,
+  type CharacterManifest,
+  type DeepReadonly,
+} from '../../../engine/core.js';
+import type {
+  AnimationClip,
+  RigJsonDefinition,
+  PoseDefinition,
+  SkinDefinition,
+  SpriteDefinition,
+  AttachmentDefinition,
+} from '../../../engine/data.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
 import { safeFilename } from '../assetFilename.js';

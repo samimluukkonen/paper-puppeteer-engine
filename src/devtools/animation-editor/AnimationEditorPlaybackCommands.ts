@@ -1,4 +1,4 @@
-import type { AnimationPlaybackMode } from '../../engine/AnimationClip.js';
+import type { AnimationPlaybackMode } from '../../engine/data.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditActions } from './AnimationEditSession.js';
 import { DEFAULT_KEYFRAME_FPS } from './timeline.js';

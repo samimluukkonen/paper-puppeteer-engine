@@ -1,6 +1,5 @@
-import type { AnimationClip } from '../../../engine/AnimationClip.js';
-import { ANIMATION_FORMAT_VERSION } from '../../../engine/externalData.js';
-import { isFullyFrozen } from '../../../engine/readonlyData.js';
+import { ANIMATION_FORMAT_VERSION, isFullyFrozen } from '../../../engine/core.js';
+import type { AnimationClip } from '../../../engine/data.js';
 import { draftSource } from '../draftSource.js';
 import type { PackageSnapshot } from './characterPackage.js';
 

@@ -59,6 +59,19 @@ export interface SampleAnimationOptions {
   mode?: 'raw' | 'playback';
 }
 
+/** Host pose hooks injected once at construction; every pose-changing call site uses them in order. */
+export interface PoseHooks {
+  /** Runs after validation, before clocks or poses change. */
+  prepare?: () => void;
+  /** Runs after the evaluated pose is applied, before notifications. */
+  synchronize?: () => void;
+}
+
+export interface AnimationPlayerOptions {
+  rootMotion?: RootMotionApplication | undefined;
+  poseHooks?: PoseHooks | undefined;
+}
+
 export interface FiredAnimationEvent extends AnimationEvent {
   clip: string;
   layer: string;
@@ -83,8 +96,6 @@ type PlaybackNotification =
       kind: 'queue';
       playbackId: number | undefined;
       revision: number;
-      preparePose: (() => void) | undefined;
-      synchronizePose: (() => void) | undefined;
     };
 
 function validateSpeed(speed: number): void {
@@ -138,12 +149,17 @@ export class AnimationPlayer {
     this.previewRootMotion = enabled && options.applyRootMotion === true;
   }
 
+  private rootMotionApplication: RootMotionApplication | undefined;
+  private readonly poseHooks: PoseHooks | undefined;
+
   constructor(
     private readonly rig: Rig,
     private joints: ReadonlyMap<string, Joint>,
     compiledClips: readonly CompiledClip[] = [],
-    private rootMotionApplication?: RootMotionApplication,
+    options: AnimationPlayerOptions = {},
   ) {
+    this.rootMotionApplication = options.rootMotion;
+    this.poseHooks = options.poseHooks;
     this.clipRig = rig;
     // Reuse compiled tracks, but check their references against this player's rig.
     for (const clip of compiledClips) {
@@ -317,27 +333,22 @@ export class AnimationPlayer {
     return !!this.clips.get(name)?.rootMotion?.translationKeys.length;
   }
 
-  /** Restart the clip unless restart:false keeps it active. Host hooks prepare after validation
-   * and synchronize the evaluated pose before time-zero events are delivered.
+  /** Restart the clip unless restart:false keeps it active. The injected hooks prepare after
+   * validation and synchronize the evaluated pose before time-zero events are delivered.
    */
-  play(name: string, options: PlayAnimationOptions = {}, preparePose?: () => void, synchronizePose?: () => void): void {
-    this.playAnimation(name, options, preparePose, synchronizePose);
+  play(name: string, options: PlayAnimationOptions = {}): void {
+    this.playAnimation(name, options);
   }
 
   /** Play and await this exact finite instance. Validation errors reject the promise. */
-  playAndWait(
-    name: string,
-    options: PlayAndWaitOptions = {},
-    preparePose?: () => void,
-    synchronizePose?: () => void,
-  ): Promise<PlaybackWaitResult> {
+  playAndWait(name: string, options: PlayAndWaitOptions = {}): Promise<PlaybackWaitResult> {
     return this.waitForSelection(
       (select) => {
         if (options.stopOnAbort !== undefined && typeof options.stopOnAbort !== 'boolean')
           throw new Error('stopOnAbort must be a boolean.');
         if (options.stopOnAbort && options.restart === false)
           throw new Error('Owned playback waits require a fresh instance; omit restart:false.');
-        this.playAnimation(name, options, preparePose, synchronizePose, false, select);
+        this.playAnimation(name, options, false, select);
       },
       options.signal,
       options.stopOnAbort === true,
@@ -460,8 +471,6 @@ export class AnimationPlayer {
   private playAnimation(
     name: string,
     options: PlayAnimationOptions = {},
-    preparePose?: () => void,
-    synchronizePose?: () => void,
     fromQueue = false,
     select?: (state: AnimationState, layer: string) => void,
   ): void {
@@ -489,14 +498,14 @@ export class AnimationPlayer {
       // Retained playback keeps its original policy and baseline.
       select?.(this.layers.get(layerName)!.state!, layerName);
       if (layerName === 'base' && !fromQueue) this.discardQueue();
-      synchronizePose?.();
+      this.synchronizePose();
       return;
     }
     if (select) this.assertWaitable(clip);
     if (rootMotion === 'apply') this.rootMotionApplication!.validate();
     const events = this.previewMode ? [] : collectAnimationStartEvents(clip, layerName, this.eventListeners.size);
     if (layerName === 'base' && !fromQueue) this.discardQueue();
-    preparePose?.();
+    this.preparePose();
     const layer = this.getOrCreateLayer(layerName);
     let source: AnimationState | AnimationPose | undefined;
     const deformationSource =
@@ -553,19 +562,14 @@ export class AnimationPlayer {
         if (layerName === 'base' && rootMotion === 'apply') this.rootMotionApplication!.begin();
         if (layerName === 'base' && !source) this.resetPose();
         this.applyCurrentPose();
-        synchronizePose?.();
+        this.synchronizePose();
       },
       () => this.dispatchNotifications(events, [], lifecycle),
     );
   }
 
   /** Append a nonlooping base request. Idle playback starts synchronously, including while paused. */
-  queue(
-    name: string,
-    options: QueueAnimationOptions = {},
-    preparePose?: () => void,
-    synchronizePose?: () => void,
-  ): void {
+  queue(name: string, options: QueueAnimationOptions = {}): void {
     this.assertActive();
     const request = this.validateQueueRequest({ name, options });
     const active = this.layers.get('base')?.state;
@@ -573,7 +577,7 @@ export class AnimationPlayer {
       throw new Error('Cannot queue behind an indefinitely looping base animation; replace or stop it first.');
     this.pendingQueue.push(request);
     if (!active?.playing) {
-      this.notifications.push(this.queueNotification(active?.playbackId, preparePose, synchronizePose));
+      this.notifications.push(this.queueNotification(active?.playbackId));
       this.flushNotifications();
     }
   }
@@ -602,11 +606,7 @@ export class AnimationPlayer {
   }
 
   /** Validate the entire replacement before interrupting the base; an empty replacement stops it. */
-  replaceQueue(
-    requests: readonly AnimationQueueRequest[],
-    preparePose?: () => void,
-    synchronizePose?: () => void,
-  ): void {
+  replaceQueue(requests: readonly AnimationQueueRequest[]): void {
     this.assertActive();
     const input = requests;
     if (!Array.isArray(requests)) throw new Error('Animation queue requests must be an array.');
@@ -620,7 +620,7 @@ export class AnimationPlayer {
     if (first.options?.rootMotion === 'apply') this.rootMotionApplication!.validate();
     this.discardQueue();
     for (const request of validated) this.pendingQueue.push(request);
-    this.playAnimation(first.name, first.options, preparePose, synchronizePose, true);
+    this.playAnimation(first.name, first.options, true);
   }
 
   private validateQueueRequest(request: AnimationQueueRequest): AnimationQueueRequest {
@@ -670,12 +670,8 @@ export class AnimationPlayer {
     this.queueRevision++;
   }
 
-  private queueNotification(
-    playbackId: number | undefined,
-    preparePose?: () => void,
-    synchronizePose?: () => void,
-  ): PlaybackNotification {
-    return { kind: 'queue', playbackId, revision: this.queueRevision, preparePose, synchronizePose };
+  private queueNotification(playbackId: number | undefined): PlaybackNotification {
+    return { kind: 'queue', playbackId, revision: this.queueRevision };
   }
 
   private advanceQueue(notification: Extract<PlaybackNotification, { kind: 'queue' }>): void {
@@ -683,7 +679,7 @@ export class AnimationPlayer {
     const state = this.layers.get('base')?.state;
     if (state?.playbackId !== notification.playbackId || state?.playing) return;
     const next = this.pendingQueue.shift();
-    if (next) this.playAnimation(next.name, next.options, notification.preparePose, notification.synchronizePose, true);
+    if (next) this.playAnimation(next.name, next.options, true);
   }
 
   stop(): void {
@@ -698,11 +694,11 @@ export class AnimationPlayer {
     this.dispatchNotifications([], [], lifecycle);
   }
   /** Restart every selected layer together, preserving speeds, masks, weights, and pause state. */
-  restart(preparePose?: () => void, synchronizePose?: () => void): void {
+  restart(): void {
     this.assertActive();
     if (![...this.layers.values()].some((layer) => layer.state)) {
       this.discardQueue();
-      synchronizePose?.();
+      this.synchronizePose();
       return;
     }
     if (this.layers.get('base')?.state?.rootMotion === 'apply') this.rootMotionApplication!.validate();
@@ -716,7 +712,7 @@ export class AnimationPlayer {
         events.push(event);
     }
     this.discardQueue();
-    preparePose?.();
+    this.preparePose();
     this.resetPose();
     const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
@@ -742,7 +738,7 @@ export class AnimationPlayer {
       () => {
         if (this.layers.get('base')?.state?.rootMotion === 'apply') this.rootMotionApplication!.begin();
         this.applyCurrentPose();
-        synchronizePose?.();
+        this.synchronizePose();
       },
       () => this.dispatchNotifications(events, [], lifecycle),
     );
@@ -767,23 +763,23 @@ export class AnimationPlayer {
     this.speed = speed;
   }
 
-  setPlaybackMode(mode: AnimationPlaybackMode, preparePose?: () => void): void {
+  setPlaybackMode(mode: AnimationPlaybackMode): void {
     this.assertActive();
     if (mode.mode === 'stepped') {
       assertFinite(mode.fps, 'Animation FPS');
       if (mode.fps <= 0) throw new Error('Animation FPS must be greater than zero.');
     } else if (mode.mode !== 'smooth') throw new Error('Unsupported playback mode.');
-    preparePose?.();
+    this.preparePose();
     this.playback = { ...mode };
     this.applyCurrentPose();
   }
 
-  setLayerMask(name: string, bones: readonly string[], preparePose?: () => void): void {
+  setLayerMask(name: string, bones: readonly string[]): void {
     this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot have a bone mask.');
     for (const id of bones) this.rig.getBone(id);
-    preparePose?.();
+    this.preparePose();
     const layer = this.getOrCreateLayer(name);
     this.poseEvaluator.resetLayerProperties(layer);
     layer.mask = new Set(bones);
@@ -791,13 +787,13 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
-  setLayerWeight(name: string, weight: number, preparePose?: () => void): void {
+  setLayerWeight(name: string, weight: number): void {
     this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer weight is fixed at 1.');
     assertFinite(weight, 'Layer weight');
     if (weight < 0 || weight > 1) throw new Error('Layer weight must be between 0 and 1.');
-    preparePose?.();
+    this.preparePose();
     const layer = this.getOrCreateLayer(name);
     if (weight === 0 && layer.weight > 0) this.poseEvaluator.resetLayerProperties(layer);
     layer.weight = weight;
@@ -805,11 +801,11 @@ export class AnimationPlayer {
     this.applyCurrentPose();
   }
 
-  clearLayer(name: string, preparePose?: () => void, synchronizePose?: () => void): void {
+  clearLayer(name: string): void {
     this.assertActive();
     if (!name) throw new Error('Layer name cannot be empty.');
     if (name === 'base') throw new Error('The base layer cannot be cleared.');
-    preparePose?.();
+    this.preparePose();
     const layer = this.layers.get(name);
     const lifecycle: PlaybackLifecycleEvent[] = [];
     if (layer?.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
@@ -820,7 +816,7 @@ export class AnimationPlayer {
     this.finishPoseChange(
       () => {
         this.applyCurrentPose();
-        synchronizePose?.();
+        this.synchronizePose();
       },
       () => this.dispatchNotifications([], [], lifecycle),
     );
@@ -863,11 +859,11 @@ export class AnimationPlayer {
   }
 
   /** Advance playback and return whether this call evaluated the authored pose.
-   * The optional preparation callback runs after validation, before clocks or poses change.
+   * The injected prepare hook runs after validation, before clocks or poses change.
    * Paused or stopped playback does not invoke it.
-   * The synchronization callback runs after evaluation and before notifications.
+   * The injected synchronize hook runs after evaluation and before notifications.
    */
-  update(delta: number, preparePose?: () => void, synchronizePose?: () => void): boolean {
+  update(delta: number): boolean {
     if (this.disposed) return false;
     assertFinite(delta, 'Animation delta');
     if (delta < 0) throw new Error('Animation delta cannot be negative.');
@@ -902,7 +898,7 @@ export class AnimationPlayer {
         advanceAnimationTime({ ...source, time: source.unwrappedTime }, delta, this.speed);
       }
     }
-    preparePose?.();
+    this.preparePose();
     const events: FiredAnimationEvent[] = [];
     const completions: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {
@@ -920,7 +916,7 @@ export class AnimationPlayer {
         try {
           if (rootDisplacement) this.rootMotionApplication!.apply(rootDisplacement);
           this.applyCurrentPose();
-          synchronizePose?.();
+          this.synchronizePose();
         } finally {
           for (const layer of this.layers.values()) {
             if (layer.transition && layer.transition.elapsed >= layer.transition.duration) {
@@ -930,7 +926,7 @@ export class AnimationPlayer {
           }
         }
       },
-      () => this.dispatchNotifications(events, completions, [], preparePose, synchronizePose),
+      () => this.dispatchNotifications(events, completions),
     );
     return true;
   }
@@ -938,12 +934,12 @@ export class AnimationPlayer {
   /** Sample only the base clip, clamping time without moving clocks or firing events.
    * Reset properties owned by fades/layers to bind values; retain untracked manual edits.
    */
-  sample(time: number, options: SampleAnimationOptions = {}, preparePose?: () => void): void {
+  sample(time: number, options: SampleAnimationOptions = {}): void {
     this.assertActive();
     assertFinite(time, 'Sample time');
     const state = this.layers.get('base')?.state;
     if (!state) return;
-    preparePose?.();
+    this.preparePose();
     this.poseEvaluator.sample(state, time, options.mode === 'playback', this.layers, this.playback);
   }
 
@@ -956,12 +952,12 @@ export class AnimationPlayer {
   /** @internal Render-only sparse overlay. No playback identities, queues, events or root application.
    * Main layers (including interrupted fades) retain their exact clocks and ownership.
    */
-  beginDialogueIdle(name: string, preparePose?: () => void): void {
+  beginDialogueIdle(name: string): void {
     this.assertActive();
     const clip = this.clips.get(name);
     if (!clip) throw new Error(`Unknown dialogue idle animation "${name}".`);
     if (this.dialogueIdle) throw new Error('A dialogue idle is already active.');
-    preparePose?.();
+    this.preparePose();
     const pose: AnimationPose = new Map([...this.joints].map(([id, joint]) => [id, { ...joint.pose }]));
     const layer: AnimationLayer = {
       state: {
@@ -987,23 +983,23 @@ export class AnimationPlayer {
   }
 
   /** @internal Only the hold-local sample changes. Root motion and authored events are never evaluated. */
-  sampleDialogueIdle(elapsed: number, preparePose?: () => void): void {
+  sampleDialogueIdle(elapsed: number): void {
     this.assertActive();
     assertFinite(elapsed, 'Dialogue idle elapsed time');
     if (elapsed < 0) throw new Error('Dialogue idle elapsed time cannot be negative.');
     const idle = this.dialogueIdle;
     if (!idle) return;
-    preparePose?.();
+    this.preparePose();
     idle.layer.state!.time = elapsed % idle.layer.state!.clip.duration;
     this.poseEvaluator.applyCurrentPose(idle.layers, this.playback);
   }
 
   /** @internal Conservative snap back, including sparse channels absent from the cinematic clip. */
-  endDialogueIdle(preparePose?: () => void): void {
+  endDialogueIdle(): void {
     this.assertActive();
     const idle = this.dialogueIdle;
     if (!idle) return;
-    preparePose?.();
+    this.preparePose();
     this.dialogueIdle = undefined;
     for (const [id, values] of idle.pose) Object.assign(this.joints.get(id)!.pose, values);
     this.poseEvaluator.invalidate();
@@ -1084,8 +1080,6 @@ export class AnimationPlayer {
     events: readonly FiredAnimationEvent[],
     completions: readonly PlaybackLifecycleEvent[],
     lifecycle: readonly PlaybackLifecycleEvent[] = [],
-    preparePose?: () => void,
-    synchronizePose?: () => void,
   ): void {
     if (this.previewMode) {
       events = [];
@@ -1099,8 +1093,7 @@ export class AnimationPlayer {
       if (!this.previewMode) notifications.push({ kind: 'complete', event: { clip: event.clip, layer: event.layer } });
     }
     const baseCompletion = completions.find((event) => event.layer === 'base');
-    if (baseCompletion)
-      notifications.push(this.queueNotification(baseCompletion.playbackId, preparePose, synchronizePose));
+    if (baseCompletion) notifications.push(this.queueNotification(baseCompletion.playbackId));
     for (const event of completions) notifications.push({ kind: 'lifecycle', event, completionPhase: 'settled' });
     if (this.notifying && !this.notifyingLifecycle) {
       throwNotificationErrors(this.deliverNotifications(notifications), 'Animation listeners failed.');
@@ -1209,6 +1202,16 @@ export class AnimationPlayer {
 
   private assertActive(): void {
     if (this.disposed) throw new Error('AnimationPlayer has been disposed.');
+  }
+
+  /** Single call site for the injected prepare hook: runs after validation, before mutation. */
+  private preparePose(): void {
+    this.poseHooks?.prepare?.();
+  }
+
+  /** Single call site for the injected synchronize hook: runs after evaluation, before notifications. */
+  private synchronizePose(): void {
+    this.poseHooks?.synchronize?.();
   }
 
   private getOrCreateLayer(name: string): AnimationLayer {

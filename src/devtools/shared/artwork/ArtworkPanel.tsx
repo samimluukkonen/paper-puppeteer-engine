@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { ArtworkAlignmentPolicy, ArtworkReference } from '../../../engine/artworkReplacement.js';
+import type { ArtworkAlignmentPolicy, ArtworkReference } from '../../../engine/data.js';
 import { InspectorSection } from '../../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../guides/anchors.js';
 import type { ArtworkController } from './ArtworkController.js';

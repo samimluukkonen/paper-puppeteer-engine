@@ -438,7 +438,7 @@ test('standalone core consumers explicitly supply an application owner and recei
   const bare = new AnimationPlayer(rig, joints, [compileClip(clip(), rig)]);
   assert.throws(() => bare.play('walk', { rootMotion: 'apply' }), /application host/);
   const application = { validate: vi.fn(), begin: vi.fn(), apply: vi.fn() };
-  const player = new AnimationPlayer(rig, joints, [compileClip(clip(), rig)], application);
+  const player = new AnimationPlayer(rig, joints, [compileClip(clip(), rig)], { rootMotion: application });
   player.play('walk', { rootMotion: 'apply' });
   player.update(3000);
   assert.deepEqual(application.apply.mock.calls, [[{ x: 120, y: 0 }]]);

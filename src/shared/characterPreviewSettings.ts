@@ -1,5 +1,4 @@
-import type { TwoBoneIKDefinition } from '../engine/core.js';
-import { type DeepReadonly, freezeData } from '../engine/readonlyData.js';
+import { freezeData, type DeepReadonly, type TwoBoneIKDefinition } from '../engine/core.js';
 import { demoPuppetCharacter, sketchCharacter } from './characterCatalog.js';
 import { paperDollIK } from './paperDollIK.js';
 

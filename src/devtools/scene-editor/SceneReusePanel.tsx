@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { readJsonFile } from '../../engine/jsonInput.js';
-import type { SceneCharacterAssets, SceneDefinition } from '../../engine/SceneDefinition.js';
+import { readJsonFile } from '../../engine/core.js';
+import type { SceneCharacterAssets, SceneDefinition } from '../../engine/data.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';

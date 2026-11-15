@@ -1,5 +1,4 @@
-import type { PropertyKeyframe } from '../../engine/AnimationClip.js';
-import type { PropertyCurve } from '../../engine/animationCurves.js';
+import type { PropertyKeyframe, PropertyCurve } from '../../engine/data.js';
 import { setText } from '../../shared/domUpdates.js';
 import { blocksEditorShortcut, isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';

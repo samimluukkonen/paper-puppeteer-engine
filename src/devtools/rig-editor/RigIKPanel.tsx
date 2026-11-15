@@ -1,7 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import type { IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import type { RigDefinition } from '../../engine/types.js';
+import type { IKConstraintPatch, TwoBoneIKDefinition, RigDefinition } from '../../engine/data.js';
 import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField as NumberField } from '../shared/InspectorNumberField.js';

@@ -1,4 +1,4 @@
-import type { Puppet } from '../../engine/Puppet.js';
+import type { Puppet } from '../../engine/runtime.js';
 
 /** Lowest authored sole point in the initial pose, relative to the scene-root Actor origin. */
 export function actorGroundOffset(puppet: Puppet): number | undefined {

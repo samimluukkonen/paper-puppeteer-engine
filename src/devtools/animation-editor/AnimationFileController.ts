@@ -1,4 +1,4 @@
-import { readJsonFile } from '../../engine/jsonInput.js';
+import { readJsonFile } from '../../engine/core.js';
 import { setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';

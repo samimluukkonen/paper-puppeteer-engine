@@ -1,10 +1,6 @@
-import { AnimationPlayer } from '../../engine/AnimationPlayer.js';
-import type { IKAnimationPose } from '../../engine/ik/AnimationIKPose.js';
-import { Joint } from '../../engine/Joint.js';
-import { meshDeformationIssues } from '../../engine/meshDeformation.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { JointTransform } from '../../engine/types.js';
+import { AnimationPlayer, Joint, meshDeformationIssues } from '../../engine/core.js';
+import type { IKAnimationPose, Rig, JointTransform } from '../../engine/data.js';
+import type { PoseSource, Puppet } from '../../engine/runtime.js';
 import { CHARACTER_PREVIEW_ORIGIN } from '../shared/previewPlacement.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { motionPreviewSampleTime } from './motionPreview.js';
@@ -25,15 +21,15 @@ export class AnimationEditorPreview {
   private ikDraft: AnimationEditorState['ikTargetDraft'] | undefined;
   private ikId: string | null | undefined;
   private libraryPose: AnimationEditorState['previewedPose'] | undefined;
-  private readonly ikSource: { ikAnimation: IKAnimationPose } = { ikAnimation: new Map() };
+  private detachPoseSource: (() => void) | undefined;
   private readonly unsubscribe: () => void;
   private readonly releasePlacement: (() => void) | undefined;
   private readonly releaseMotion: (() => void) | undefined;
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'setIKAnimationSource'> &
-      Partial<Pick<Puppet, 'container' | 'setMeshDeformationSource'>>,
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'attachPoseSource'> &
+      Partial<Pick<Puppet, 'container'>>,
     private readonly motion?: MotionPreviewController,
   ) {
     this.origin = motion
@@ -67,8 +63,8 @@ export class AnimationEditorPreview {
       }
     }
     if (this.state.editorMode === 'rig') {
-      this.puppet.setIKAnimationSource(undefined);
-      this.puppet.setMeshDeformationSource?.(undefined);
+      this.detachPoseSource?.();
+      this.detachPoseSource = undefined;
       if (force) this.puppet.syncPose();
       return;
     }
@@ -129,25 +125,42 @@ export class AnimationEditorPreview {
     // Restore even untracked temporary properties before sampling. Drafts belong before presets/IK/rendering.
     this.puppet.preparePose();
     for (const joint of this.joints?.values() ?? []) joint.reset();
-    this.player?.sample(time, { mode: 'playback' });
-    for (const joint of this.joints?.values() ?? []) Object.assign(this.puppet.getBone(joint.id).pose, joint.pose);
-    if (this.state.selectedBoneId) Object.assign(this.puppet.getBone(this.state.selectedBoneId).pose, draft);
-    // Reuse sparse absolute local values before the normal single IK solve.
-    for (const [id, values] of Object.entries(libraryPose?.bones ?? {}))
-      Object.assign(this.puppet.getBone(id).pose, values);
-    // Overlay provisional channels without touching compiled clips, runtime targets or ownership.
-    const pose = new Map(this.player?.ikAnimation);
-    if (ikId && Object.keys(ikDraft).length) {
-      const values = { ...pose.get(ikId) };
-      for (const property of ['x', 'y', 'mix'] as const) {
-        const value = ikDraft[property];
-        if (value !== undefined) values[property] = Object.freeze({ value, weight: 1 });
-      }
-      pose.set(ikId, Object.freeze(values));
+    // Build the pose source as live views over the detached preview joints and player, attach it,
+    // then sample and let the puppet project — no manual pose copying into the live puppet.
+    const joints = this.joints;
+    const player = this.player;
+    const source: PoseSource = {
+      pose: joints ? new Map([...joints].map(([id, joint]) => [id, joint.pose])) : undefined,
+      get ikAnimation(): IKAnimationPose {
+        // Overlay provisional channels without touching compiled clips, runtime targets or ownership.
+        const pose = new Map(player?.ikAnimation);
+        if (ikId && Object.keys(ikDraft).length) {
+          const values = { ...pose.get(ikId) };
+          for (const property of ['x', 'y', 'mix'] as const) {
+            const value = ikDraft[property];
+            if (value !== undefined) values[property] = Object.freeze({ value, weight: 1 });
+          }
+          pose.set(ikId, Object.freeze(values));
+        }
+        return pose;
+      },
+      get meshDeformation() {
+        return player?.meshDeformation;
+      },
+    };
+    this.detachPoseSource?.();
+    this.detachPoseSource = this.puppet.attachPoseSource(source);
+    player?.sample(time, { mode: 'playback' });
+    // Editor drafts overlay the sampled pose on the detached joints before projection.
+    const selectedId = this.state.selectedBoneId;
+    if (selectedId && draft) {
+      const joint = joints?.get(selectedId);
+      if (joint) Object.assign(joint.pose, draft);
     }
-    this.ikSource.ikAnimation = pose;
-    this.puppet.setIKAnimationSource(this.ikSource);
-    this.puppet.setMeshDeformationSource?.(this.player);
+    for (const [id, values] of Object.entries(libraryPose?.bones ?? {})) {
+      const joint = joints?.get(id);
+      if (joint) Object.assign(joint.pose, values);
+    }
     this.puppet.syncPose();
     this.sampledTime = sampledTime;
     this.draft = draft;
@@ -163,8 +176,8 @@ export class AnimationEditorPreview {
     this.releaseMotion?.();
     this.releasePlacement?.();
     this.puppet.container?.setPosition(this.origin.x, this.origin.y);
-    this.puppet.setIKAnimationSource(undefined);
-    this.puppet.setMeshDeformationSource?.(undefined);
+    this.detachPoseSource?.();
+    this.detachPoseSource = undefined;
     this.player?.dispose();
     this.player = undefined;
     this.rig = undefined;
@@ -174,6 +187,5 @@ export class AnimationEditorPreview {
     this.ikDraft = undefined;
     this.ikId = undefined;
     this.libraryPose = undefined;
-    this.ikSource.ikAnimation = new Map();
   }
 }

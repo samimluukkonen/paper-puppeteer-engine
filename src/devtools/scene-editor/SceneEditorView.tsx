@@ -9,11 +9,14 @@ import RotateCcw from 'lucide-react/icons/rotate-ccw';
 import ShieldCheck from 'lucide-react/icons/shield-check';
 import Undo2 from 'lucide-react/icons/undo-2';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { readJsonFile } from '../../engine/jsonInput.js';
-import { encodePackageZip, PACKAGE_MAX_FILE_BYTES } from '../../engine/packageZip.js';
-import { serializeSceneDefinition } from '../../engine/SceneDefinition.js';
-import { buildScenePackage } from '../../engine/ScenePackage.js';
-import { readSceneResource } from '../../engine/sceneResource.js';
+import {
+  readJsonFile,
+  encodePackageZip,
+  PACKAGE_MAX_FILE_BYTES,
+  serializeSceneDefinition,
+  buildScenePackage,
+  readSceneResource,
+} from '../../engine/core.js';
 import { downloadBlob, downloadJson } from '../../shared/downloadJson.js';
 import { bindExportShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorContext } from '../../ui/EditorContext.js';

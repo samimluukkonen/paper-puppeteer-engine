@@ -1,5 +1,4 @@
-import { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError, validateInputLimit } from '../../engine/jsonInput.js';
-import { isFullyFrozen } from '../../engine/readonlyData.js';
+import { DEFAULT_MAX_JSON_BYTES, JsonInputLimitError, validateInputLimit, isFullyFrozen } from '../../engine/core.js';
 
 const sizes = new WeakMap<object, Map<number, number>>();
 const encoder = new TextEncoder();

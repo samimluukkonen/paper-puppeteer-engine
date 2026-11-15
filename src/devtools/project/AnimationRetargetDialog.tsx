@@ -1,8 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import type { AnimationClip } from '../../engine/AnimationClip.js';
-import type { RetargetOptions } from '../../engine/animationRetargeting.js';
-import type { RigBoneMapping } from '../../engine/rigBoneMapping.js';
-import { analyzeRigCompatibility } from '../../engine/rigCompatibility.js';
+import { analyzeRigCompatibility } from '../../engine/core.js';
+import type { AnimationClip, RetargetOptions, RigBoneMapping } from '../../engine/data.js';
 import { animationAssetReference, type AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import { CharacterRigSelect } from '../shared/CharacterRigSelect.js';
 import type { AnimationRetargetSession } from './AnimationRetargetSession.js';

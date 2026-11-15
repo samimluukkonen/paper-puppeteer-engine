@@ -231,26 +231,26 @@ test('invalidation during synchronization survives even when a provider removes 
   puppet.destroy();
 });
 
-test('external IK and deformation sources remain live and clearing them restores idle sleep', () => {
+test('external pose sources remain live and detaching them restores idle sleep', () => {
   const puppet = fixture('dirty');
   const ik = new Map<string, IKAnimationValues>();
-  puppet.setIKAnimationSource({ ikAnimation: ik });
+  const detachIK = puppet.attachPoseSource({ ikAnimation: ik });
   puppet.update(16);
   ik.set('arm', { x: { value: 30, weight: 1 }, y: { value: 10, weight: 1 } });
   puppet.update(16);
   // The fixture has an authored target; animation takes ownership when no runtime target is set.
   assert.deepEqual(puppet.getIK('arm').resolvedTarget, { x: 30, y: 10 });
-  puppet.setIKAnimationSource(undefined);
+  detachIK();
   puppet.update(16);
   assert.deepEqual(puppet.getIK('arm').resolvedTarget, { x: 65, y: 20 });
   const shapes = new Map<string, MeshVertexOffsets>();
-  puppet.setMeshDeformationSource({ meshDeformation: shapes });
+  const detachShapes = puppet.attachPoseSource({ meshDeformation: shapes });
   puppet.update(16);
   const vertices = [...puppet.getSlotMesh('cloth')!.vertices];
   shapes.set('sleeve', new Map([['v0', { x: 5, y: -3 }]]));
   puppet.update(16);
   assert.notDeepEqual(puppet.getSlotMesh('cloth')!.vertices, vertices);
-  puppet.setMeshDeformationSource(undefined);
+  detachShapes();
   puppet.update(16);
   assert.deepEqual(puppet.getSlotMesh('cloth')!.vertices, vertices);
   const rendering = vi.spyOn(PuppetRenderer.prototype, 'sync');

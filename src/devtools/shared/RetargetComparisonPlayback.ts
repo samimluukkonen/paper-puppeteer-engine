@@ -1,4 +1,4 @@
-import type { Puppet } from '../../engine/Puppet.js';
+import type { Puppet } from '../../engine/runtime.js';
 
 /** One view-only clock samples both ordinary Puppets. No clip evaluation or authored events live here. */
 export class RetargetComparisonPlayback {

@@ -1,6 +1,9 @@
-import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/characterTextureLimits.js';
-import { decodeImage } from '../../../engine/decodeImage.js';
-import { IMAGE_HEADER_BYTES, inspectImageHeader } from '../../../engine/imageHeader.js';
+import {
+  DEFAULT_CHARACTER_TEXTURE_LIMITS as limits,
+  decodeImage,
+  IMAGE_HEADER_BYTES,
+  inspectImageHeader,
+} from '../../../engine/core.js';
 
 export interface SpriteMetadata {
   readonly filename: string;

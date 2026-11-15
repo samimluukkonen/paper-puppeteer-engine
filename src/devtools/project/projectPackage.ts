@@ -1,14 +1,22 @@
 import { z } from 'zod';
-import { validateAudioAssetData } from '../../engine/AudioAsset.js';
-import { AudioAssetLoader, type AudioBackend } from '../../engine/AudioAssetLoader.js';
-import { canonicalJson } from '../../engine/authoredSerialization.js';
-import { characterManifestSchema, type CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { decodeImage } from '../../engine/decodeImage.js';
-import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import { PACKAGE_MAX_BYTES, packagePath, validatePackageFiles } from '../../engine/packageZip.js';
-import { parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
-import { buildScenePackage, validateScenePackage } from '../../engine/ScenePackage.js';
-import { buildStoryPackage } from '../../engine/StoryPackage.js';
+import {
+  validateAudioAssetData,
+  AudioAssetLoader,
+  canonicalJson,
+  characterManifestSchema,
+  decodeImage,
+  assertJsonInputSize,
+  PACKAGE_MAX_BYTES,
+  packagePath,
+  validatePackageFiles,
+  parseSceneJson,
+  serializeSceneDefinition,
+  buildScenePackage,
+  validateScenePackage,
+  buildStoryPackage,
+  type AudioBackend,
+  type CharacterDefinition,
+} from '../../engine/core.js';
 import type { ReadonlyScene } from '../scene-editor/SceneEditorDocument.js';
 import {
   buildCharacterPackage,

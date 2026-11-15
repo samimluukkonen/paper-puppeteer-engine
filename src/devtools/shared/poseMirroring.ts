@@ -1,9 +1,15 @@
-import { type Affine, composeAffine, localToWorld, transformToAffine, worldToLocal } from '../../engine/affineMath.js';
-import { shortestRotationDelta } from '../../engine/animationMath.js';
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import type { ValidationIssue } from '../../engine/externalData.js';
-import type { Rig } from '../../engine/Rig.js';
-import { createTransform, type JointTransform, transformProperties } from '../../engine/types.js';
+import {
+  composeAffine,
+  localToWorld,
+  transformToAffine,
+  worldToLocal,
+  shortestRotationDelta,
+  createTransform,
+  transformProperties,
+  type Affine,
+  type JointTransform,
+} from '../../engine/core.js';
+import type { AnimationPose, ValidationIssue, Rig } from '../../engine/data.js';
 import { type BoneSymmetryIssueCode, type BoneSymmetryMapping, validateBoneSymmetryMapping } from './boneSymmetry.js';
 import { freezeData } from './editorData.js';
 

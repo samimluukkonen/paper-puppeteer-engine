@@ -1,31 +1,36 @@
-import type { Point } from '../../engine/affineMath.js';
-import { normalizeBoneDirection } from '../../engine/boneMath.js';
 import {
+  normalizeBoneDirection,
   RIG_FORMAT_VERSION,
-  type RigJsonDefinition,
-  type ValidationIssue,
   validateRigDefinition,
-} from '../../engine/externalData.js';
-import { createFootContactMarker, type CreateFootContactMarkerOptions } from '../../engine/footContactMarkers.js';
-import {
+  createFootContactMarker,
   assertIKConstraintChangesAllowed,
   createIKConstraint,
   getIKConstraint,
   ikConstraintDependencies,
   removeIKConstraint,
   updateIKConstraint,
+  mergeSkins,
+  createRectangleMeshAttachment,
+  replaceMeshGeometry,
+  deleteMeshVertex,
+  subdivideMeshEdge,
+  normalizeBoneInfluences,
+  MeshWeightStroke,
+  setBoneWeight,
+  assertInfluenceLimit,
+  Rig,
+  footContactMarkerSchema,
+  checkSkinReferences,
+  throwValidationIssue,
+  type RigJsonDefinition,
+  type ValidationIssue,
+  type CreateFootContactMarkerOptions,
   type CreateIKConstraintOptions,
   type IKConstraintPatch,
-} from '../../engine/ik/ikAuthoring.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import { mergeSkins } from '../../engine/mergeSkins.js';
-import { createRectangleMeshAttachment, replaceMeshGeometry } from '../../engine/meshAttachments.js';
-import { deleteMeshVertex, subdivideMeshEdge } from '../../engine/meshEditing.js';
-import { normalizeBoneInfluences } from '../../engine/meshSkinning.js';
-import { MeshWeightStroke, setBoneWeight, assertInfluenceLimit } from '../../engine/meshWeightPainting.js';
-import { Rig } from '../../engine/Rig.js';
-import { footContactMarkerSchema } from '../../engine/schemas.js';
+} from '../../engine/core.js';
 import type {
+  Point,
+  TwoBoneIKDefinition,
   BoneDefinition,
   MeshAttachmentDefinition,
   FootContactMarker,
@@ -35,8 +40,7 @@ import type {
   SlotDefinition,
   AttachmentDefinition,
   TransformProperty,
-} from '../../engine/types.js';
-import { checkSkinReferences, throwValidationIssue } from '../../engine/validation.js';
+} from '../../engine/data.js';
 import { boneHierarchy, sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData, freezeData, type ReadonlyEditorData, roundEditorNumber } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';

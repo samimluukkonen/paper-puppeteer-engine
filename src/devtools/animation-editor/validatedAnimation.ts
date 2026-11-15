@@ -1,19 +1,15 @@
-import type { AnimationClip } from '../../engine/AnimationClip.js';
 import {
   ANIMATION_FORMAT_VERSION,
   inspectAnimationDefinition,
   parseAnimationClip,
-  type ValidationResult,
-} from '../../engine/externalData.js';
-import { JsonInputLimitError } from '../../engine/jsonInput.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import {
+  JsonInputLimitError,
   getValidatedAnimation,
   isDataRecord,
   isValidatedAnimation,
   rememberValidatedAnimation,
-} from '../../engine/validatedAnimation.js';
+  type ValidationResult,
+} from '../../engine/core.js';
+import type { AnimationClip, DeepReadonly, Rig } from '../../engine/data.js';
 import { freezeData, isFullyFrozen } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 

@@ -1,7 +1,7 @@
 import Trash2 from 'lucide-react/icons/trash-2';
 import { useState } from 'react';
-import { AUDIO_CATEGORIES, type AudioCategory } from '../../engine/AudioAsset.js';
-import type { SceneAudioClip } from '../../engine/sceneAudio.js';
+import { AUDIO_CATEGORIES, type AudioCategory } from '../../engine/core.js';
+import type { SceneAudioClip } from '../../engine/data.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';

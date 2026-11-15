@@ -1,18 +1,21 @@
 import Phaser from 'phaser';
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
-import { Actor } from '../../engine/Actor.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { cinematicFrame, SCENE_OUTPUT_VIEWPORT } from '../../engine/cinematicCamera.js';
-import { loadSceneCharacter } from '../../engine/loadSceneCharacter.js';
-import { throwNotificationErrors } from '../../engine/notifications.js';
-import { Puppet } from '../../engine/Puppet.js';
-import { SceneDialogueOverlay } from '../../engine/SceneDialogueOverlay.js';
-import { SceneImageLayer } from '../../engine/SceneImageLayer.js';
-import { sceneLayer } from '../../engine/sceneLayers.js';
-import { createSceneTextureBudget } from '../../engine/sceneTextureBudget.js';
-import { SceneTransitionOverlay } from '../../engine/SceneTransitionOverlay.js';
-import { CLEAR_SCENE_TRANSITION, evaluateTransitionAtTime } from '../../engine/sceneTransitions.js';
-import { assertSceneInstanceBudget } from '../../engine/sceneWorkloadLimits.js';
+import {
+  Actor,
+  cinematicFrame,
+  SCENE_OUTPUT_VIEWPORT,
+  throwNotificationErrors,
+  SceneDialogueOverlay,
+  SceneImageLayer,
+  sceneLayer,
+  createSceneTextureBudget,
+  SceneTransitionOverlay,
+  CLEAR_SCENE_TRANSITION,
+  evaluateTransitionAtTime,
+  assertSceneInstanceBudget,
+} from '../../engine/core.js';
+import type { CharacterDefinition } from '../../engine/data.js';
+import { loadSceneCharacter, Puppet } from '../../engine/runtime.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { projectEditorContext } from '../project/projectBridge.js';

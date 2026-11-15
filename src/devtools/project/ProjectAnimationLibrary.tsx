@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AnimationClip } from '../../engine/AnimationClip.js';
+import type { AnimationClip } from '../../engine/data.js';
 import { AnimationLibrary } from '../shared/AnimationLibrary.js';
 import { animationAssetReference, type AnimationLibraryEntry } from '../shared/animationLibraryData.js';
 import { AnimationLibraryPreview, type AnimationPreviewLease } from '../shared/AnimationLibraryPreviewDialog.js';

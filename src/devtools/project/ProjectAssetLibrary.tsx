@@ -1,6 +1,6 @@
 import ImageIcon from 'lucide-react/icons/image';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { mergeSkins } from '../../engine/mergeSkins.js';
+import { mergeSkins } from '../../engine/core.js';
 import type { PackageFiles, PackageSnapshot } from '../shared/package/characterPackage.js';
 
 function AssetGroup({ title, count, children }: { title: string; count: number; children: ReactNode }) {

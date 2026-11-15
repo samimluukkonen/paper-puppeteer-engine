@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SceneAudioClip } from '../../engine/sceneAudio.js';
+import type { SceneAudioClip } from '../../engine/data.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 

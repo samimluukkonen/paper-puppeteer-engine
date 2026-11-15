@@ -1,5 +1,10 @@
-import { localToWorld, type Affine } from '../../engine/affineMath.js';
-import { evaluateRootMotion, evaluateRootMotionAtElapsedTime, sampleRootMotion } from '../../engine/rootMotion.js';
+import {
+  localToWorld,
+  evaluateRootMotion,
+  evaluateRootMotionAtElapsedTime,
+  sampleRootMotion,
+  type Affine,
+} from '../../engine/core.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { evaluatePreviewDisplacement, motionPreviewSampleTime, type MotionPreviewSettings } from './motionPreview.js';
 import { rootMotionMatrix } from './rootMotionCoordinates.js';

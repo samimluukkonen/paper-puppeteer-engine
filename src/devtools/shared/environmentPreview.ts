@@ -1,4 +1,4 @@
-import type { SceneImageDefinition } from '../../engine/SceneDefinition.js';
+import type { SceneImageDefinition } from '../../engine/data.js';
 
 /** Editor preferences. Never part of a rig, animation, Puppet or scene document. */
 export interface EnvironmentPreviewSettings {

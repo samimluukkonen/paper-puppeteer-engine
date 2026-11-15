@@ -1,7 +1,6 @@
-import type { Point } from '../../engine/affineMath.js';
-import { getFootContactWorldPosition } from '../../engine/footContactMarkers.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import type { Rig } from '../../engine/Rig.js';
+import { getFootContactWorldPosition } from '../../engine/core.js';
+import type { Point, Rig } from '../../engine/data.js';
+import type { Puppet } from '../../engine/runtime.js';
 
 export const DEFAULT_CONTACT_TOLERANCE = 0.5;
 

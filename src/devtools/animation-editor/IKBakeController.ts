@@ -1,13 +1,18 @@
-import { compileClip, type AnimationClip, type CompiledClip } from '../../engine/AnimationClip.js';
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import { ANIMATION_FORMAT_VERSION, type ValidationIssue } from '../../engine/externalData.js';
-import { type IKBakePlan } from '../../engine/ik/IKBakeGeneration.js';
-import type { IKBakeMotionFidelity } from '../../engine/ik/IKBakeMotionFidelity.js';
-import { getIKBakeRuntimeIssues } from '../../engine/ik/IKBakeSampling.js';
-import { IsolatedIKSampler } from '../../engine/ik/IsolatedIKSampler.js';
-import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
-import { type DeepReadonly, freezeData } from '../../engine/readonlyData.js';
+import {
+  compileClip,
+  ANIMATION_FORMAT_VERSION,
+  getIKBakeRuntimeIssues,
+  IsolatedIKSampler,
+  dispatchListeners,
+  throwNotificationErrors,
+  freezeData,
+  type AnimationClip,
+  type CompiledClip,
+  type ValidationIssue,
+  type IKBakePlan,
+  type DeepReadonly,
+} from '../../engine/core.js';
+import type { AnimationPose, IKBakeMotionFidelity, TwoBoneIKConstraint } from '../../engine/data.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { bakeRigSnapshot } from './ikBakePlanning.js';
 import { startIKBakePlanning, type IKBakePlanningTask, type StartIKBakePlanning } from './ikBakeWorkerClient.js';

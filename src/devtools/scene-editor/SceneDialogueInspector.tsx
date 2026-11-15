@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { dialogueSpeaker, type SceneDialogueLine } from '../../engine/sceneDialogue.js';
+import { dialogueSpeaker, type SceneDialogueLine } from '../../engine/core.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';

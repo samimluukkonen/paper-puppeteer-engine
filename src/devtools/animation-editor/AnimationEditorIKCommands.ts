@@ -1,5 +1,3 @@
-import type { Point } from '../../engine/affineMath.js';
-import type { PropertyKeyframe } from '../../engine/AnimationClip.js';
 import {
   findIKPropertyKeyframe,
   setIKPropertyKeyframe,
@@ -7,8 +5,8 @@ import {
   moveIKPropertyKeyframe,
   ikAnimationProperties,
   type IKAnimationProperty,
-} from '../../engine/ik/animationKeyframes.js';
-import type { Rig } from '../../engine/Rig.js';
+} from '../../engine/core.js';
+import type { Point, PropertyKeyframe, Rig } from '../../engine/data.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';

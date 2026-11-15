@@ -1,5 +1,4 @@
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { StoryDefinition } from '../../engine/StoryDefinition.js';
+import type { DeepReadonly, StoryDefinition } from '../../engine/data.js';
 import type { AssetReference, ProjectDiagnostic, ProjectInspection } from './projectInspection.js';
 
 const key = ({ kind, owner, id }: AssetReference): string => JSON.stringify([kind, owner, id]);

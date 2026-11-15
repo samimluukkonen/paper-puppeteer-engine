@@ -1,12 +1,14 @@
-import { withoutKeyframeProperty } from '../../engine/animationCurves.js';
-import { findIKPropertyKeyframe, ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
 import {
+  withoutKeyframeProperty,
+  findIKPropertyKeyframe,
+  ikAnimationProperties,
   normalizeKeyframeTime,
   setTrackPropertyKeyframes,
+  assertFinite,
+  transformProperties,
   type SparseKeyframe,
-} from '../../engine/keyframeAuthoring.js';
-import type { Rig } from '../../engine/Rig.js';
-import { assertFinite, transformProperties } from '../../engine/types.js';
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { IKKeyframeSelection } from './ikTimeline.js';
 import { findBonePropertyKeyframe } from './keyframeQueries.js';
 import { type AnimationData, assertTarget } from './keyframeTargets.js';

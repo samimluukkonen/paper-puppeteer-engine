@@ -1,6 +1,5 @@
-import type { ValidationIssue } from '../../engine/externalData.js';
-import { readonlyMap } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { readonlyMap } from '../../engine/core.js';
+import type { ValidationIssue, Rig } from '../../engine/data.js';
 import { freezeData } from './editorData.js';
 
 export interface BoneSymmetryPair {

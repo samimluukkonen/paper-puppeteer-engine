@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import { inspectMeshDeformation } from '../../engine/meshDiagnostics.js';
-import type { Puppet } from '../../engine/Puppet.js';
-import type { MeshAttachmentDefinition } from '../../engine/types.js';
+import { inspectMeshDeformation } from '../../engine/core.js';
+import type { MeshAttachmentDefinition } from '../../engine/data.js';
+import type { Puppet } from '../../engine/runtime.js';
 
 function isVisible(object: Phaser.GameObjects.Mesh2D): boolean {
   let branch: Phaser.GameObjects.Mesh2D | Phaser.GameObjects.Container | null = object;

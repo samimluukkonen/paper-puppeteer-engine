@@ -1,15 +1,19 @@
-import { sampleProperty, type PropertyKeyframe } from '../../engine/AnimationClip.js';
 import {
+  sampleProperty,
   copyPropertyCurve,
   propertyKeyframe,
   withoutKeyframeProperty,
+  quantizePlaybackTime,
+  shortestRotationDelta,
+  ikAnimationProperties,
+  transformProperties,
+  type PropertyKeyframe,
   type CurveHandle,
   type PropertyCurve,
-} from '../../engine/animationCurves.js';
-import { quantizePlaybackTime, shortestRotationDelta } from '../../engine/animationMath.js';
-import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import type { Rig } from '../../engine/Rig.js';
-import { transformProperties, type TransformProperty } from '../../engine/types.js';
+  type IKAnimationProperty,
+  type TransformProperty,
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { rootKeys } from './rootMotionEdits.js';

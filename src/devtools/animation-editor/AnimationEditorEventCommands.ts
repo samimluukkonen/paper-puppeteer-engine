@@ -1,7 +1,5 @@
-import type { AnimationEvent } from '../../engine/AnimationClip.js';
-import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { assertJsonInputSize, JsonInputLimitError } from '../../engine/core.js';
+import type { AnimationEvent, DeepReadonly, Rig } from '../../engine/data.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';

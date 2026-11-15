@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/notifications.js';
+import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { retimeSelectionReason } from './commandAvailability.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';

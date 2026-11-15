@@ -1,8 +1,11 @@
-import { compileValidatedClip, sampleProperty, type PropertyKeyframe } from '../../engine/AnimationClip.js';
-import { shortestRotationDelta } from '../../engine/animationMath.js';
-import { KEYFRAME_TIME_TOLERANCE_MS } from '../../engine/keyframeAuthoring.js';
-import type { Rig } from '../../engine/Rig.js';
-import type { TransformProperty } from '../../engine/types.js';
+import {
+  compileValidatedClip,
+  sampleProperty,
+  shortestRotationDelta,
+  KEYFRAME_TIME_TOLERANCE_MS,
+  type PropertyKeyframe,
+} from '../../engine/core.js';
+import type { Rig, TransformProperty } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
 import { removeBonePropertyKeyframes, type PropertyKeyframeTarget } from './keyframeEdits.js';
 import type { AnimationData } from './keyframeTargets.js';

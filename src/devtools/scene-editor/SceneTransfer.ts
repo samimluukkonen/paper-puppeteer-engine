@@ -1,8 +1,14 @@
-import { safeFilename } from '../../engine/assetFilename.js';
-import { AudioAssetLoader } from '../../engine/AudioAssetLoader.js';
-import { decodeImage } from '../../engine/decodeImage.js';
-import { resolveSceneDefinition, sceneAssetCatalog, type SceneAssetOptions } from '../../engine/SceneAssets.js';
-import { parseSceneDefinition, parseSceneJson, serializeSceneDefinition } from '../../engine/SceneDefinition.js';
+import {
+  safeFilename,
+  AudioAssetLoader,
+  decodeImage,
+  resolveSceneDefinition,
+  sceneAssetCatalog,
+  parseSceneDefinition,
+  parseSceneJson,
+  serializeSceneDefinition,
+  type SceneAssetOptions,
+} from '../../engine/core.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
 

@@ -1,7 +1,5 @@
-import { dispatchAnimationEvents } from '../../engine/animationNotifications.js';
-import type { FiredAnimationEvent } from '../../engine/AnimationPlayer.js';
-import { collectAnimationStartEvents } from '../../engine/animationTimeline.js';
-import { throwNotificationErrors } from '../../engine/notifications.js';
+import { dispatchAnimationEvents, collectAnimationStartEvents, throwNotificationErrors } from '../../engine/core.js';
+import type { FiredAnimationEvent } from '../../engine/data.js';
 import type { AnimationEditorDocument } from './AnimationEditorDocument.js';
 import type { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import type { AnimationEditorSelection } from './AnimationEditorSelection.js';

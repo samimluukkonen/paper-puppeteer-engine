@@ -1,16 +1,19 @@
-import { copyPropertyCurve, type PropertyCurve, type PropertyCurves } from '../../engine/animationCurves.js';
 import {
+  copyPropertyCurve,
   ANIMATION_FORMAT_VERSION,
   inspectAnimationDefinition,
+  ikAnimationProperties,
+  assertJsonInputSize,
+  JsonInputLimitError,
+  ROOT_MOTION_PROPERTIES,
+  transformProperties,
+  type PropertyCurve,
+  type PropertyCurves,
   type AnimationJsonDefinition,
   type JsonValue,
   type ValidationIssue,
-} from '../../engine/externalData.js';
-import { ikAnimationProperties } from '../../engine/ik/animationKeyframes.js';
-import { assertJsonInputSize, JsonInputLimitError } from '../../engine/jsonInput.js';
-import type { Rig } from '../../engine/Rig.js';
-import { ROOT_MOTION_PROPERTIES } from '../../engine/rootMotion.js';
-import { transformProperties } from '../../engine/types.js';
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 

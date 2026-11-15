@@ -1,6 +1,5 @@
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import { evaluateMeshDeformation, type MeshDeformationPose } from '../../engine/meshDeformation.js';
-import type { Rig } from '../../engine/Rig.js';
+import { evaluateMeshDeformation, type MeshDeformationPose } from '../../engine/core.js';
+import type { AnimationPose, Rig } from '../../engine/data.js';
 import { getEvaluatedAnimationPose } from './animationValues.js';
 import type { AnimationData } from './keyframeTargets.js';
 import { motionPreviewSampleTime } from './motionPreview.js';

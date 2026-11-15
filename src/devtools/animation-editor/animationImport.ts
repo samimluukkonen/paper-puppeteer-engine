@@ -1,11 +1,17 @@
-import { compileClip, type AnimationClip, type CompiledClip } from '../../engine/AnimationClip.js';
-import { quantizePlaybackTime } from '../../engine/animationMath.js';
-import { evaluateClip } from '../../engine/AnimationPose.js';
-import { inspectAnimationDefinition, type ValidationIssue } from '../../engine/externalData.js';
-import { assertJsonInputSize } from '../../engine/jsonInput.js';
-import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from '../../engine/jsonWorkloadLimits.js';
-import type { Rig } from '../../engine/Rig.js';
-import { transformProperties } from '../../engine/types.js';
+import {
+  compileClip,
+  quantizePlaybackTime,
+  evaluateClip,
+  inspectAnimationDefinition,
+  assertJsonInputSize,
+  JsonWorkloadBudget,
+  transformProperties,
+  type AnimationClip,
+  type CompiledClip,
+  type ValidationIssue,
+  type JsonWorkloadLimitOptions,
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import { serializeAnimation } from './animationSerialization.js';
 import { inspectEditorAnimation } from './validatedAnimation.js';

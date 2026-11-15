@@ -1,5 +1,5 @@
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import { Rig } from '../../engine/Rig.js';
+import { Rig } from '../../engine/core.js';
+import type { CharacterDefinition } from '../../engine/data.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { createCharacterDocuments } from '../shared/newCharacter.js';

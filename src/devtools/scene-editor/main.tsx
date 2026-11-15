@@ -1,4 +1,4 @@
-import { sceneAssetCatalog } from '../../engine/SceneAssets.js';
+import { sceneAssetCatalog } from '../../engine/core.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { projectEditorContext } from '../project/projectBridge.js';

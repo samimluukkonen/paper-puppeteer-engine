@@ -1,9 +1,7 @@
 import type Phaser from 'phaser';
-import { localToWorld, worldToLocal } from '../../engine/affineMath.js';
-import type { TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import { meshEdges } from '../../engine/meshEditing.js';
-import { boneWeightColor } from '../../engine/meshWeightPainting.js';
-import type { Puppet } from '../../engine/Puppet.js';
+import { localToWorld, worldToLocal, meshEdges, boneWeightColor } from '../../engine/core.js';
+import type { TwoBoneIKDefinition } from '../../engine/data.js';
+import type { Puppet } from '../../engine/runtime.js';
 import { gridLines } from './grid.js';
 import type { RigEditorSelection, RigEditorState } from './RigEditorState.js';
 import { rigIKBendArrow } from './rigIKBendArrow.js';

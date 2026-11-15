@@ -1,5 +1,4 @@
-import { evaluateCurveProgress } from '../../engine/animationCurves.js';
-import { interpolateNumber, quantizePlaybackTime } from '../../engine/animationMath.js';
+import { evaluateCurveProgress, interpolateNumber, quantizePlaybackTime } from '../../engine/core.js';
 import type { ReadonlyAnimation } from './AnimationEditorState.js';
 import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
 

@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { sceneImageReferenceSchema } from '../../engine/SceneDefinition.js';
-import { identifierSchema } from '../../engine/schemas.js';
+import { sceneImageReferenceSchema, identifierSchema } from '../../engine/core.js';
 import { groundGuideSchema } from './groundGuide.js';
 
 /** Project editor metadata only. Never consumed by CharacterLoader, Puppet or scene choreography. */

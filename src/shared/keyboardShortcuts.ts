@@ -1,6 +1,6 @@
-import { isTypingTarget } from '../engine/keyboardTarget.js';
+import { isTypingTarget } from '../engine/core.js';
 
-export { isTypingTarget } from '../engine/keyboardTarget.js';
+export { isTypingTarget } from '../engine/core.js';
 
 /** Dialog controls keep their keyboard behavior without changing the background workspace. */
 export function isDialogTarget(target: EventTarget | null): boolean {

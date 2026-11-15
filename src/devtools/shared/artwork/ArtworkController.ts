@@ -1,13 +1,13 @@
 import type Phaser from 'phaser';
 import {
+  replacementOriginScale,
+  DEFAULT_CHARACTER_TEXTURE_LIMITS as limits,
   type ArtworkAlignmentPolicy,
   type ArtworkReference,
   type ArtworkReplacement,
-  replacementOriginScale,
-} from '../../../engine/artworkReplacement.js';
-import type { CharacterDefinition } from '../../../engine/CharacterDefinition.js';
-import { DEFAULT_CHARACTER_TEXTURE_LIMITS as limits } from '../../../engine/characterTextureLimits.js';
-import type { Puppet } from '../../../engine/Puppet.js';
+} from '../../../engine/core.js';
+import type { CharacterDefinition } from '../../../engine/data.js';
+import type { Puppet } from '../../../engine/runtime.js';
 import { assetFilename } from '../assetFilename.js';
 import { SnapshotHistory } from '../SnapshotHistory.js';
 import { notifySubscribers } from '../subscriberNotifications.js';

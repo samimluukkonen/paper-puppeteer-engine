@@ -1,5 +1,5 @@
 import CornerDownLeft from 'lucide-react/icons/corner-down-left';
-import { compareDialogueLines, dialogueSpeaker } from '../../engine/sceneDialogue.js';
+import { compareDialogueLines, dialogueSpeaker } from '../../engine/core.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';

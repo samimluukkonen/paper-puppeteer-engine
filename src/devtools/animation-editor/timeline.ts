@@ -1,4 +1,4 @@
-import { DEFAULT_ANIMATION_FPS } from '../../engine/animationMath.js';
+import { DEFAULT_ANIMATION_FPS } from '../../engine/core.js';
 import { type Milliseconds, type Seconds, toSeconds } from './timeUnits.js';
 
 /** Editor coordinates use continuous seconds; external clips and the runtime use milliseconds. */

@@ -1,5 +1,5 @@
-import type { Rig } from '../../engine/Rig.js';
-import { sampleRootMotion, type RootMotionOffset, type RootMotionProperty } from '../../engine/rootMotion.js';
+import { sampleRootMotion, type RootMotionOffset, type RootMotionProperty } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEditActions } from './AnimationEditSession.js';
 import { motionPreviewSampleTime } from './motionPreview.js';

@@ -1,11 +1,13 @@
 import GitCompareArrows from 'lucide-react/icons/git-compare-arrows';
 import { useMemo, useState, type ReactNode } from 'react';
-import { createRigBoneMapping, type IdentifiedRig, type RigBoneMapping } from '../../engine/rigBoneMapping.js';
 import {
+  createRigBoneMapping,
   analyzeRigCompatibility,
   suggestRigBoneMapping,
+  type IdentifiedRig,
+  type RigBoneMapping,
   type RigMappingSuggestions,
-} from '../../engine/rigCompatibility.js';
+} from '../../engine/core.js';
 import { CharacterRigSelect } from '../shared/CharacterRigSelect.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';

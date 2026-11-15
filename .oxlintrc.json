@@ -62,6 +62,29 @@
         "jsx-a11y/aria-role": "error",
         "jsx-a11y/role-has-required-aria-props": "error"
       }
+    },
+    {
+      "files": ["src/devtools/**/*", "src/ui/**/*", "src/shared/**/*", "src/examples/**/*", "src/main.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/engine/**",
+                  "!**/engine/core.js",
+                  "!**/engine/runtime.js",
+                  "!**/engine/data.js",
+                  "!**/engine/index.js",
+                  "!**/engine/serialization.js"
+                ],
+                "message": "Outside src/engine, import engine modules only through the core/runtime/data barrels."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

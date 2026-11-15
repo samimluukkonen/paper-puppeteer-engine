@@ -1,7 +1,10 @@
-import { canonicalJson } from '../../../engine/authoredSerialization.js';
-import { characterManifestSchema } from '../../../engine/CharacterDefinition.js';
-import { freezeData, type DeepReadonly } from '../../../engine/readonlyData.js';
-import { parseSceneDefinition } from '../../../engine/SceneDefinition.js';
+import {
+  canonicalJson,
+  characterManifestSchema,
+  freezeData,
+  parseSceneDefinition,
+  type DeepReadonly,
+} from '../../../engine/core.js';
 import { parseProjectDefinition } from '../../project/ProjectDefinition.js';
 import { buildProjectPackage, packageHostedCharacter } from '../../project/projectPackage.js';
 import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';

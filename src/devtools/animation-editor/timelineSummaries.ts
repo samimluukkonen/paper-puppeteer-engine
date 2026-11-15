@@ -1,7 +1,5 @@
-import type { Keyframe } from '../../engine/AnimationClip.js';
-import type { IKKeyframe, IKAnimationProperty } from '../../engine/ik/animationKeyframes.js';
-import type { TransformProperty } from '../../engine/types.js';
-import { transformProperties } from '../../engine/types.js';
+import { transformProperties } from '../../engine/core.js';
+import type { Keyframe, IKKeyframe, IKAnimationProperty, TransformProperty } from '../../engine/data.js';
 import { timeToTimelineX } from './timeline.js';
 import { type Seconds, toSeconds } from './timeUnits.js';
 

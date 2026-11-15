@@ -1,6 +1,10 @@
-import { type RigJsonDefinition, validateRigDefinition } from '../../engine/externalData.js';
-import { readJsonFile } from '../../engine/jsonInput.js';
-import { JsonWorkloadBudget, type JsonWorkloadLimitOptions } from '../../engine/jsonWorkloadLimits.js';
+import {
+  validateRigDefinition,
+  readJsonFile,
+  JsonWorkloadBudget,
+  type RigJsonDefinition,
+  type JsonWorkloadLimitOptions,
+} from '../../engine/core.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { RigEditor } from './RigEditor.js';

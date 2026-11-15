@@ -1,7 +1,5 @@
-import { quantizePlaybackTime } from '../../engine/animationMath.js';
-import { IsolatedIKSampler, type IKTargetValues } from '../../engine/ik/IsolatedIKSampler.js';
-import { isFullyFrozen } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { quantizePlaybackTime, IsolatedIKSampler, isFullyFrozen, type IKTargetValues } from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import type { AnimationData } from './keyframeTargets.js';
 import { getCompiledPreviewClip } from './previewClip.js';
 

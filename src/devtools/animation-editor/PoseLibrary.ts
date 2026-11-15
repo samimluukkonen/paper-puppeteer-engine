@@ -1,10 +1,14 @@
-import { canonicalJson } from '../../engine/authoredSerialization.js';
-import { equalJsonData } from '../../engine/equalJsonData.js';
-import { parsePoseDefinition, type PoseDefinition } from '../../engine/Pose.js';
-import { freezeData, type DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
-import { identifierSchema } from '../../engine/schemas.js';
-import { createTransform } from '../../engine/types.js';
+import {
+  canonicalJson,
+  equalJsonData,
+  parsePoseDefinition,
+  freezeData,
+  identifierSchema,
+  createTransform,
+  type PoseDefinition,
+  type DeepReadonly,
+} from '../../engine/core.js';
+import type { Rig } from '../../engine/data.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
 
 export interface LibraryPose {

@@ -1,7 +1,5 @@
-import type { AnimationClip, AnimationEvent } from '../../engine/AnimationClip.js';
-import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/externalData.js';
-import type { DeepReadonly } from '../../engine/readonlyData.js';
-import type { Rig } from '../../engine/Rig.js';
+import { ANIMATION_FORMAT_VERSION, parseAnimationClip } from '../../engine/core.js';
+import type { AnimationClip, AnimationEvent, DeepReadonly, Rig } from '../../engine/data.js';
 import { equalEditorData, freezeData, isFullyFrozen } from '../shared/editorData.js';
 import { type Milliseconds, type Seconds, toSeconds } from './timeUnits.js';
 import { getValidatedEditorAnimation, validateEditedAnimation } from './validatedAnimation.js';

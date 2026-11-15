@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
-import type { AnimationPose } from '../../engine/AnimationPose.js';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
-import type { RigJsonDefinition } from '../../engine/externalData.js';
-import { getFootContactWorldPosition } from '../../engine/footContactMarkers.js';
-import type { TwoBoneIKConstraint } from '../../engine/ik/TwoBoneIKConstraint.js';
-import type { IKTargetProvider, TwoBoneIKDefinition } from '../../engine/ik/types.js';
-import { Puppet } from '../../engine/Puppet.js';
-import { Rig } from '../../engine/Rig.js';
-import type { Facing } from '../../engine/types.js';
+import { getFootContactWorldPosition, Rig } from '../../engine/core.js';
+import type {
+  AnimationPose,
+  CharacterDefinition,
+  RigJsonDefinition,
+  TwoBoneIKConstraint,
+  IKTargetProvider,
+  TwoBoneIKDefinition,
+  Facing,
+} from '../../engine/data.js';
+import { Puppet } from '../../engine/runtime.js';
 import { loadSceneCharacter } from '../../shared/loadSceneCharacter.js';
 import type { ProjectCharacterDocument } from '../project/ProjectCharacterDocument.js';
 import { RigEditor } from '../rig-editor/RigEditor.js';

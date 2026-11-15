@@ -5,9 +5,13 @@ import ListVideo from 'lucide-react/icons/list-video';
 import MessagesSquare from 'lucide-react/icons/messages-square';
 import Volume2 from 'lucide-react/icons/volume-2';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { CAMERA_PROPERTIES, type CameraProperty } from '../../engine/cameraAnimation.js';
-import type { SceneAudioClip } from '../../engine/sceneAudio.js';
-import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
+import {
+  CAMERA_PROPERTIES,
+  sceneActionDuration,
+  type CameraProperty,
+  type SceneActionDefinition,
+} from '../../engine/core.js';
+import type { SceneAudioClip } from '../../engine/data.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { generateRulerTicks, timeToTimelineX, timelineXToTime } from '../animation-editor/timeline.js';

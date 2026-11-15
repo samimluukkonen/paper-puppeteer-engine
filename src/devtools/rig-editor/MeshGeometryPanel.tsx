@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { meshEdges } from '../../engine/meshEditing.js';
+import { meshEdges } from '../../engine/core.js';
 import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';

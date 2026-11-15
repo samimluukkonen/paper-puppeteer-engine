@@ -1,4 +1,4 @@
-import { localToWorld, worldToLocal, type Affine, type Point } from '../../engine/affineMath.js';
+import { localToWorld, worldToLocal, type Affine, type Point } from '../../engine/core.js';
 
 /** Root translation uses the puppet's linear placement transform, never a pelvis/bone transform. */
 export function rootMotionMatrix(matrix: Affine, origin: Point): Affine {

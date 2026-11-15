@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import type { CharacterDefinition } from '../../engine/CharacterDefinition.js';
+import type { CharacterDefinition } from '../../engine/data.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { AnimationLibrary } from '../shared/AnimationLibrary.js';
 import { existingAnimationReference } from '../shared/animationLibraryData.js';

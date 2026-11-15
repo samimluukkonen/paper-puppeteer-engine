@@ -3,8 +3,8 @@ import {
   evaluateCameraAtTime,
   type CameraProperty,
   type CameraKeyframe,
-} from '../../engine/cameraAnimation.js';
-import type { CinematicCameraState } from '../../engine/cinematicCamera.js';
+} from '../../engine/core.js';
+import type { CinematicCameraState } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 type CommandState = Pick<

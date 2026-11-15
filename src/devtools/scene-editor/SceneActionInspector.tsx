@@ -1,6 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { evaluateRootMotionAtElapsedTime } from '../../engine/rootMotion.js';
-import { sceneActionDuration, type SceneActionDefinition } from '../../engine/SceneDefinition.js';
+import { evaluateRootMotionAtElapsedTime, sceneActionDuration, type SceneActionDefinition } from '../../engine/core.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';

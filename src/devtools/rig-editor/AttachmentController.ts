@@ -1,5 +1,4 @@
-import type { CreateIKConstraintOptions, IKConstraintPatch } from '../../engine/ik/ikAuthoring.js';
-import type { FootContactMarker } from '../../engine/types.js';
+import type { CreateIKConstraintOptions, IKConstraintPatch, FootContactMarker } from '../../engine/data.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { notifySubscribers } from '../shared/subscriberNotifications.js';

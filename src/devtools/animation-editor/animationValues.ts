@@ -1,8 +1,13 @@
-import type { CompiledClip } from '../../engine/AnimationClip.js';
-import { quantizePlaybackTime } from '../../engine/animationMath.js';
-import { type AnimationPose, ClipPoseBuffer } from '../../engine/AnimationPose.js';
-import type { Rig } from '../../engine/Rig.js';
-import { assertFinite, createTransform, type JointTransform, type TransformProperty } from '../../engine/types.js';
+import {
+  quantizePlaybackTime,
+  ClipPoseBuffer,
+  assertFinite,
+  createTransform,
+  type AnimationPose,
+  type JointTransform,
+  type TransformProperty,
+} from '../../engine/core.js';
+import type { CompiledClip, Rig } from '../../engine/data.js';
 import { isFullyFrozen } from '../shared/editorData.js';
 import { type AnimationData, assertTarget } from './keyframeTargets.js';
 import { getCompiledPreviewClip } from './previewClip.js';
