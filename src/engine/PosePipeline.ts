@@ -18,8 +18,8 @@ export interface SyncPoseOptions {
 
 /** External pose channels attached for previews. Absent channels fall back to the runtime player. */
 export interface PoseSource {
-  /** Sampled bone-local pose keyed by bone id; projected after presets and before IK. */
-  readonly pose?: ReadonlyMap<string, Readonly<JointTransform>> | undefined;
+  /** Sampled bone-local pose keyed by bone id; entries merge over the live pose, then presets apply and IK runs. */
+  readonly pose?: ReadonlyMap<string, Readonly<Partial<JointTransform>>> | undefined;
   readonly ikAnimation?: IKAnimationPose | undefined;
   readonly meshDeformation?: MeshDeformationPose | undefined;
 }
@@ -53,7 +53,7 @@ export class PosePipeline {
   private activePose: { pose: PoseDefinition; mix: number } | undefined;
   private readonly poseUnderlying = new Map<string, Partial<JointTransform>>();
   private poseSource: PoseSource | undefined;
-  private projectedPose: ReadonlyMap<string, Readonly<JointTransform>> | undefined;
+  private projectedPose: ReadonlyMap<string, Readonly<Partial<JointTransform>>> | undefined;
   private poseRevision = 0;
   private synchronizedPoseRevision = -1;
   private destroyed = false;

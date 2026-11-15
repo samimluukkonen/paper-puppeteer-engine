@@ -7,6 +7,7 @@ import {
   computeRenderOrder,
   Rig,
   createTransform,
+  type AnimationPose,
   type RigDefinition,
 } from '../../engine/core.js';
 import type {
@@ -42,6 +43,7 @@ export class RigEditor {
   }
   private artworkDraft: { id: string; attachment: boolean; values: Partial<Record<SpriteField, number>> } | undefined;
   private previewClip: CompiledClip | undefined;
+  private detachPreviewPoseSource: (() => void) | undefined;
   private appliedCatalog: RigDefinition | undefined;
   private appliedSkins: readonly import('../../engine/data.js').SkinDefinition[] | undefined;
   previewTime = 0;
@@ -189,6 +191,8 @@ export class RigEditor {
     this.inputController = undefined;
     // oxlint-disable-next-line typescript/unbound-method -- Phaser uses the explicit listener context supplied below.
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
+    this.detachPreviewPoseSource?.();
+    this.detachPreviewPoseSource = undefined;
     this.meshDiagnostics?.destroy();
     this.meshDiagnostics = undefined;
     this.overlay.destroy();
@@ -343,8 +347,10 @@ export class RigEditor {
   }
 
   private applyRig(rig: RigDefinition): void {
-    this.puppet.posePipeline.preparePose();
+    const pipeline = this.puppet.posePipeline;
+    pipeline.preparePose();
     // Preview the same logical joint positions that an exported rig loads with.
+    // Authored rig-bone edits stay direct edits; they are not a preview.
     const definitions = new Map(rig.bones.map((bone) => [bone.id, bone]));
     for (const edited of rig.bones) {
       const runtime = this.puppet.getBone(edited.id);
@@ -363,14 +369,20 @@ export class RigEditor {
         );
       }
     }
+    // The clip preview (and test bend) project through an attached pose source
+    // instead of hand-copying sampled transforms into the live bones.
+    const previewPose: AnimationPose = new Map();
     if (this.previewClip) {
-      const pose = evaluateClip(this.previewClip, this.previewTime);
-      for (const [id, transform] of pose) {
-        if (definitions.has(id)) Object.assign(this.puppet.getBone(id).pose, transform);
-      }
+      for (const [id, transform] of evaluateClip(this.previewClip, this.previewTime))
+        if (definitions.has(id)) previewPose.set(id, transform);
     }
     if (this.weightPreviewEnabled && definitions.has(this.weightPreviewBoneId)) {
-      this.puppet.getBone(this.weightPreviewBoneId).pose.rotation += this.weightPreviewRotation;
+      const bone = this.puppet.getBone(this.weightPreviewBoneId);
+      const clipValues = previewPose.get(this.weightPreviewBoneId);
+      previewPose.set(this.weightPreviewBoneId, {
+        ...clipValues,
+        rotation: (clipValues?.rotation ?? bone.pose.rotation) + this.weightPreviewRotation,
+      });
     }
     for (const slot of rig.slots ?? []) {
       this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
@@ -389,7 +401,14 @@ export class RigEditor {
       }
     }
     this.updateRenderOrder(rig);
-    this.puppet.posePipeline.syncPose();
+    this.detachPreviewPoseSource?.();
+    if (previewPose.size) {
+      // attachPoseSource owns prepare -> attach -> project, so the preview needs no manual sync here.
+      this.detachPreviewPoseSource = this.puppet.attachPoseSource({ pose: previewPose });
+    } else {
+      this.detachPreviewPoseSource = undefined;
+      pipeline.syncPose();
+    }
   }
 
   private updateRenderOrder(rig: RigDefinition): void {

@@ -11,6 +11,7 @@ import { composeAffine, transformToAffine } from '../src/engine/affineMath.js';
 import { compileClip, type CompiledClip } from '../src/engine/AnimationClip.js';
 import { parseRigDefinition } from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
+import type { PoseSource } from '../src/engine/PosePipeline.js';
 import type { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 
@@ -134,7 +135,14 @@ function fixture(mode: EditMode = 'sprite', attachment = false, facing = 1) {
     getSlotImage: () => (attachment ? image : undefined),
     getSlotMesh: () => undefined,
     posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
-    attachPoseSource: vi.fn(() => vi.fn()),
+    // Mimic the pipeline's attach projection: merge the source pose onto the mock bones.
+    attachPoseSource: (source?: PoseSource) => {
+      for (const [id, values] of source?.pose ?? []) {
+        const bone = bones[id as keyof typeof bones];
+        if (bone) Object.assign(bone.pose, values);
+      }
+      return () => {};
+    },
     setSlotTransform: vi.fn(),
     setRenderOrder: vi.fn(),
     setFacing: vi.fn(),
