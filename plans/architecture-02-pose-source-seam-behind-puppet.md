@@ -38,3 +38,10 @@ Make the engine's entry point structural and give `Puppet` a small preview inter
 - `AnimationEditorPreview.refresh()` reduces to: build source → attach → sample (no manual pose copying).
 - No public method of `AnimationPlayer` takes per-call pose hooks anymore.
 - Full test suite passes.
+
+## Recorded decisions (follow-up: architecture-10, commits 6a06e0e, f7b5f98, 5f548cc)
+
+- `PoseSource.pose` channel ratified as intentional. The spec'd `{ ikAnimation, meshDeformation }` shape grew a `pose` channel because the editor previews project sampled poses through it. Entries are partial transforms merged over the live bone pose (`Object.assign`) on projection — after restore, before presets and IK. A newly attached source projects once; later syncs keep direct bone edits until re-attach or detach (covered by `tests/poseSourcePreview.test.ts`).
+- `previewClip` throwaway-player strategy recorded as intentional. It builds and disposes a fresh `AnimationPlayer` per call instead of sampling on the pipeline's player, so previewing never moves runtime clocks, fires events, or applies root motion. Covered by `tests/poseSourcePreview.test.ts`.
+- `attachPoseSource` owns the full prepare → attach → project ordering, so editor call sites reduce to build source → sample → attach with no manual `preparePose()`/`syncPose()` (AnimationEditorPreview) and no `Object.assign` copies into live bones (RigEditor clip preview; authored rig edits stay direct edits).
+- Facade shrink outcome: `Puppet.animationPlayer` is private (player access routes through `PosePipeline.player`), and the pose-sync protocol (`preparePose`/`syncPose`/`syncIK`/`markPoseDirty`/`refreshDebugViews`) lives on `PosePipeline`, exposed only as `@internal puppet.posePipeline` for engine internals and tests. Puppet's public surface keeps lifecycle/placement/facing/slots/animation-control/pose-preset APIs plus the `attachPoseSource`/`previewClip` preview seam; the per-call pose-hook parameters on `AnimationPlayer` remain removed (constructor-injected `PoseHooks` only).
