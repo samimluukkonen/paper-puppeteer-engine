@@ -70,7 +70,7 @@ function fixture(options: Partial<Omit<PuppetOptions, 'definition' | 'rig'>> = {
   });
   const actor = new Actor({ id: 'hero', puppet });
   live.push(actor);
-  return { scene, puppet, actor, player: puppet.animationPlayer };
+  return { scene, puppet, actor, player: puppet.posePipeline.player };
 }
 function close(actual: { x: number; y: number }, expected: { x: number; y: number }) {
   assert.closeTo(actual.x, expected.x, 1e-8);

@@ -55,7 +55,7 @@ function states(puppet: Puppet) {
 }
 function resources(puppet: Puppet): number[] {
   return ['lifecycleListeners', 'settledCompletionListeners', 'pendingWaitDisposers'].map(
-    (key) => (Reflect.get(puppet.animationPlayer, key) as Set<unknown>).size,
+    (key) => (Reflect.get(puppet.posePipeline.player, key) as Set<unknown>).size,
   );
 }
 
@@ -91,7 +91,7 @@ test.each([
       assert.notInclude(authored, `${from}:middle`);
       assert.include(authored, `${to}:middle`);
       puppet.update(50);
-      assert.isUndefined(puppet.animationPlayer.transition);
+      assert.isUndefined(puppet.posePipeline.player.transition);
     } finally {
       puppet.destroy();
     }
@@ -141,16 +141,16 @@ test('pause and speed zero hold clocks; fades use elapsed milliseconds and stopQ
     puppet.resumeAnimation().setAnimationSpeed(0);
     puppet.update(50);
     assert.equal(puppet.getPlaybackStatus()!.elapsedTime, 0);
-    assert.equal(puppet.animationPlayer.transition!.progress, 0.25);
+    assert.equal(puppet.posePipeline.player.transition!.progress, 0.25);
     puppet.setAnimationSpeed(1);
     puppet.update(25);
     assert.equal(puppet.getPlaybackStatus()!.elapsedTime, 50);
     const overlayTime = puppet.getPlaybackStatus('upper')!.elapsedTime;
-    const fade = puppet.animationPlayer.transition!.progress;
+    const fade = puppet.posePipeline.player.transition!.progress;
     puppet.stopQueue();
     assert.equal((await result).status, 'stopped');
     puppet.update(100);
-    assert.equal(puppet.animationPlayer.transition!.progress, fade);
+    assert.equal(puppet.posePipeline.player.transition!.progress, fade);
     assert.equal(puppet.getPlaybackStatus('upper')!.elapsedTime, overlayTime + 100);
     assert.equal(puppet.getBone('upper').pose.x, 5);
   } finally {
@@ -251,7 +251,7 @@ test('steady controller updates evaluate and synchronize once without creating r
   const scene = puppetScene();
   const puppet = fixture(scene);
   const controller = states(puppet);
-  const evaluate = vi.spyOn(puppet.animationPlayer, 'applyCurrentPose');
+  const evaluate = vi.spyOn(puppet.posePipeline.player, 'applyCurrentPose');
   const sync = vi.spyOn(puppet, 'syncPose');
   const images = vi.spyOn(scene.add, 'image');
   const containers = vi.spyOn(scene.add, 'container');

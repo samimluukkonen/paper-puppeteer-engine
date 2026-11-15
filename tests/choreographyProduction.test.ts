@@ -67,8 +67,8 @@ function resources(puppet: Puppet) {
   return [
     [puppet, 'updateListeners'],
     [puppet, 'destroyListeners'],
-    [puppet.animationPlayer, 'lifecycleListeners'],
-    [puppet.animationPlayer, 'pendingWaitDisposers'],
+    [puppet.posePipeline.player, 'lifecycleListeners'],
+    [puppet.posePipeline.player, 'pendingWaitDisposers'],
   ].map(([owner, key]) => {
     const listeners: unknown = Reflect.get(owner as object, key as string);
     assert.instanceOf(listeners, Set);
@@ -245,7 +245,7 @@ test.each(['reach', 'baked'] as const)(
       for (const delta of [13, 87, 150, 250, 500]) {
         puppet.update(delta);
         reference.update(delta);
-        assert.equal(puppet.animationPlayer.elapsedTime, reference.animationPlayer.elapsedTime);
+        assert.equal(puppet.posePipeline.player.elapsedTime, reference.posePipeline.player.elapsedTime);
         for (const bone of definition.rig.bones) {
           assert.deepEqual(puppet.getBone(bone.id).pose, reference.getBone(bone.id).pose);
           const actual = puppet.getBone(bone.id).container.getWorldTransformMatrix();

@@ -728,7 +728,7 @@ test('mask eligibility compiles vertex influences once and refreshes for masks a
 test('runtime and editor-source rendering consume live channels without creating public snapshots', () => {
   const { rig, clip } = fixture();
   const puppet = new Puppet(puppetScene(), { rig, animations: [clip], skin: 'default', autoUpdate: false });
-  const snapshotReads = vi.spyOn(puppet.animationPlayer, 'meshDeformation', 'get');
+  const snapshotReads = vi.spyOn(puppet.posePipeline.player, 'meshDeformation', 'get');
   puppet.play(clip.name);
   puppet.update(100);
   puppet.update(100);

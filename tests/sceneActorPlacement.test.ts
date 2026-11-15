@@ -202,7 +202,7 @@ test('real Actor/Puppet previews share definitions but isolate placement, facing
   assert.equal(second.puppet.getBone('root').pose.x, 0);
   assert.equal(first.puppet.getAttachment('hand'), 'alternate-art');
   assert.equal(second.puppet.getAttachment('hand'), 'plain-art');
-  assert.isTrue(first.puppet.animationPlayer.isPaused, 'initial pose is sampled without scene playback');
+  assert.isTrue(first.puppet.posePipeline.player.isPaused, 'initial pose is sampled without scene playback');
   document.updateActor(id, { position: { x: -210, y: 30 } });
   document.reorderActor(id, 1);
   preview.sync(document.workingScene!, definitions);
@@ -375,7 +375,7 @@ test('changing initial appearance suppresses authored animation events and leave
   preview.sync(document.workingScene!, definitions);
   assert.equal(events.mock.calls.length, 0);
   assert.equal(actor.puppet.getBone('root').pose.x, 13);
-  assert.isUndefined(actor.puppet.animationPlayer.transition);
+  assert.isUndefined(actor.puppet.posePipeline.player.transition);
   preview.dispose();
 });
 

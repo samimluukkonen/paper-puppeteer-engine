@@ -209,7 +209,7 @@ export class ActorMovement {
           playbackId !== undefined &&
           this.puppet.getPlaybackStatus()?.playbackId === playbackId &&
           !this.puppet.isDestroyed &&
-          !this.puppet.animationPlayer.isDisposed
+          !this.puppet.posePipeline.player.isDisposed
         ) {
           try {
             this.puppet.play(mapping.idle, { loop: true, restart: true, fadeDuration: mapping.fadeDuration ?? 0 });
@@ -307,7 +307,7 @@ export class ActorMovement {
     // Release subscriptions before invoking any animation callbacks.
     this.release(request);
     try {
-      if (restore && ownsPlayback && !this.puppet.isDestroyed && !this.puppet.animationPlayer.isDisposed) {
+      if (restore && ownsPlayback && !this.puppet.isDestroyed && !this.puppet.posePipeline.player.isDisposed) {
         // Reuse the runtime's crossfade and identity policy; never restart walk from update().
         this.puppet.play(request.locomotion!.idle, {
           loop: true,

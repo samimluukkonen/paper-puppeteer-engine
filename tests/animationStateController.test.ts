@@ -611,7 +611,7 @@ test('Puppet state/action transitions synchronize rendering and retain overlays,
   const target = constraint.target;
   const verify = () => {
     assert.equal(puppet.getPlaybackStatus('upper')!.playbackId, overlayId);
-    assert.equal(puppet.animationPlayer.getLayerWeight('upper'), 0.5);
+    assert.equal(puppet.posePipeline.player.getLayerWeight('upper'), 0.5);
     assert.equal(puppet.getBone('middle').pose.x, 2);
     assert.equal(puppet.getBone('root').pose.y, 0);
     assert.strictEqual(puppet.getIK('chain'), constraint);

@@ -294,7 +294,7 @@ export class SceneRunner implements ScenePlayback {
   private resumeActors(): void {
     this.state = 'playing';
     for (const actor of this.instances.values()) {
-      actor.puppet.animationPlayer.setPreviewMode(false);
+      actor.puppet.posePipeline.player.setPreviewMode(false);
       actor.resumeAnimation();
     }
   }
@@ -359,7 +359,7 @@ export class SceneRunner implements ScenePlayback {
           // movement identities, event cursors and root-motion origins together.
           this.state = 'paused';
           for (const actor of this.instances.values()) {
-            actor.puppet.animationPlayer.setPreviewMode(true, { applyRootMotion: true });
+            actor.puppet.posePipeline.player.setPreviewMode(true, { applyRootMotion: true });
             actor.resumeAnimation();
           }
         } else {
@@ -480,7 +480,7 @@ export class SceneRunner implements ScenePlayback {
         if (data.dialogueIdle && !actor.puppet.hasAnimation(data.dialogueIdle.animation))
           throw new Error(`Actor "${data.id}": unknown dialogue idle animation "${data.dialogueIdle.animation}".`);
         actor.puppet.container.setVisible(sceneLayer(this.definition, 'actors').visible);
-        actor.puppet.animationPlayer.setPreviewMode(!runtime, { applyRootMotion: true });
+        actor.puppet.posePipeline.player.setPreviewMode(!runtime, { applyRootMotion: true });
         actor.setPosition(data.position.x, data.position.y).setFacing(data.facing ?? 'right');
         if (data.skin !== undefined) actor.setSkin(data.skin);
         if (data.animation !== undefined) actor.play(data.animation, { restart: true, fadeDuration: 0 });
@@ -511,7 +511,7 @@ export class SceneRunner implements ScenePlayback {
         if (
           action.type === 'animation' &&
           action.movementSource === 'rootMotion' &&
-          !this.instances.get(action.actorId)!.puppet.animationPlayer.hasRootMotion(action.animation)
+          !this.instances.get(action.actorId)!.puppet.posePipeline.player.hasRootMotion(action.animation)
         )
           throw new Error(
             `Action "${action.id}": animation "${action.animation}" has no root-motion translation keys.`,
@@ -641,7 +641,7 @@ export class SceneRunner implements ScenePlayback {
       const status = puppet.getPlaybackStatus();
       if (
         status?.playbackId !== playbackId ||
-        puppet.animationPlayer.isPlaybackStopped() ||
+        puppet.posePipeline.player.isPlaybackStopped() ||
         (status.status === 'paused' && this.state === 'playing')
       ) {
         this.halt('interrupted');

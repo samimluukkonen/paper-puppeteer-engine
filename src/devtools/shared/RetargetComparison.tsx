@@ -52,7 +52,7 @@ export class RetargetComparisonScene extends Phaser.Scene {
       if (!loaded || this.disposed) return;
       const puppet = new Puppet(this, { definition: loaded, autoUpdate: false });
       this.puppets.push(puppet);
-      puppet.animationPlayer.setPreviewMode(true);
+      puppet.posePipeline.player.setPreviewMode(true);
       puppet.play(this.animations[index]!, { restart: true, loop: false, fadeDuration: 0 });
       puppet.pauseAnimation();
       this.overlays.push(this.add.graphics().setDepth(9000));

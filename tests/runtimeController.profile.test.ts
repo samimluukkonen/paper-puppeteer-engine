@@ -48,7 +48,7 @@ for (const count of [1, 20]) {
             if (workload === 'states') controllers[index]!.setState(frame % 2 ? 'walking' : 'idle');
             if (workload === 'crossfade' && frame % 10 === 0)
               puppet.play(frame % 20 ? 'idle' : 'walk', { fadeDuration: 150 });
-            if (workload === 'queue' && (!puppet.animationPlayer.isPlaying || frame === 0))
+            if (workload === 'queue' && (!puppet.posePipeline.player.isPlaying || frame === 0))
               puppet.replaceQueue([{ name: 'attack' }, { name: 'recover', options: { fadeDuration: 100 } }]);
             if (workload === 'async') {
               const result = puppet.playAndWait('attack', { fadeDuration: 150 });

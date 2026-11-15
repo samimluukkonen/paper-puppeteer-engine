@@ -5,7 +5,7 @@ import { assertFinite } from './types.js';
 export class DisposedChoreographyActorError extends Error {}
 
 export function assertChoreographyActorLive(actor: Actor): void {
-  if (actor.isDisposed || actor.puppet.isDestroyed || actor.puppet.animationPlayer.isDisposed)
+  if (actor.isDisposed || actor.puppet.isDestroyed || actor.puppet.posePipeline.player.isDisposed)
     throw new DisposedChoreographyActorError(`Choreography Actor "${actor.id}" is disposed.`);
 }
 

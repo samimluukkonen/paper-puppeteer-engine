@@ -475,7 +475,7 @@ test('Puppet awaits synchronize rendering, and destruction settles pending waits
   assert.equal((await disposed).status, 'disposed');
   assert.isTrue(root.isDestroyed);
   assert.isTrue(puppet.container.isDestroyed);
-  assert.deepEqual(resources(puppet.animationPlayer), [0, 0, 0]);
+  assert.deepEqual(resources(puppet.posePipeline.player), [0, 0, 0]);
   await rejects(puppet.playAndWait('a'), /disposed/);
 });
 
@@ -546,7 +546,7 @@ test('Puppet destruction still settles waits when a disposal listener throws', a
   assert.throws(() => puppet.destroy(), /dispose listener failed/);
   assert.equal((await pending).status, 'disposed');
   assert.isTrue(puppet.container.isDestroyed);
-  assert.deepEqual(resources(puppet.animationPlayer), [0, 0, 0]);
+  assert.deepEqual(resources(puppet.posePipeline.player), [0, 0, 0]);
 });
 
 test('owned wait cancellation stops only its fresh selected layer and releases wait resources', async () => {

@@ -371,7 +371,7 @@ test.each(['left', 'right'] as const)(
       for (const time of [0, 125, 500, 1000, 200]) {
         assert.deepEqual(evaluateClip(withMotion, time), evaluateClip(legacy, time));
         assert.deepEqual([...evaluateIKClip(withMotion, time)], [...evaluateIKClip(legacy, time)]);
-        puppet.animationPlayer.sample(time);
+        puppet.posePipeline.player.sample(time);
         assert.deepEqual(actor.position, { x: 123, y: 456 });
         assert.deepEqual(actor.worldPosition, { x: 123, y: 456 });
         assert.equal(puppet.container.scaleX, facing === 'left' ? -2 : 2);

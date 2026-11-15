@@ -335,7 +335,7 @@ test('start, pause, resume, speed, restart and stop use one scene clock', () => 
   runner.pause();
   runner.update(500);
   assert.equal(runner.time, 350);
-  assert.equal(runner.actors.get('a')!.puppet.animationPlayer.isPaused, true);
+  assert.equal(runner.actors.get('a')!.puppet.posePipeline.player.isPaused, true);
   runner.speed = 2;
   runner.play();
   runner.update(125);
@@ -740,7 +740,7 @@ test.each(
   const actor = runner.actors.get(target)!;
   const source = runner.actors.get(target === 'a' ? 'b' : 'a')!;
   const targetUpdate = vi.spyOn(actor.puppet, 'update');
-  const player = actor.puppet.animationPlayer;
+  const player = actor.puppet.posePipeline.player;
   source.puppet.onUpdate(() => {
     switch (operation) {
       case 'cancel-move':
@@ -783,7 +783,7 @@ test.each(['stop', 'stopQueue', 'clearAllLayers', 'restart'] as const)(
     const { runner, onCue } = fixture([clip(0, 2000), cue(1000)]);
     runner.play();
     runner.update(600);
-    const player = runner.actors.get('a')!.puppet.animationPlayer;
+    const player = runner.actors.get('a')!.puppet.posePipeline.player;
     assert.equal(player.getPlaybackStatus()?.status, 'completed');
     runner.actors.get('b')!.puppet.onUpdate(() => player[operation]());
     runner.update(1500);
@@ -803,7 +803,7 @@ test('pausing inside a cue keeps simultaneous commands and all Actor clocks sync
   runner.update(250);
   assert.equal(runner.actors.get('a')!.position.x, 25);
   assert.equal(runner.actors.get('b')!.position.x, 175);
-  assert.equal(runner.actors.get('a')!.puppet.animationPlayer.elapsedTime, 250);
+  assert.equal(runner.actors.get('a')!.puppet.posePipeline.player.elapsedTime, 250);
   assert.equal(onCue.mock.calls.length, 1);
 });
 
@@ -813,8 +813,8 @@ test('pausing from an animation event finishes the shared delta for every Actor'
   runner.actors.get('a')!.puppet.onAnimationEvent(() => runner.pause());
   runner.update(250);
   assert.equal(runner.status, 'paused');
-  assert.equal(runner.actors.get('a')!.puppet.animationPlayer.elapsedTime, 250);
-  assert.equal(runner.actors.get('b')!.puppet.animationPlayer.elapsedTime, 250);
+  assert.equal(runner.actors.get('a')!.puppet.posePipeline.player.elapsedTime, 250);
+  assert.equal(runner.actors.get('b')!.puppet.posePipeline.player.elapsedTime, 250);
   assert.equal(runner.actors.get('a')!.position.x, 25);
   assert.equal(runner.actors.get('b')!.position.x, 175);
 });
@@ -1004,12 +1004,12 @@ test('adjacent scene clips use hard cuts and held poses at the exact boundary', 
   const { runner } = fixture([clip(0, 500), { ...clip(500, 1000), animation: 'rest' }]);
   runner.play();
   runner.update(499);
-  assert.isUndefined(runner.actors.get('a')!.puppet.animationPlayer.transition);
+  assert.isUndefined(runner.actors.get('a')!.puppet.posePipeline.player.transition);
   runner.update(1);
   const actor = runner.actors.get('a')!;
   assert.equal(actor.currentAnimation, 'rest');
   assert.equal(actor.puppet.getBone('root').pose.x, 0);
-  assert.isUndefined(actor.puppet.animationPlayer.transition);
+  assert.isUndefined(actor.puppet.posePipeline.player.transition);
   runner.seek(500);
   assert.equal(runner.actors.get('a')!.puppet.getBone('root').pose.x, 0);
 });

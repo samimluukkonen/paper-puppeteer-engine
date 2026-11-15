@@ -156,7 +156,7 @@ test.each([-1, NaN, Infinity])('invalid update delta %s preserves movement and a
   const pending = actor.moveTo(100, 0, { speed: 100 });
   assert.throws(() => puppet.update(delta), /delta/);
   assert.equal(actor.position.x, 0);
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
   puppet.update(1000);
   assert.equal((await pending).status, 'completed');
 });
@@ -246,15 +246,15 @@ test('walkTo uses explicit names, looping locomotion and existing crossfades', a
   const pending = actor.walkTo(100, 0, { speed: 100 });
   const playbackId = puppet.getPlaybackStatus()?.playbackId;
   assert.equal(actor.currentAnimation, 'stride');
-  assert.deepEqual(puppet.animationPlayer.transition, { from: 'rest', to: 'stride', progress: 0 });
+  assert.deepEqual(puppet.posePipeline.player.transition, { from: 'rest', to: 'stride', progress: 0 });
   puppet.update(20);
-  assert.closeTo(puppet.animationPlayer.transition?.progress ?? -1, 0.5, 1e-10);
+  assert.closeTo(puppet.posePipeline.player.transition?.progress ?? -1, 0.5, 1e-10);
   puppet.update(480);
   assert.equal(puppet.getPlaybackStatus()?.playbackId, playbackId, 'No per-update locomotion restart.');
   puppet.update(500);
   assert.equal((await pending).status, 'completed');
   assert.equal(actor.currentAnimation, 'rest');
-  assert.deepEqual(puppet.animationPlayer.transition, { from: 'stride', to: 'rest', progress: 0 });
+  assert.deepEqual(puppet.posePipeline.player.transition, { from: 'stride', to: 'rest', progress: 0 });
 });
 
 test('walkTo requires a valid mapping and allows per-request overrides', async () => {
@@ -371,7 +371,7 @@ test('movement synchronizes world IK and bone positions without mixing bone anim
   puppet.update(500);
   assert.equal((await pending).status, 'completed');
   assert.deepEqual(actor.position, { x: 10, y: 0 });
-  assert.equal(puppet.animationPlayer.elapsedTime, 500);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 500);
   assert.closeTo(puppet.getBone('root').pose.x, 5, 1e-10);
   const end = puppet.getBone('end').container.getWorldTransformMatrix();
   assert.closeTo(end.tx, 12, 1e-8);
@@ -385,7 +385,7 @@ test('scene-driven movement needs no additional scene subscription and pauses in
   actor.pauseAnimation();
   events.emit('update', 0, 500);
   assert.equal(actor.position.x, 50);
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
   events.emit('update', 0, 500);
   assert.equal((await pending).status, 'completed');
 });

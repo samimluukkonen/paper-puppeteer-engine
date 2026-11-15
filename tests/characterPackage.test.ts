@@ -1033,8 +1033,8 @@ test('all shipped animations, IK and baked IK round-trip through ZIP → Charact
       original.play(clip.name);
       reloaded.play(clip.name);
       for (const time of [0, clip.duration * 0.25, clip.duration * 0.5, clip.duration - 0.001]) {
-        original.animationPlayer.sample(time);
-        reloaded.animationPlayer.sample(time);
+        original.posePipeline.player.sample(time);
+        reloaded.posePipeline.player.sample(time);
         original.syncPose();
         reloaded.syncPose();
         assert.deepEqual(evaluatedFootContacts(reloaded), evaluatedFootContacts(original));

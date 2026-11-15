@@ -377,7 +377,7 @@ test('hold-local overlays loop independently for multiple Actors while all cinem
   const mainId = hero.puppet.getPlaybackStatus()!.playbackId;
   expect(runner.dialogueHoldPlayback).toEqual({ sceneTime: 500, holdElapsedTime: 0 });
   expect(hero.puppet.getBone('root').pose.rotation).toBe(2);
-  expect(hero.puppet.animationPlayer.elapsedTime).toBe(500);
+  expect(hero.puppet.posePipeline.player.elapsedTime).toBe(500);
   runner.update(250);
   expect(hero.puppet.getBone('root').pose.rotation).toBeCloseTo(2.5);
   expect(friend.puppet.getBone('root').pose.scaleY).toBeCloseTo(0.5);
@@ -386,7 +386,7 @@ test('hold-local overlays loop independently for multiple Actors while all cinem
   expect(runner.time).toBe(500);
   expect(hero.position).toEqual({ x: 50, y: 0 });
   expect(friend.position).toEqual({ x: 50, y: 0 });
-  expect(hero.puppet.animationPlayer.elapsedTime).toBe(500);
+  expect(hero.puppet.posePipeline.player.elapsedTime).toBe(500);
   expect(hero.puppet.getPlaybackStatus()!.playbackId).toBe(mainId);
   expect(runner.cinematicCamera.x).toBe(50);
   expect(runner.transition.opacity).toBe(0.25);
@@ -478,21 +478,21 @@ test('idle overlays preserve a frozen interrupted crossfade and sparse manual ch
     puppet.update(300);
     puppet.play('walk', { fadeDuration: 800 });
     puppet.update(200);
-    puppet.animationPlayer.pause();
+    puppet.posePipeline.player.pause();
     puppet.getBone('root').pose.x = 17;
     puppet.syncPose();
     const before = { ...puppet.getBone('root').pose };
-    const transition = puppet.animationPlayer.transition;
-    const time = puppet.animationPlayer.elapsedTime;
+    const transition = puppet.posePipeline.player.transition;
+    const time = puppet.posePipeline.player.elapsedTime;
     puppet.beginDialogueIdle('blink');
     puppet.sampleDialogueIdle(1250);
     expect(puppet.getBone('root').pose.scaleY).toBeCloseTo(0.5);
     expect(puppet.getBone('root').pose.x).toBe(17);
-    expect(puppet.animationPlayer.transition).toEqual(transition);
-    expect(puppet.animationPlayer.elapsedTime).toBe(time);
+    expect(puppet.posePipeline.player.transition).toEqual(transition);
+    expect(puppet.posePipeline.player.elapsedTime).toBe(time);
     puppet.endDialogueIdle();
     expect(puppet.getBone('root').pose).toEqual(before);
-    expect(puppet.animationPlayer.transition).toEqual(transition);
+    expect(puppet.posePipeline.player.transition).toEqual(transition);
   } finally {
     puppet.destroy();
   }

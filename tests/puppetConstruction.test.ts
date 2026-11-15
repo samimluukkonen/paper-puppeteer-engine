@@ -62,13 +62,13 @@ test.each(['container', 'puppet'] as const)(
     puppet.container.ignoreDestroy = true;
     if (owner === 'container') puppet.container.destroy(true);
     else puppet.destroy();
-    assert.equal(puppet.animationPlayer.isDisposed, owner === 'puppet');
+    assert.equal(puppet.posePipeline.player.isDisposed, owner === 'puppet');
     assert.isFalse(puppet.container.isDestroyed);
     assert.equal(nativeDestroy.mock.calls.length, 0);
     puppet.container.ignoreDestroy = false;
     puppet.container.destroy(true);
     assert.deepEqual(nativeDestroy.mock.calls, [[true]]);
-    assert.isTrue(puppet.animationPlayer.isDisposed);
+    assert.isTrue(puppet.posePipeline.player.isDisposed);
   },
 );
 
@@ -87,7 +87,7 @@ test('a failing overlay cleanup does not retain skeletons or player state', () =
   assert.throws(() => puppet.destroy(), failure.message);
   assert.isTrue(puppet.container.isDestroyed);
   assert.isTrue(child.isDestroyed);
-  assert.isTrue(puppet.animationPlayer.isDisposed);
+  assert.isTrue(puppet.posePipeline.player.isDisposed);
   assert.throws(() => puppet.getBone('child'), /Unknown bone/);
 });
 
@@ -349,7 +349,7 @@ test('puppets share a character compilation while retaining independent playback
   second.play('move').update(25);
   assert.equal(first.getBone('arm').pose.x, 30);
   assert.equal(second.getBone('arm').pose.x, 25);
-  assert.equal(second.animationPlayer.elapsedTime, 25);
+  assert.equal(second.posePipeline.player.elapsedTime, 25);
   assert.equal(firstEvents.length, 1);
   assert.equal(secondEvents.length, 0);
   first.destroy();

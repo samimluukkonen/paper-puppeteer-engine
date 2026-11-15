@@ -98,9 +98,9 @@ function cinematic(runner: SceneRunner) {
       id,
       position: actor.position,
       facing: actor.facingDirection,
-      time: actor.puppet.animationPlayer.elapsedTime,
+      time: actor.puppet.posePipeline.player.elapsedTime,
       pose: actor.puppet.rig.bones.map(({ id }) => ({ ...actor.puppet.getBone(id).pose })),
-      deformation: [...actor.puppet.animationPlayer.meshDeformation].map(([id, vertices]) => [id, [...vertices]]),
+      deformation: [...actor.puppet.posePipeline.player.meshDeformation].map(([id, vertices]) => [id, [...vertices]]),
     })),
   };
 }
@@ -137,7 +137,7 @@ test('three-scene packaged film freezes every cinematic owner, advances exchange
     expect(forest.time).toBe(500);
     expect(forest.cinematicCamera).toEqual(camera);
     expect(forest.actors.get('hero')!.position).toEqual(heldPosition);
-    expect(forest.actors.get('hero')!.puppet.animationPlayer.elapsedTime).toBe(500);
+    expect(forest.actors.get('hero')!.puppet.posePipeline.player.elapsedTime).toBe(500);
     expect(forest.actors.get('hero')!.puppet.getBone('root').pose.scaleY).not.toBe(pose);
     expect(f.cues).toHaveBeenCalledTimes(cues);
     expect(f.events).toHaveBeenCalledTimes(events);

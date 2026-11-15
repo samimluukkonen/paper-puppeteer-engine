@@ -152,7 +152,7 @@ test('self and stale Actor targets preserve facing without reading a dead positi
   destroyed.puppet.destroy();
   source.actor.lookAt(destroyed.actor);
   const disposedPlayer = fixture();
-  disposedPlayer.puppet.animationPlayer.dispose();
+  disposedPlayer.puppet.posePipeline.player.dispose();
   source.actor.lookAt(disposedPlayer.actor);
   assert.equal(source.actor.facingDirection, 'left');
 });
@@ -237,7 +237,7 @@ test.each(['world', 'authored'] as const)(
         puppet.rig.bones.map(({ id }) => puppet.getBone(id).container.parentContainer),
         parents,
       );
-      assert.equal(puppet.animationPlayer.elapsedTime, 500);
+      assert.equal(puppet.posePipeline.player.elapsedTime, 500);
     }
     assert.equal(JSON.stringify(animation), before);
     assert.equal(JSON.stringify(puppet.rig), rigBefore);

@@ -415,7 +415,7 @@ test.each([0.5, 1, 2])('baked playback at speed %s preserves events, pause/resum
   }
   puppet.pauseAnimation();
   puppet.update(500);
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
   puppet.resumeAnimation();
   for (const delta of [250 / speed, 250 / speed, 550 / speed]) {
     puppet.update(delta);
@@ -427,12 +427,12 @@ test.each([0.5, 1, 2])('baked playback at speed %s preserves events, pause/resum
     ['start', 'contact', 'end'],
   );
   assert.equal(complete.mock.calls.length, 1);
-  assert.equal(puppet.animationPlayer.elapsedTime, 1050);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 1050);
   puppet.sampleAnimation(500);
   assert.equal(events.mock.calls.length, 3);
   puppet.play('loop', { restart: true });
   puppet.update(2100 / speed);
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
   assert.equal(complete.mock.calls.length, 1);
   assert.equal(puppet.getIK('left').status, 'inactive');
   puppet.destroy();

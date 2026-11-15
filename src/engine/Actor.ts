@@ -55,7 +55,7 @@ export class Actor {
     const ownership = options.puppetOwnership ?? 'borrowed';
     if (ownership !== 'borrowed' && ownership !== 'owned') throw new Error('Invalid Actor Puppet ownership.');
     const puppet = options.puppet;
-    if (!puppet || puppet.isDestroyed || puppet.animationPlayer.isDisposed)
+    if (!puppet || puppet.isDestroyed || puppet.posePipeline.player.isDisposed)
       throw new Error('Actor requires a live Puppet.');
     if (ownership === 'owned' && ownedPuppets.has(puppet)) throw new Error('Puppet already has an owning Actor.');
     this.id = options.id;
@@ -103,7 +103,7 @@ export class Actor {
 
   setPosition(x: number, y: number): this {
     this.assertActive();
-    if (this.puppet.animationPlayer.isApplyingRootMotion)
+    if (this.puppet.posePipeline.player.isApplyingRootMotion)
       throw new Error('setPosition conflicts with active root motion. Stop or replace playback first.');
     assertFinite(x, 'Actor x');
     assertFinite(y, 'Actor y');
@@ -223,7 +223,7 @@ export class Actor {
     this.assertActive();
     if (
       target instanceof Actor &&
-      (target === this || target.disposed || target.puppet.isDestroyed || target.puppet.animationPlayer.isDisposed)
+      (target === this || target.disposed || target.puppet.isDestroyed || target.puppet.posePipeline.player.isDisposed)
     )
       return this;
     const position = target instanceof Actor ? target.worldPosition : target;
@@ -290,7 +290,7 @@ export class Actor {
   }
 
   private assertActive(): void {
-    if (this.disposed || this.puppet.isDestroyed || this.puppet.animationPlayer.isDisposed)
+    if (this.disposed || this.puppet.isDestroyed || this.puppet.posePipeline.player.isDisposed)
       throw new Error('Actor has been disposed or its Puppet is no longer live.');
   }
 }

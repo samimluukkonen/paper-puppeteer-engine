@@ -90,12 +90,12 @@ test('hold presentation reuses IK sampling while preserving the main pose and no
   const puppet = fixture([clip(), idle]);
   try {
     puppet.update(250);
-    puppet.animationPlayer.pause();
+    puppet.posePipeline.player.pause();
     reaches(puppet, { x: 45, y: 70 });
     puppet.beginDialogueIdle('idle');
     puppet.sampleDialogueIdle(1250);
     reaches(puppet, { x: 30, y: 67.5 });
-    assert.equal(puppet.animationPlayer.elapsedTime, 250);
+    assert.equal(puppet.posePipeline.player.elapsedTime, 250);
     puppet.endDialogueIdle();
     reaches(puppet, { x: 45, y: 70 });
     assert.equal(JSON.stringify(idle), before);
@@ -122,7 +122,7 @@ test('authored A/B/C positions and sparse interpolation drive the existing solve
   ]) {
     puppet.sampleAnimation(time!);
     reaches(puppet, { x: x!, y: y! });
-    assert.equal(puppet.animationPlayer.elapsedTime, 0);
+    assert.equal(puppet.posePipeline.player.elapsedTime, 0);
     assert.equal(puppet.getIK('arm').bendDirection, 1);
   }
   assert.equal(event.mock.calls.length, 0);
@@ -233,9 +233,9 @@ test('layers blend channels independently, root-bone masks control chains, and c
   puppet.setLayerMask('upperBody', ['upper']);
   puppet.setLayerWeight('upperBody', 0.5);
   puppet.play('partial', { layer: 'upperBody' });
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 60);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.y!.value, 70);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.mix!.weight, 0.5);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 60);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.y!.value, 70);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.mix!.weight, 0.5);
   puppet.setLayerMask('upperBody', ['hand', 'other']);
   reaches(puppet, { x: 40, y: 70 });
   puppet.setLayerMask('upperBody', ['upper']);
@@ -256,7 +256,7 @@ test('crossfades and interrupted crossfades blend targets and influence with the
   puppet.play('b', { fadeDuration: 1000 });
   reaches(puppet, { x: 60, y: 60 });
   puppet.update(500);
-  const values = puppet.animationPlayer.ikAnimation.get('arm')!;
+  const values = puppet.posePipeline.player.ikAnimation.get('arm')!;
   assert.equal(values.x!.value, 20);
   assert.equal(values.y!.value, 70);
   assert.equal(values.mix!.value, 0.75);
@@ -264,9 +264,9 @@ test('crossfades and interrupted crossfades blend targets and influence with the
   puppet.play('c', { fadeDuration: 1000 });
   assert.deepEqual(puppet.getBone('upper').pose, held, 'interrupted fade starts from the held pose');
   puppet.update(500);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 10);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.y!.value, 80);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.mix!.value, 0.875);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 10);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.y!.value, 80);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.mix!.value, 0.875);
   puppet.update(500);
   reaches(puppet, { x: 0, y: 90 });
   puppet.destroy();
@@ -277,15 +277,15 @@ test('fading to/from absent target tracks releases ownership and preserves inter
   delete old.ikTracks;
   const puppet = fixture([old, clip('reach')]);
   puppet.play('reach', { fadeDuration: 1000 });
-  assert.equal(puppet.animationPlayer.ikAnimation.size, 0);
+  assert.equal(puppet.posePipeline.player.ikAnimation.size, 0);
   puppet.update(500);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.weight, 0.5);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.weight, 0.5);
   puppet.play('old', { fadeDuration: 1000 });
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.weight, 0.5);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.weight, 0.5);
   puppet.update(500);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.weight, 0.25);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.weight, 0.25);
   puppet.update(500);
-  assert.equal(puppet.animationPlayer.ikAnimation.size, 0);
+  assert.equal(puppet.posePipeline.player.ikAnimation.size, 0);
   assert.equal(puppet.getIK('arm').status, 'inactive');
   assert.approximately(puppet.getBone('upper').pose.rotation, 0.5, 1e-12);
   puppet.destroy();
@@ -300,7 +300,7 @@ test('partial overlay fade-in and scrub share base-only sampling semantics', () 
   puppet.sampleAnimation(750);
   reaches(puppet, { x: 40, y: 70 });
   puppet.preparePose();
-  puppet.animationPlayer.applyCurrentPose();
+  puppet.posePipeline.player.applyCurrentPose();
   puppet.syncPose();
   reaches(puppet, { x: 60, y: 70 });
   puppet.destroy();
@@ -335,20 +335,20 @@ test('stepped positions and fade weights hold while rendering continues, with ex
   puppet.update(50);
   reaches(puppet, { x: 60, y: 60 });
   puppet.update(50);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 48.6);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 48.6);
   puppet.destroy();
 });
 
 test('held stepped IK samples reuse immutable poses and changing frames preserve earlier snapshots', () => {
   const puppet = fixture([{ ...clip(), playback: { mode: 'stepped', fps: 10 } }]);
-  const first = puppet.animationPlayer.ikAnimation;
+  const first = puppet.posePipeline.player.ikAnimation;
   for (const delta of [20, 20, 59]) {
     puppet.update(delta);
-    assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+    assert.strictEqual(puppet.posePipeline.player.ikAnimation, first);
     reaches(puppet, { x: 60, y: 60 });
   }
   puppet.update(1);
-  const second = puppet.animationPlayer.ikAnimation;
+  const second = puppet.posePipeline.player.ikAnimation;
   assert.notStrictEqual(second, first);
   assert.equal(first.get('arm')!.x!.value, 60);
   assert.equal(second.get('arm')!.x!.value, 54);
@@ -356,11 +356,11 @@ test('held stepped IK samples reuse immutable poses and changing frames preserve
   assert.isTrue(Object.isFrozen(first.get('arm')!.x));
   assert.isFalse('set' in first);
   puppet.sampleAnimation(175, { mode: 'playback' });
-  const sampled = puppet.animationPlayer.ikAnimation;
+  const sampled = puppet.posePipeline.player.ikAnimation;
   puppet.sampleAnimation(199, { mode: 'playback' });
-  assert.strictEqual(puppet.animationPlayer.ikAnimation, sampled);
+  assert.strictEqual(puppet.posePipeline.player.ikAnimation, sampled);
   puppet.sampleAnimation(175, { mode: 'raw' });
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 49.5);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 49.5);
   assert.equal(sampled.get('arm')!.x!.value, 54);
   puppet.destroy();
 });
@@ -373,21 +373,21 @@ test('held layered IK poses invalidate on weight and root-mask changes while ret
   puppet.setLayerMask('overlay', ['upper']);
   puppet.setLayerWeight('overlay', 0.5);
   puppet.play('overlay', { layer: 'overlay' });
-  const first = puppet.animationPlayer.ikAnimation;
+  const first = puppet.posePipeline.player.ikAnimation;
   puppet.update(49);
-  assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+  assert.strictEqual(puppet.posePipeline.player.ikAnimation, first);
   puppet.setLayerWeight('overlay', 0.25);
-  const weighted = puppet.animationPlayer.ikAnimation;
+  const weighted = puppet.posePipeline.player.ikAnimation;
   assert.notStrictEqual(weighted, first);
   assert.equal(weighted.get('arm')!.x!.value, 50);
   assert.equal(weighted.get('arm')!.y!.value, 70);
   assert.equal(weighted.get('arm')!.mix!.weight, 0.25);
-  puppet.animationPlayer.applyCurrentPose();
-  assert.strictEqual(puppet.animationPlayer.ikAnimation, weighted);
+  puppet.posePipeline.player.applyCurrentPose();
+  assert.strictEqual(puppet.posePipeline.player.ikAnimation, weighted);
   puppet.setLayerMask('overlay', ['hand']);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 40);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 40);
   puppet.setLayerMask('overlay', ['upper']);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 50);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 50);
   assert.equal(first.get('arm')!.x!.value, 60);
   assert.equal(first.get('arm')!.mix!.weight, 0.5);
   puppet.destroy();
@@ -400,18 +400,18 @@ test('stepped fade caches hold frames and recompute when the fade progresses or 
     { ...clip('c', [{ time: 0, x: -20, y: 70 }]), playback: { mode: 'stepped', fps: 10 } },
   ]);
   puppet.play('b', { fadeDuration: 1000 });
-  const first = puppet.animationPlayer.ikAnimation;
+  const first = puppet.posePipeline.player.ikAnimation;
   puppet.update(50);
-  assert.strictEqual(puppet.animationPlayer.ikAnimation, first);
+  assert.strictEqual(puppet.posePipeline.player.ikAnimation, first);
   puppet.update(50);
-  const blended = puppet.animationPlayer.ikAnimation;
+  const blended = puppet.posePipeline.player.ikAnimation;
   assert.equal(blended.get('arm')!.x!.value, 48.6);
   puppet.update(49);
-  assert.strictEqual(puppet.animationPlayer.ikAnimation, blended);
+  assert.strictEqual(puppet.posePipeline.player.ikAnimation, blended);
   puppet.play('c', { fadeDuration: 1000 });
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 48.6);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 48.6);
   puppet.update(100);
-  assert.approximately(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 41.74, 1e-12);
+  assert.approximately(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 41.74, 1e-12);
   assert.equal(blended.get('arm')!.x!.value, 48.6);
   puppet.destroy();
 });
@@ -426,11 +426,11 @@ test('a held stepped overlay fade recomputes sparse fallback when the smooth lay
   ]);
   puppet.play('overlay', { layer: 'overlay', fadeDuration: 1000 });
   puppet.update(100);
-  const first = puppet.animationPlayer.ikAnimation;
+  const first = puppet.posePipeline.player.ikAnimation;
   assert.approximately(first.get('arm')!.x!.value, 45.8, 1e-12);
   puppet.update(50);
-  assert.approximately(puppet.animationPlayer.ikAnimation.get('arm')!.x!.value, 46.7, 1e-12);
-  assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.y!.value, 70);
+  assert.approximately(puppet.posePipeline.player.ikAnimation.get('arm')!.x!.value, 46.7, 1e-12);
+  assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.y!.value, 70);
   assert.approximately(first.get('arm')!.x!.value, 45.8, 1e-12);
   puppet.destroy();
 });

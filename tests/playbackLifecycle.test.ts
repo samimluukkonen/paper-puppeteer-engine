@@ -626,13 +626,13 @@ test('Puppet exposes synchronized lifecycle and completes destruction despite li
     }
   });
   assert.strictEqual(puppet.play('a'), puppet);
-  assert.deepEqual(puppet.getPlaybackStatus(), puppet.animationPlayer.getPlaybackStatus());
+  assert.deepEqual(puppet.getPlaybackStatus(), puppet.posePipeline.player.getPlaybackStatus());
   puppet.update(100);
   puppet.restart();
   assert.throws(() => puppet.destroy(), 'disposed callback failed');
   assert.isTrue(puppet.container.isDestroyed);
   assert.isTrue(root.isDestroyed);
-  assert.isTrue(puppet.animationPlayer.isDisposed);
+  assert.isTrue(puppet.posePipeline.player.isDisposed);
   assert.throws(() => puppet.getBone('root'), /Unknown bone/);
   assert.isUndefined(puppet.getPlaybackStatus());
   assert.doesNotThrow(off);

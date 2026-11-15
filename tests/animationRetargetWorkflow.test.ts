@@ -94,7 +94,7 @@ test.each(['shared-mesh', 'different-topology', 'rigid-to-mesh', 'mesh-to-rigid'
         expect(puppet.getSlotMesh('cloth')!.vertices).not.toEqual(beforeVertices);
         expect(puppet.getSlotMesh('cloth')!.vertices.every(Number.isFinite)).toBe(true);
       }
-      expect(puppet.animationPlayer.meshDeformation.size).toBe(kind === 'shared-mesh' ? 1 : 0);
+      expect(puppet.posePipeline.player.meshDeformation.size).toBe(kind === 'shared-mesh' ? 1 : 0);
       expect({ source, target, sourceClip }).toEqual(before);
     } finally {
       puppet.destroy();
@@ -231,7 +231,7 @@ test('a single clock seeks both real Puppets through FK/IK, root motion and mesh
     [a, 'sword-cut'],
     [b, animation.name],
   ] as const) {
-    puppet.animationPlayer.setPreviewMode(true);
+    puppet.posePipeline.player.setPreviewMode(true);
     puppet.onAnimationEvent(events);
     puppet.play(name, { loop: false, fadeDuration: 0 });
     puppet.pauseAnimation();
@@ -241,10 +241,10 @@ test('a single clock seeks both real Puppets through FK/IK, root motion and mesh
     clock.scrub(500);
     expect(a.container.x).toBeCloseTo(40);
     expect(b.container.x).toBeCloseTo(40);
-    expect(a.animationPlayer.ikAnimation.get('arm')!.mix!.value).toBeCloseTo(0.75);
-    expect(b.animationPlayer.ikAnimation.get('target-arm')!.disabled!.value).toBe(1);
-    expect(a.animationPlayer.meshDeformation.get('sleeve')!.get('top-left')).toEqual({ x: 2, y: 1 });
-    expect(b.animationPlayer.meshDeformation.size).toBe(0);
+    expect(a.posePipeline.player.ikAnimation.get('arm')!.mix!.value).toBeCloseTo(0.75);
+    expect(b.posePipeline.player.ikAnimation.get('target-arm')!.disabled!.value).toBe(1);
+    expect(a.posePipeline.player.meshDeformation.get('sleeve')!.get('top-left')).toEqual({ x: 2, y: 1 });
+    expect(b.posePipeline.player.meshDeformation.size).toBe(0);
     const positions = [a, b].map((puppet) => {
       const pose = new Map(puppet.rig.bones.map(({ id }) => [id, puppet.getBone(id).pose]));
       return getFootContactWorldPosition(

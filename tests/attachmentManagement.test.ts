@@ -293,7 +293,7 @@ test('preview authoring and skin switching preserve player, IK, bone pose, facin
   const image = puppet.getSlotImage('hand-art')!;
   const mount = image.parentContainer;
   const order = puppet.getRenderOrder();
-  const player = puppet.animationPlayer;
+  const player = puppet.posePipeline.player;
   const prepare = vi.spyOn(puppet, 'preparePose');
   controller.assign('grip');
   assert.equal(puppet.getAttachment('hand-art'), 'grip');
@@ -309,7 +309,7 @@ test('preview authoring and skin switching preserve player, IK, bone pose, facin
   editor.undo();
   editor.redo();
   assert.equal(prepare.mock.calls.length, 0, 'artwork changes never restore bone transforms');
-  assert.strictEqual(puppet.animationPlayer, player);
+  assert.strictEqual(puppet.posePipeline.player, player);
   assert.equal(player.elapsedTime, 450);
   assert.isTrue(player.isPlaying);
   assert.strictEqual(puppet.getIK('arm'), ik);

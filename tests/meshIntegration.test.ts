@@ -339,10 +339,10 @@ test('runtime catalog changes validate tracks before installation and refresh ma
     autoUpdate: false,
   });
   puppet.play('bend', { layer: 'overlay' });
-  puppet.animationPlayer.setLayerMask('overlay', ['upper']);
+  puppet.posePipeline.player.setLayerMask('overlay', ['upper']);
   puppet.update(500);
   // Reapplying a layer mask uses the live attachment weights, including an edited catalog.
-  puppet.animationPlayer.setLayerMask('overlay', ['upper']);
+  puppet.posePipeline.player.setLayerMask('overlay', ['upper']);
   assert.equal(puppet.meshDeformation.size, 0);
   const attachments = f.animation.rig!.attachments.map((attachment) =>
     attachment.type === 'mesh'

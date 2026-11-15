@@ -69,7 +69,10 @@ export type PuppetOptions = PuppetSettings &
 export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
-  readonly animationPlayer: AnimationPlayer;
+  /** @internal Editor/test access to the pose pipeline; the public seam is attachPoseSource/previewClip.
+   * The runtime AnimationPlayer stays private — player access routes through the pipeline.
+   */
+  readonly posePipeline: PosePipeline;
   private readonly destroyContainer: Phaser.GameObjects.Container['destroy'];
   private readonly bones = new Map<string, Bone>();
   private readonly attachments: PuppetAttachments;
@@ -81,7 +84,6 @@ export class Puppet {
   private readonly renderedSlotAttachments = new Map<string, string>();
   private readonly renderedSlotDefinitions = new Map<string, Readonly<AttachmentDefinition>>();
   private readonly ikConstraints = new Map<string, TwoBoneIKConstraint>();
-  private readonly posePipeline: PosePipeline;
   private readonly idleSync: 'always' | 'dirty';
   private readonly ikContext: IKTransformContext = {
     puppetToWorld: (target) => localToWorld(target, this.container.getWorldTransformMatrix()),
@@ -185,10 +187,6 @@ export class Puppet {
       ikContext: this.ikContext,
       renderer: this.renderer,
       updateDebugViews: (constraints) => this.updateDebugViews(constraints),
-      poseHooks: {
-        prepare: () => this.preparePose(),
-        synchronize: () => this.syncPose(),
-      },
       rootMotion: {
         validate: () => {
           if (this.movementTranslation)
@@ -211,7 +209,6 @@ export class Puppet {
         apply: (displacement) => this.applyRootMotion(displacement),
       },
     });
-    this.animationPlayer = this.posePipeline.player;
     this.renderSlots();
     for (const definition of ikDefinitions) this.addIK(definition);
     this.setFacing(this.facing);
@@ -239,6 +236,11 @@ export class Puppet {
       throw new Error(`Missing texture "${sprite.texture}" for ${owner}.`);
     if (sprite.frame !== undefined && !this.scene.textures.get(sprite.texture).has(String(sprite.frame)))
       throw new Error(`Missing frame "${sprite.frame}" for ${owner}.`);
+  }
+
+  /** Runtime player, private to the facade: delegates route through the pose pipeline. */
+  private get animationPlayer(): AnimationPlayer {
+    return this.posePipeline.player;
   }
 
   get currentAnimation(): string | undefined {

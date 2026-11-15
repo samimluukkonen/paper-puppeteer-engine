@@ -123,7 +123,7 @@ for (const instances of [1, 20]) {
           } finally {
             for (const puppet of puppets) puppet.destroy();
           }
-          assert.isTrue(puppets.every((puppet) => puppet.isDestroyed && puppet.animationPlayer.isDisposed));
+          assert.isTrue(puppets.every((puppet) => puppet.isDestroyed && puppet.posePipeline.player.isDisposed));
           assert.equal(events.listenerCount('update'), 0);
           assert.equal(events.listenerCount('shutdown'), 0);
           for (const result of [...createContainer.mock.results, ...createImage.mock.results]) {

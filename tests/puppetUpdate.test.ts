@@ -127,7 +127,7 @@ test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork witho
   const completion = vi.fn();
   puppet.onAnimationEvent(event);
   puppet.onAnimationComplete(completion);
-  const clock = puppet.animationPlayer.elapsedTime;
+  const clock = puppet.posePipeline.player.elapsedTime;
   const assertPreview = (x: number) => {
     const upper = puppet.getBone('upper');
     assert.equal(upper.pose.x, x);
@@ -137,7 +137,7 @@ test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork witho
     const hand = puppet.getBone('hand').container.getWorldTransformMatrix().transformPoint(3, 4);
     assert.closeTo(slot.tx, hand.x, 1e-9);
     assert.closeTo(slot.ty, hand.y, 1e-9);
-    assert.equal(puppet.animationPlayer.elapsedTime, clock);
+    assert.equal(puppet.posePipeline.player.elapsedTime, clock);
     assert.isTrue(puppet.isPlaying);
     assert.equal(event.mock.calls.length, 0);
     assert.equal(completion.mock.calls.length, 0);
@@ -155,7 +155,7 @@ test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork witho
   puppet.sampleAnimation(2000, { mode: 'playback' });
   assert.equal(puppet.getBone('upper').pose.x, 100);
   assert.closeTo(puppet.getBone('upper').container.rotation, 0.9, 1e-12);
-  assert.equal(puppet.animationPlayer.elapsedTime, clock);
+  assert.equal(puppet.posePipeline.player.elapsedTime, clock);
   assert.equal(event.mock.calls.length, 0);
   assert.equal(completion.mock.calls.length, 0);
   puppet.destroy();
@@ -170,9 +170,9 @@ test('sampleAnimation preserves paused and stopped playback and safely handles a
   puppet.addAnimation({ name: 'held', duration: 1000, loop: true, tracks: { upper: [{ time: 0, x: 10 }] } });
   puppet.play('held').pauseAnimation().stop();
   puppet.sampleAnimation(500);
-  assert.isTrue(puppet.animationPlayer.isPaused);
+  assert.isTrue(puppet.posePipeline.player.isPaused);
   assert.isFalse(puppet.isPlaying);
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
   assert.equal(puppet.getBone('upper').container.x, 10);
   puppet.destroy();
 });
@@ -200,9 +200,9 @@ test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and
         slot: { x: mount.tx, y: mount.ty },
       };
     }),
-    time: puppet.animationPlayer.elapsedTime,
-    transition: puppet.animationPlayer.transition,
-    mode: puppet.animationPlayer.playbackMode,
+    time: puppet.posePipeline.player.elapsedTime,
+    transition: puppet.posePipeline.player.transition,
+    mode: puppet.posePipeline.player.playbackMode,
     ikStatus: constraint.status,
   });
   const before = snapshot();
@@ -296,7 +296,7 @@ test('throwing listeners preserve rendering, finish fades, and deliver remaining
   assert.throws(() => puppet.update(100), /listener failed/);
   assert.equal(puppet.getBone('root').pose.x, 100);
   assert.equal(puppet.getBone('root').container.x, 100);
-  assert.isUndefined(puppet.animationPlayer.transition);
+  assert.isUndefined(puppet.posePipeline.player.transition);
   assert.deepEqual(observed, ['middle', 'end', 'complete']);
   puppet.update(100);
   assert.deepEqual(observed, ['middle', 'end', 'complete']);
@@ -334,8 +334,8 @@ test('a completion callback can start a new clip without overwriting its synchro
   });
   puppet.play('once').update(100);
   assert.equal(puppet.currentAnimation, 'next');
-  assert.equal(puppet.animationPlayer.elapsedTime, 0);
-  assert.equal(puppet.animationPlayer.transition?.progress, 0);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.transition?.progress, 0);
   puppet.update(50);
   assert.equal(puppet.getBone('root').container.x, 20);
   puppet.destroy();
@@ -343,7 +343,7 @@ test('a completion callback can start a new clip without overwriting its synchro
 
 test('destroying a puppet disposes playback and cancels callbacks that would access its destroyed bones', () => {
   const { puppet } = fixture();
-  const player = puppet.animationPlayer;
+  const player = puppet.posePipeline.player;
   puppet.addAnimation({
     name: 'once',
     duration: 100,
@@ -387,7 +387,7 @@ test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit']
         return { pose: { ...bone.pose }, x: bone.container.x, rotation: bone.container.rotation };
       });
     const before = snapshot();
-    const transition = puppet.animationPlayer.transition;
+    const transition = puppet.posePipeline.player.transition;
     const prepare = vi.spyOn(puppet, 'preparePose');
     const event = vi.fn();
     puppet.onAnimationEvent(event);
@@ -402,12 +402,12 @@ test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit']
     assert.throws(() => puppet.update(delta));
     assert.equal(prepare.mock.calls.length, 0);
     assert.deepEqual(snapshot(), before);
-    assert.equal(puppet.animationPlayer.elapsedTime, 0);
-    assert.deepEqual(puppet.animationPlayer.transition, transition);
+    assert.equal(puppet.posePipeline.player.elapsedTime, 0);
+    assert.deepEqual(puppet.posePipeline.player.transition, transition);
     assert.equal(event.mock.calls.length, 0);
     // Retrying must still restore the correct pre-IK/preset baseline.
     puppet.update(10);
-    assert.equal(puppet.animationPlayer.elapsedTime, 20);
+    assert.equal(puppet.posePipeline.player.elapsedTime, 20);
     assert.deepEqual(snapshot(), before);
     puppet.destroy();
   },

@@ -46,7 +46,7 @@ test('previewClip owns prepare → sample → project without moving runtime clo
     puppet.previewClip(swing, 500);
     assert.approximately(puppet.getBone('arm').pose.rotation, 0.5, 1e-12, 'sampled pose lands on the bone');
     assert.approximately(puppet.getBone('arm').container.rotation, 0.5, 1e-12, 'rendering is projected');
-    assert.equal(puppet.animationPlayer.elapsedTime, 0, 'the runtime clock never advances');
+    assert.equal(puppet.posePipeline.player.elapsedTime, 0, 'the runtime clock never advances');
     assert.isUndefined(puppet.currentAnimation);
     assert.equal(events.mock.calls.length, 0, 'previews never dispatch gameplay events');
 
@@ -75,7 +75,7 @@ test('previewClip restores the runtime pose on the next update while playback is
       1e-12,
       'runtime playback re-evaluates after a preview',
     );
-    assert.approximately(puppet.animationPlayer.elapsedTime, 116, 1e-12);
+    assert.approximately(puppet.posePipeline.player.elapsedTime, 116, 1e-12);
   } finally {
     puppet.destroy();
   }

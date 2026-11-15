@@ -124,7 +124,7 @@ test.each(['destroy', 'shutdown'] as const)(
     releaseReservation();
     assert.equal(load.listenerCount('complete'), 0);
     const puppet = new runtime.Puppet(scene, { definition });
-    const player = puppet.animationPlayer;
+    const player = puppet.posePipeline.player;
     const constraint = puppet.getIK('chain');
     const provider = vi.fn(() => undefined);
     constraint.setTargetProvider(provider);
@@ -196,10 +196,10 @@ test('rig exports are detached and transition/playback queries cannot change pla
   rig.bones[0]!.x = 99;
   assert.equal(puppet.rig.getBone('root').x, undefined);
   puppet.play('idle').play('walk', { fadeDuration: 100 });
-  puppet.animationPlayer.transition!.progress = 1;
-  puppet.animationPlayer.playbackMode.mode = 'stepped';
-  assert.equal(puppet.animationPlayer.transition?.progress, 0);
-  assert.deepEqual(puppet.animationPlayer.playbackMode, { mode: 'smooth' });
+  puppet.posePipeline.player.transition!.progress = 1;
+  puppet.posePipeline.player.playbackMode.mode = 'stepped';
+  assert.equal(puppet.posePipeline.player.transition?.progress, 0);
+  assert.deepEqual(puppet.posePipeline.player.playbackMode, { mode: 'smooth' });
   puppet.destroy();
 });
 

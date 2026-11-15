@@ -89,7 +89,7 @@ test.each(['destroy', 'shutdown'] as const)(
       puppet.destroy();
     }
     assert.isTrue(puppet.isDestroyed);
-    assert.isTrue(puppet.animationPlayer.isDisposed);
+    assert.isTrue(puppet.posePipeline.player.isDisposed);
     assert.equal(events.listenerCount('update'), 0);
     assert.equal(events.listenerCount('shutdown'), 0);
     const count = delivered.length;

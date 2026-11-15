@@ -90,8 +90,8 @@ test('multiple Actors share one immutable character with independent transforms 
   b.setPosition(20, 30).play('idle');
   first.update(50);
   assert.equal(
-    first.animationPlayer.getPlaybackStatus()?.playbackId,
-    second.animationPlayer.getPlaybackStatus()?.playbackId,
+    first.posePipeline.player.getPlaybackStatus()?.playbackId,
+    second.posePipeline.player.getPlaybackStatus()?.playbackId,
   );
   assert.notEqual(a.id, b.id);
   assert.notEqual(a.id, character.id);
@@ -135,7 +135,7 @@ test('setPosition immediately synchronizes world-target IK and preserves playbac
   const sync = vi.spyOn(puppet, 'syncPose');
   actor.setPosition(20, 40);
   assert.equal(sync.mock.calls.length, 1);
-  assert.equal(puppet.animationPlayer.elapsedTime, 25);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 25);
   const end = puppet.getBone('end').container.getWorldTransformMatrix();
   assert.closeTo(end.tx, 22, 1e-8);
   assert.closeTo(end.ty, 44, 1e-8);
@@ -161,7 +161,7 @@ test('animation delegation keeps Puppet options, events, pauses, stops and exter
   const waiting = actor.waitForPlayback({ layer: 'gesture' });
   actor.pauseAnimation();
   events.emit('update', 0, 50);
-  assert.equal(puppet.animationPlayer.getPlaybackStatus('gesture')?.elapsedTime, 0);
+  assert.equal(puppet.posePipeline.player.getPlaybackStatus('gesture')?.elapsedTime, 0);
   actor.resumeAnimation();
   events.emit('update', 0, 50);
   assert.equal((await waiting).status, 'completed');
@@ -185,7 +185,7 @@ test('Actor states reuse action returns, fades and imperative playback precedenc
   assert.equal(actor.currentState, 'rest');
   assert.equal(actor.currentAnimation, 'idle');
   actor.playAction('greeting');
-  assert.equal(puppet.animationPlayer.transition?.to, 'wave');
+  assert.equal(puppet.posePipeline.player.transition?.to, 'wave');
   puppet.update(100);
   assert.equal(actor.currentAnimation, 'idle');
   actor.playAction('greeting');
@@ -210,7 +210,7 @@ test('appearance changes use existing skins, slot selection and facing', () => {
   actor.setAttachment('hand', 'prop').setSkin('default').applySkin('default').setFacing('left');
   assert.equal(puppet.getAttachment('hand'), 'prop');
   assert.equal(puppet.facingDirection, 'left');
-  assert.equal(puppet.animationPlayer.elapsedTime, 25);
+  assert.equal(puppet.posePipeline.player.elapsedTime, 25);
   assert.throws(() => actor.setAttachment('hand', 'missing'), /Unknown attachment/);
   assert.throws(() => actor.setSkin('missing'), /Unknown skin/);
   puppet.destroy();
@@ -256,7 +256,7 @@ test('borrowed disposal cancels only Actor waits, removes listeners and leaves o
   const ownSecondWait = actor.waitForPlayback();
   const otherWait = other.waitForPlayback();
   const hostWait = puppet.waitForPlayback();
-  const disposePlayer = vi.spyOn(puppet.animationPlayer, 'dispose');
+  const disposePlayer = vi.spyOn(puppet.posePipeline.player, 'dispose');
   actor.dispose();
   actor.dispose();
   assert.equal((await ownWait).status, 'cancelled');
@@ -272,7 +272,7 @@ test('borrowed disposal cancels only Actor waits, removes listeners and leaves o
 
 test('owned disposal destroys once and preserves disposed results for pending waits', async () => {
   const { actor, puppet, events } = fixture({ puppetOwnership: 'owned' });
-  const destroy = vi.spyOn(puppet.animationPlayer, 'dispose');
+  const destroy = vi.spyOn(puppet.posePipeline.player, 'dispose');
   const waiting = actor.playAndWait('wave');
   actor.dispose();
   actor.dispose();

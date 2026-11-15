@@ -235,7 +235,7 @@ test('isolated runtime preview plays, pauses, stops and loops actual root motion
     () => {},
   );
   const puppet = new Puppet(puppetScene(), { definition, autoUpdate: false });
-  puppet.animationPlayer.setPreviewMode(true, { applyRootMotion: true });
+  puppet.posePipeline.player.setPreviewMode(true, { applyRootMotion: true });
   preview.puppet = puppet;
   const events = vi.fn();
   puppet.onAnimationEvent(events);
@@ -245,8 +245,8 @@ test('isolated runtime preview plays, pauses, stops and loops actual root motion
     preview.update(500, 500);
     assert.closeTo(puppet.container.x, 420, 1e-8);
     assert.closeTo(puppet.container.y, 440, 1e-8);
-    assert.equal(puppet.animationPlayer.ikAnimation.get('arm')!.mix!.value, 0.75);
-    assert.deepEqual(puppet.animationPlayer.meshDeformation.get('paper-mesh')!.get('top-left'), { x: 2, y: -1 });
+    assert.equal(puppet.posePipeline.player.ikAnimation.get('arm')!.mix!.value, 0.75);
+    assert.deepEqual(puppet.posePipeline.player.meshDeformation.get('paper-mesh')!.get('top-left'), { x: 2, y: -1 });
     assert.notEqual(puppet.getBone('upper').pose.rotation, 0);
     preview.toggle();
     preview.update(700, 200);

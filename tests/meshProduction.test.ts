@@ -40,7 +40,7 @@ for (const side of [2, 12, 32]) {
       },
     };
     for (const actor of actors) {
-      actor.animationPlayer.addAnimation(clip);
+      actor.posePipeline.player.addAnimation(clip);
       actor.play('sword-attack');
     }
     const buffers = actors.map((actor) => actor.getSlotMesh('cloth')!.vertices);

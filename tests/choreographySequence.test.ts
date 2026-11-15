@@ -51,8 +51,8 @@ async function flush(): Promise<void> {
 function resources(puppet: Puppet): number[] {
   return [
     [puppet, 'updateListeners'],
-    [puppet.animationPlayer, 'lifecycleListeners'],
-    [puppet.animationPlayer, 'pendingWaitDisposers'],
+    [puppet.posePipeline.player, 'lifecycleListeners'],
+    [puppet.posePipeline.player, 'pendingWaitDisposers'],
   ].map(([owner, key]) => {
     const value: unknown = Reflect.get(owner as object, key as string);
     assert.instanceOf(value, Set);

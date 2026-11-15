@@ -89,7 +89,7 @@ test('zero-duration IK animations fail validation before render allocation; empt
     puppet.play('old');
     puppet.update(10000);
     assert.equal(puppet.getBone('root').pose.x, 5);
-    assert.equal(puppet.animationPlayer.ikAnimation.size, 0);
+    assert.equal(puppet.posePipeline.player.ikAnimation.size, 0);
     assert.deepEqual(parseAnimationClip({ version: 1, ...old }, rig), old);
   } finally {
     puppet.destroy();
@@ -148,8 +148,8 @@ test.each(['smooth', 'stepped'] as const)(
       puppet.play('reach');
       puppet.setAnimationSpeed(2);
       puppet.update(1250); // 2.5 loops, ending exactly on the middle marker.
-      assert.equal(puppet.animationPlayer.elapsedTime, 500);
-      assert.equal(puppet.animationPlayer.ikAnimation.get('leftIK')!.x!.value, 30);
+      assert.equal(puppet.posePipeline.player.elapsedTime, 500);
+      assert.equal(puppet.posePipeline.player.ikAnimation.get('leftIK')!.x!.value, 30);
       assert.deepEqual(events, ['start', 'touch', 'start', 'touch', 'start', 'touch']);
       const before = [...events];
       for (const time of [1000, 0, 599, 500]) {
@@ -158,11 +158,11 @@ test.each(['smooth', 'stepped'] as const)(
       }
       assert.deepEqual(events, before, 'inspection and scrubbing are event-free');
       puppet.update(250);
-      assert.equal(puppet.animationPlayer.elapsedTime, 0);
-      assert.equal(puppet.animationPlayer.ikAnimation.get('leftIK')!.x!.value, 45);
+      assert.equal(puppet.posePipeline.player.elapsedTime, 0);
+      assert.equal(puppet.posePipeline.player.ikAnimation.get('leftIK')!.x!.value, 45);
       puppet.setAnimationSpeed(0);
       puppet.update(10000);
-      assert.equal(puppet.animationPlayer.elapsedTime, 0);
+      assert.equal(puppet.posePipeline.player.elapsedTime, 0);
     } finally {
       puppet.destroy();
     }
@@ -238,9 +238,9 @@ test('editor export/import stabilizes and CharacterLoader/Puppet play the same a
     for (const time of [0, 250, 500, 750, 1000]) {
       loaded.sampleAnimation(time);
       direct.sampleAnimation(time);
-      assert.deepEqual([...loaded.animationPlayer.ikAnimation], [...direct.animationPlayer.ikAnimation]);
+      assert.deepEqual([...loaded.posePipeline.player.ikAnimation], [...direct.posePipeline.player.ikAnimation]);
       for (const bone of rig.bones) assert.deepEqual(loaded.getBone(bone.id).pose, direct.getBone(bone.id).pose);
-      assert.deepEqual([...evaluateIKClip(compileClip(authored, rig), time)], [...loaded.animationPlayer.ikAnimation]);
+      assert.deepEqual([...evaluateIKClip(compileClip(authored, rig), time)], [...loaded.posePipeline.player.ikAnimation]);
     }
     assert.deepEqual(definition.animations[0]!.events, source.events);
     assert.equal(state.exportJson(), json);

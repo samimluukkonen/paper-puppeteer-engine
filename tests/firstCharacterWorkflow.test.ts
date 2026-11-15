@@ -115,7 +115,7 @@ test('new workspace → rig/artwork/default skin → first clips → ZIP → rel
   assert.equal(puppet.getBone('body').pose.x, 10);
   puppet.destroy();
   puppet.destroy();
-  assert.isTrue(puppet.animationPlayer.isDisposed);
+  assert.isTrue(puppet.posePipeline.player.isDisposed);
   assert.equal(JSON.stringify(source), original);
   assert.deepEqual(animation.packageAnimations(), before.animations);
   assert.isTrue(rig.dirty);
