@@ -79,7 +79,7 @@
                   "!**/engine/index.js",
                   "!**/engine/serialization.js"
                 ],
-                "message": "Outside src/engine, import engine modules only through the core/runtime/data barrels."
+                "message": "Outside src/engine, import engine modules only through the core/runtime/data barrels or the published index/serialization entries."
               }
             ]
           }
