@@ -252,7 +252,7 @@ test('steady controller updates evaluate and synchronize once without creating r
   const puppet = fixture(scene);
   const controller = states(puppet);
   const evaluate = vi.spyOn(puppet.posePipeline.player, 'applyCurrentPose');
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   const images = vi.spyOn(scene.add, 'image');
   const containers = vi.spyOn(scene.add, 'container');
   try {

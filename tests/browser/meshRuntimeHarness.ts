@@ -120,14 +120,14 @@ export async function sampleSkinnedMeshes() {
     puppet.setArtworkTexture('cloth');
     puppet.getBone('child').pose.rotation = 0.6;
     puppet.getBone('child').pose.y = 12;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const posed = await capture();
     puppet.setFacing('left');
     puppet.container.setPosition(420, 80).setScale(-1.3, 0.9);
     const reflected = await capture();
     puppet.getBone('root').container.setAlpha(0.5);
     mesh.setAlpha(0.5);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const faded = await capture();
     const stableBuffers = vertices === mesh.vertices && indices === mesh.indices;
     const texturesStable = textureCount === Object.keys(scene.textures.list).length;
@@ -136,7 +136,7 @@ export async function sampleSkinnedMeshes() {
     // Draw a small rigid image over a known mesh sample and verify slot depth ordering.
     puppet.getBone('root').container.setAlpha(1);
     mesh.setAlpha(1);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const samplePoint = mesh
       .getWorldTransformMatrix()
       .transformPoint(

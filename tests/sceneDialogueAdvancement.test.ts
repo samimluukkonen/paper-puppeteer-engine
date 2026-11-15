@@ -480,7 +480,7 @@ test('idle overlays preserve a frozen interrupted crossfade and sparse manual ch
     puppet.update(200);
     puppet.posePipeline.player.pause();
     puppet.getBone('root').pose.x = 17;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const before = { ...puppet.getBone('root').pose };
     const transition = puppet.posePipeline.player.transition;
     const time = puppet.posePipeline.player.elapsedTime;

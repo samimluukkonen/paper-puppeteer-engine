@@ -67,7 +67,7 @@ test('pose exports exclude IK without rerunning providers or consuming restorati
   puppet.addPose({ version: 1, name: 'preset', bones: { upper: { rotation: 0.7, x: 5 } } }).applyPose('preset');
   const provider = vi.fn(() => ({ x: 60, y: 70 }));
   constraint.setTargetProvider(provider);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   provider.mockClear();
   const upper = puppet.getBone('upper');
   const held = { ...upper.pose };
@@ -97,7 +97,7 @@ test('pose exports exclude IK without rerunning providers or consuming restorati
   other.pose.x = 10;
   puppet.clearPose();
   constraint.enabled = false;
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.equal(upper.pose.rotation, 0.1);
   assert.equal(puppet.getBone('lower').pose.rotation, 0.2);
   puppet.destroy();
@@ -122,7 +122,7 @@ test('sampleAnimation synchronizes sampled poses, presets, IK, and artwork witho
   puppet.update(100);
   puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 20 } } }).applyPose('preset', { mix: 0.5 });
   constraint.setTarget(60, 70);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const event = vi.fn();
   const completion = vi.fn();
   puppet.onAnimationEvent(event);
@@ -188,7 +188,7 @@ test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and
   puppet.play('held').play('held', { fadeDuration: 1000 });
   puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 5, rotation: 1 } } }).applyPose('preset');
   constraint.setTarget(60, 70);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const snapshot = () => ({
     bones: puppet.rig.bones.map(({ id }) => {
       const bone = puppet.getBone(id);
@@ -206,15 +206,15 @@ test.each(rejectedCommands)('rejected %s preserves the preset, IK, playback, and
     ikStatus: constraint.status,
   });
   const before = snapshot();
-  const prepare = vi.spyOn(puppet, 'preparePose');
+  const prepare = vi.spyOn(puppet.posePipeline, 'preparePose');
   assert.throws(() => command(puppet));
   assert.equal(prepare.mock.calls.length, 0);
   assert.deepEqual(snapshot(), before);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.deepEqual(snapshot(), before);
   puppet.clearPose();
   constraint.enabled = false;
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.equal(puppet.getBone('upper').pose.rotation, 0.7);
   assert.equal(puppet.getBone('upper').pose.x, 0);
   puppet.destroy();
@@ -380,7 +380,7 @@ test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit']
     puppet.play('held').play('held', { fadeDuration: 1000 }).setAnimationSpeed(2);
     puppet.addPose({ version: 1, name: 'preset', bones: { upper: { x: 5, rotation: 1 } } }).applyPose('preset');
     constraint.setTarget(60, 70);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const snapshot = () =>
       puppet.rig.bones.map(({ id }) => {
         const bone = puppet.getBone(id);
@@ -388,7 +388,7 @@ test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit']
       });
     const before = snapshot();
     const transition = puppet.posePipeline.player.transition;
-    const prepare = vi.spyOn(puppet, 'preparePose');
+    const prepare = vi.spyOn(puppet.posePipeline, 'preparePose');
     const event = vi.fn();
     puppet.onAnimationEvent(event);
     const delta =
@@ -416,7 +416,7 @@ test.each(['negative delta', 'nonfinite delta', 'clock overflow', 'event limit']
 test.each([false, true])('resetPose clears presets and restores bind transforms with active IK: %s', (withIK) => {
   const { puppet, constraint } = fixture();
   if (withIK) constraint.setTarget(60, 70);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const expected = puppet.rig.bones.map(({ id }) => ({ ...puppet.getBone(id).pose }));
   puppet
     .addAnimation({
@@ -503,7 +503,7 @@ test.each([false, true])('later providers see synchronized projections with defe
   puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
   for (const update of debug) update.mockClear();
   for (let frame = 0; frame < 5; frame += 1) {
-    if (deferred) puppet.syncPose({ updateDebug: false });
+    if (deferred) puppet.posePipeline.syncPose({ updateDebug: false });
     else puppet.update(16);
   }
   assert.equal(sync.mock.calls.length, 5);
@@ -513,7 +513,7 @@ test.each([false, true])('later providers see synchronized projections with defe
   assert.approximately(end.ty, observed!.y, 1e-8);
   for (const update of debug) assert.equal(update.mock.calls.length, deferred ? 0 : 5);
   const solved = { ...puppet.getBone('otherUpper').pose };
-  puppet.refreshDebugViews();
+  puppet.posePipeline.refreshDebugViews();
   for (const update of debug) assert.equal(update.mock.calls.length, deferred ? 1 : 6);
   assert.deepEqual(puppet.getBone('otherUpper').pose, solved);
 });
@@ -553,7 +553,7 @@ test.each([1e-200, 1e200])(
       puppet.container.setScale(scaleX, scale);
       constraint.mix = 1;
       constraint.setTarget(60 * scaleX, 70 * scale);
-      puppet.syncPose();
+      puppet.posePipeline.syncPose();
       assert.equal(constraint.status, 'solved');
       const hand = puppet.getBone('hand').container.getWorldTransformMatrix();
       assert.approximately(hand.tx / scaleX, 60, 1e-8);
@@ -568,14 +568,14 @@ test('IK retains support for nonsingular ancestors below the editor gesture tole
   const expected = fixture();
   expected.constraint.mix = 1;
   expected.constraint.setTarget(60, 70);
-  expected.puppet.syncPose();
+  expected.puppet.posePipeline.syncPose();
   actual.puppet.container.setScale(1, 1e-14);
   actual.puppet.getBone('root').pose.rotation = Math.PI / 4;
-  actual.puppet.syncPose();
+  actual.puppet.posePipeline.syncPose();
   const parent = actual.puppet.getBone('root').container.getWorldTransformMatrix();
   actual.constraint.mix = 1;
   actual.constraint.setTarget(parent.transformPoint(60, 70));
-  actual.puppet.syncPose();
+  actual.puppet.posePipeline.syncPose();
   assert.equal(actual.constraint.status, 'solved');
   for (const id of ['upper', 'lower'])
     assert.approximately(actual.puppet.getBone(id).pose.rotation, expected.puppet.getBone(id).pose.rotation, 1e-8);
@@ -679,7 +679,7 @@ test.each([false, true])(
         .addIK({ name: 'overlap', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix: 0.25 })
         .setTarget(50, 80);
       constraint.setTarget(60, 70);
-      puppet.syncPose();
+      puppet.posePipeline.syncPose();
     }
     const fullProjection = vi.spyOn(PuppetRenderer.prototype, 'sync');
     const untouchedBone = vi.spyOn(optimized.puppet.getBone('otherHand'), 'syncTransform');
@@ -691,10 +691,10 @@ test.each([false, true])(
         constraint.priority = frame % 2;
       }
       fullProjection.mockClear();
-      optimized.puppet.syncIK({ updateDebug: false });
+      optimized.puppet.posePipeline.syncIK({ updateDebug: false });
       assert.equal(fullProjection.mock.calls.length, 0);
       assert.equal(untouchedBone.mock.calls.length, 0);
-      baseline.puppet.syncPose({ updateDebug: false });
+      baseline.puppet.posePipeline.syncPose({ updateDebug: false });
       for (const bone of optimized.puppet.rig.bones)
         assert.deepEqual(optimized.puppet.getBone(bone.id).pose, baseline.puppet.getBone(bone.id).pose);
       const actual = optimized.puppet.getSlotImage('item')!.getWorldTransformMatrix();
@@ -702,8 +702,8 @@ test.each([false, true])(
       for (const property of ['a', 'b', 'c', 'd', 'tx', 'ty'] as const)
         assert.approximately(actual[property], expected[property], 1e-8);
     }
-    optimized.puppet.preparePose();
-    baseline.puppet.preparePose();
+    optimized.puppet.posePipeline.preparePose();
+    baseline.puppet.posePipeline.preparePose();
     for (const bone of optimized.puppet.rig.bones)
       assert.deepEqual(optimized.puppet.getBone(bone.id).pose, baseline.puppet.getBone(bone.id).pose);
   },
@@ -712,7 +712,7 @@ test.each([false, true])(
 test('IK-only provider failures remain restorable, including disabled constraints and destroyed puppets', () => {
   const { puppet, constraint } = fixture();
   constraint.setTarget(60, 70);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const failing = puppet.addIK({
     name: 'failure',
     rootBone: 'otherUpper',
@@ -723,15 +723,15 @@ test('IK-only provider failures remain restorable, including disabled constraint
   failing.setTargetProvider(() => {
     throw new Error('provider failed');
   });
-  assert.throws(() => puppet.syncIK(), /provider failed/);
+  assert.throws(() => puppet.posePipeline.syncIK(), /provider failed/);
   constraint.enabled = false;
   failing.enabled = false;
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   for (const id of ['upper', 'lower']) {
     const bone = puppet.getBone(id);
     assert.equal(bone.pose.rotation, bone.bindPose.rotation);
     assert.approximately(bone.container.rotation, bone.bindPose.rotation, 1e-8);
   }
   puppet.destroy();
-  assert.doesNotThrow(() => puppet.syncIK());
+  assert.doesNotThrow(() => puppet.posePipeline.syncIK());
 });

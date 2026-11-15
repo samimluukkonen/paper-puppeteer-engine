@@ -15,8 +15,8 @@ function fixture(definition: RigDefinition) {
   const puppet = {
     rig,
     getBone: (id: string) => joints.get(id)!,
-    preparePose: vi.fn(),
-    syncPose: vi.fn(),
+    posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
+    attachPoseSource: vi.fn(() => vi.fn()),
     setRenderOrder: vi.fn<Puppet['setRenderOrder']>(),
     setSlotTransform: vi.fn(),
     getSlotImage: vi.fn(),
@@ -105,13 +105,13 @@ test('presentation changes skip pose work and transform edits preserve cached dr
   editor.state.artworkOpacity = 0.5;
   editor.state.gridSnap = 5;
   editor.refresh();
-  assert.equal(puppet.preparePose.mock.calls.length, 1);
-  assert.equal(puppet.syncPose.mock.calls.length, 1);
+  assert.equal(puppet.posePipeline.preparePose.mock.calls.length, 1);
+  assert.equal(puppet.posePipeline.syncPose.mock.calls.length, 1);
   assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
 
   editor.editBone('arm', 'x', 12);
   assert.equal(joints.get('arm')!.pose.x, 12);
-  assert.equal(puppet.syncPose.mock.calls.length, 2);
+  assert.equal(puppet.posePipeline.syncPose.mock.calls.length, 2);
   assert.equal(puppet.setRenderOrder.mock.calls.length, 1);
   editor.editBone('arm', 'depth', -1);
   assert.deepEqual(puppet.setRenderOrder.mock.lastCall?.[0], ['arm', 'root']);

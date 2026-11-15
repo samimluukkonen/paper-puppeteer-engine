@@ -738,7 +738,7 @@ test('runtime and editor-source rendering consume live channels without creating
   source.play(clip.name);
   source.sample(500);
   const detach = puppet.attachPoseSource(source);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.equal(sourceReads.mock.calls.length, 0);
   assert.deepEqual(puppet.meshDeformation.get('mesh')!.get('top-left'), { x: 6, y: -4 });
   assert.equal(sourceReads.mock.calls.length, 1);

@@ -115,7 +115,7 @@ test.each([0, 0.5, 1])('both authored rotations precede IK correction at influen
         bendDirection: 1,
       });
       for (let pass = 0; pass < 3; ++pass) {
-        puppet.syncIK();
+        puppet.posePipeline.syncIK();
         assert.closeTo(
           puppet.getBone('leftUpper').pose.rotation,
           blendIKRotation(upper, solved.rootRotation, mix),
@@ -240,7 +240,10 @@ test('editor export/import stabilizes and CharacterLoader/Puppet play the same a
       direct.sampleAnimation(time);
       assert.deepEqual([...loaded.posePipeline.player.ikAnimation], [...direct.posePipeline.player.ikAnimation]);
       for (const bone of rig.bones) assert.deepEqual(loaded.getBone(bone.id).pose, direct.getBone(bone.id).pose);
-      assert.deepEqual([...evaluateIKClip(compileClip(authored, rig), time)], [...loaded.posePipeline.player.ikAnimation]);
+      assert.deepEqual(
+        [...evaluateIKClip(compileClip(authored, rig), time)],
+        [...loaded.posePipeline.player.ikAnimation],
+      );
     }
     assert.deepEqual(definition.animations[0]!.events, source.events);
     assert.equal(state.exportJson(), json);
@@ -303,7 +306,7 @@ test('bone mirroring retains IK tracks, and ghost refresh never solves or change
   const ghosts = new AnimationEditorGhostLayer(scene, state, puppet);
   const constraint = puppet.getIK('leftIK');
   const apply = vi.spyOn(constraint, 'apply');
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   try {
     const before = {
       pose: { ...puppet.getBone('leftUpper').pose },
@@ -358,7 +361,7 @@ test('disposing an old preview twice cannot clear a replacement preview or run s
   const first = new AnimationEditorPreview(state, puppet);
   first.dispose();
   const replacement = new AnimationEditorPreview(state, puppet);
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   try {
     first.dispose();
     state.setCurrentTime(0.5);

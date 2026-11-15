@@ -187,7 +187,7 @@ test('invalidation projects changed preview joints without an authored data chan
   const label = current.labels[1]!;
   const before = label.x;
   current.puppet.getBone('bone0').pose.x = 42;
-  current.puppet.syncPose();
+  current.puppet.posePipeline.syncPose();
   current.overlay.invalidate();
   current.overlay.draw();
   assert.equal(label.x - before, 42);

@@ -174,7 +174,7 @@ test('debug overlays allocate only on first enable, retain label settings, and c
   assert.throws(() => puppet.setDebugLabelSide('hand', 'up' as Facing), /Invalid label side/);
   puppet.setDebug(false).setIKDebug(false).setSlotDebug(false);
   puppet.update(16);
-  puppet.refreshDebugViews();
+  puppet.posePipeline.refreshDebugViews();
   assert.equal(text.mock.calls.length, 0);
   assert.equal(graphics.mock.calls.length, 0);
   assert.isFalse(puppet.isDebug);

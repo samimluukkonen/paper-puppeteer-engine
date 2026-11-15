@@ -132,7 +132,7 @@ test('setPosition immediately synchronizes world-target IK and preserves playbac
   puppet.update(25);
   puppet.setIKTarget('chain', { x: 22, y: 44 });
   puppet.getIK('chain').enabled = true;
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   actor.setPosition(20, 40);
   assert.equal(sync.mock.calls.length, 1);
   assert.equal(puppet.posePipeline.player.elapsedTime, 25);

@@ -292,7 +292,7 @@ test('actual Puppet playback and exported data skip baked IK even with runtime o
   for (const time of plan.sampling.times) {
     reference.sampleAnimation(time, { mode: 'playback' });
     puppet.sampleAnimation(time, { mode: 'playback' });
-    puppet.syncIK();
+    puppet.posePipeline.syncIK();
     for (const id of ['upper', 'lower', 'thigh', 'shin'])
       assert.approximately(puppet.getBone(id).pose.rotation, reference.getBone(id).pose.rotation, 1e-6);
     assert.equal(puppet.getIK('arm').status, 'inactive');
@@ -301,7 +301,7 @@ test('actual Puppet playback and exported data skip baked IK even with runtime o
   }
   assert.equal(provider.mock.calls.length, 0);
   puppet.getIK('arm').setTarget(80, 20);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(puppet.getIK('arm').status, 'inactive');
   puppet.play('other');
   assert.equal(puppet.getIK('arm').status, 'solved');

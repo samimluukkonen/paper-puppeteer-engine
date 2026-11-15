@@ -182,7 +182,7 @@ test.each(['runtime', 'provider'] as const)(
         assert.equal(constraint.mix, 0.3);
         assert.isTrue(constraint.hasMixOverride);
         assert.isTrue(constraint.enabled);
-        current.puppet.syncPose();
+        current.puppet.posePipeline.syncPose();
         assert.deepEqual(constraint.resolvedTarget, target);
       };
       current.editor.createIKConstraint({ ...chain, name: 'additional', mix: 0, priority: -1 });
@@ -379,7 +379,7 @@ test('legacy bend defaults, visual roles, bend edits and history retain bind tra
     const after = current.puppet.getBone('segment').getWorldPosition();
     assert.isAbove(Math.hypot(after.x - before.x, after.y - before.y), 50);
     const solved = current.puppet.rig.bones.map((bone) => ({ ...current.puppet.getBone(bone.id).pose }));
-    for (let frame = 0; frame < 50; ++frame) current.puppet.syncPose();
+    for (let frame = 0; frame < 50; ++frame) current.puppet.posePipeline.syncPose();
     assert.deepEqual(
       current.puppet.rig.bones.map((bone) => current.puppet.getBone(bone.id).pose),
       solved,
@@ -437,18 +437,18 @@ test('solver diagnostics refresh for host target and transform changes without a
     current.controller.selectIK(chain.name);
     const constraint = current.puppet.getIK(chain.name);
     constraint.setTarget(10000, 10000);
-    current.puppet.syncPose();
+    current.puppet.posePipeline.syncPose();
     current.getOverlay().draw();
     assert.equal(current.editor.getIKFeedback(chain.name).label, 'Unreachable target');
     assert.include(current.labels, 'tentacle · Unreachable target');
     const bone = current.puppet.getBone('base');
     bone.pose.scaleX = 2;
-    current.puppet.syncPose();
+    current.puppet.posePipeline.syncPose();
     current.getOverlay().draw();
     assert.include(render(current.controller), 'Unsupported scale.');
     assert.include(current.labels, 'tentacle · Unsupported scale');
     bone.pose.scaleX = 0;
-    current.puppet.syncPose();
+    current.puppet.posePipeline.syncPose();
     current.getOverlay().draw();
     assert.include(render(current.controller), 'Cannot solve.');
     assert.strictEqual(current.state.workingCopy, snapshot);

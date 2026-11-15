@@ -102,7 +102,7 @@ function reference(scene: Phaser.Scene, rig: Rig, state: AnimationEditorState, t
   player.play(state.workingAnimation!.name);
   player.pause();
   player.sample(time * 1000, { mode: 'playback' });
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   player.dispose();
   return puppet;
 }
@@ -495,14 +495,14 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
   try {
     f.puppet.addIK({ name: 'arm', rootBone: 'root', middleBone: 'arm', endBone: 'hand' });
     f.puppet.setIKTarget('arm', 40, 100);
-    f.puppet.syncPose();
+    f.puppet.posePipeline.syncPose();
     const poses = f.rig.bones.map((bone) => ({ ...f.puppet.getBone(bone.id).pose }));
     const authored = JSON.stringify(f.state.workingAnimation);
     const clock = f.state.currentTime;
     const events = vi.fn();
     const unsubscribe = f.state.onAnimationEvent(events);
-    const prepare = vi.spyOn(f.puppet, 'preparePose');
-    const sync = vi.spyOn(f.puppet, 'syncPose');
+    const prepare = vi.spyOn(f.puppet.posePipeline, 'preparePose');
+    const sync = vi.spyOn(f.puppet.posePipeline, 'syncPose');
     try {
       f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
       for (let i = 0; i < 10; ++i) f.layer.sync();

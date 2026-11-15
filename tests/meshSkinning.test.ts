@@ -278,7 +278,7 @@ test.each([
   outer.add(puppet.container);
   Object.assign(puppet.getBone('root').pose, { x: -8, y: 12, rotation: 0.5, scaleX, scaleY });
   Object.assign(puppet.getBone('lower').pose, { x: 30, y: 5, rotation: -0.8 });
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const buffer = puppet.getSlotMesh('cloth')!.vertices;
   for (const facing of ['left', 'right'] as const) {
     actor.setPosition(230, 120);
@@ -305,7 +305,7 @@ test('weighted updates invert each owning transform once and retain each vertex 
       invert.mockClear();
       Object.assign(puppet.getBone('root').pose, { rotation, scaleX: -1.4, scaleY: 0.7 });
       puppet.getBone('lower').pose.rotation = -rotation;
-      puppet.syncPose();
+      puppet.posePipeline.syncPose();
       assert.equal(invert.mock.calls.length, slots.length);
       assert.equal(convertPoint.mock.calls.length, 0);
     }
@@ -326,7 +326,7 @@ test('legacy unweighted geometry follows each assigned slot bone without changin
   puppet.updateSlotDefinitions([legacy, { id: 'sprite', texture: 'paper' }], puppet.rig.skins);
   Object.assign(puppet.getBone('root').pose, { rotation: 0.3, x: 20 });
   Object.assign(puppet.getBone('lower').pose, { rotation: -0.8, y: 15 });
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const local = legacy.vertices.flatMap((vertex) => [vertex.x, vertex.y, vertex.u, vertex.v]);
   assert.deepEqual(puppet.getSlotMesh('cloth')!.vertices, local);
   assert.deepEqual(puppet.getSlotMesh('second')!.vertices, local);
@@ -363,7 +363,7 @@ test('final IK and deterministic forward/backward animation sampling deform immu
   }
   assert.deepEqual(puppet.getSlotMesh('cloth')!.vertices, snapshot);
   puppet.getIK('arm').setTarget(12, 28);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assertRendered(puppet, weighted, 'cloth');
   puppet.destroy();
 });
@@ -403,7 +403,7 @@ test('skin changes, late assignments, slot transforms and resource disposal pres
   Object.assign(scene.textures, { remove: removeTexture });
   old.setAlpha(0.35).setVisible(false).setDepth(4);
   puppet.getBone('lower').pose.rotation = 0.8;
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   puppet.setSkin('rigid');
   assert.isTrue(old.isDestroyed);
   puppet.setAttachment('cloth', 'mesh');
@@ -437,7 +437,7 @@ test('render-only mesh previews deform their own sampled pose rather than the so
   }
   const preview = new PuppetRenderer(scene, parent, puppet.rig, bones);
   puppet.getBone('lower').pose.rotation = 1;
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   puppet.copyAppearanceTo(preview, 0xabcdef);
   preview.sync();
   const object = preview.getSlotMesh('cloth')!;
@@ -459,6 +459,6 @@ test('Canvas fails before Puppet allocation, and weighted singular mounts report
   assert.doesNotThrow(() => new Puppet(scene, { autoUpdate: false, rig: rest }).destroy());
   const { puppet } = runtime();
   puppet.getBone('upper').pose.scaleX = 0;
-  assert.throws(() => puppet.syncPose(), /nonsingular posed/);
+  assert.throws(() => puppet.posePipeline.syncPose(), /nonsingular posed/);
   puppet.destroy();
 });

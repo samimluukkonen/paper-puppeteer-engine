@@ -532,7 +532,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.ikPreviewEnabled = enabled;
     const puppet = this.puppet;
     if (!puppet) return;
-    puppet.preparePose();
+    puppet.posePipeline.preparePose();
     for (const chain of this.options.ikChains ?? []) {
       const constraint = puppet.getIK(chain.name);
       // The fixed-preview control may replace only its own callbacks. Specialized
@@ -555,7 +555,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       const authored = puppet.rig.ik?.find((definition) => definition.name === chain.name);
       constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
     }
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     this.ikHandles?.refreshAvailability();
   }
 

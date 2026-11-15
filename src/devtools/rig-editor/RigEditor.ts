@@ -177,7 +177,7 @@ export class RigEditor {
         if (!chain.target && !constraint.target) this.pinPreviewTarget(constraint);
         constraint.enabled = chain.enabled !== false;
       }
-      this.puppet.syncPose();
+      this.puppet.posePipeline.syncPose();
       this.overlay.invalidate();
       this.update();
     }
@@ -343,7 +343,7 @@ export class RigEditor {
   }
 
   private applyRig(rig: RigDefinition): void {
-    this.puppet.preparePose();
+    this.puppet.posePipeline.preparePose();
     // Preview the same logical joint positions that an exported rig loads with.
     const definitions = new Map(rig.bones.map((bone) => [bone.id, bone]));
     for (const edited of rig.bones) {
@@ -389,7 +389,7 @@ export class RigEditor {
       }
     }
     this.updateRenderOrder(rig);
-    this.puppet.syncPose();
+    this.puppet.posePipeline.syncPose();
   }
 
   private updateRenderOrder(rig: RigDefinition): void {
@@ -649,14 +649,14 @@ export class RigEditor {
     this.cancelGesture();
     this.state.ikPreview = enabled;
     this.state.visibility.ik = enabled;
-    this.puppet.preparePose();
+    this.puppet.posePipeline.preparePose();
     for (const chain of this.ikChains) {
       const constraint = this.puppet.getIK(chain.name);
       if (this.hasExternalTarget(constraint)) continue;
       if (enabled && !chain.target) this.pinPreviewTarget(constraint);
       constraint.enabled = enabled && chain.enabled !== false;
     }
-    this.puppet.syncPose();
+    this.puppet.posePipeline.syncPose();
     this.refresh();
   }
 

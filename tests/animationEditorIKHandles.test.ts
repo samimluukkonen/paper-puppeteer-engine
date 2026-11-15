@@ -315,7 +315,7 @@ test.each(['provider', 'empty-provider', 'runtime', 'disabled', 'singular'])(
       if (owner === 'runtime') constraint.setTarget(target);
       if (owner === 'disabled') constraint.enabled = false;
       if (owner === 'singular') f.puppet.container.setScale(0);
-      f.puppet.syncPose();
+      f.puppet.posePipeline.syncPose();
       const handle = f.handles.getHandles()[0]!;
       assert.isTrue(f.handles.pointerDown(f.pointer(handle.world)));
       assert.equal(f.state.selectedIKConstraintId, 'handIK');
@@ -411,7 +411,7 @@ test('provider ownership acquired during dragging cancels the gesture, preserves
     f.input.emit('pointermove', f.localPointer({ x: 20, y: 80 }));
     const owned = { x: 120, y: 150 };
     f.puppet.getIK('handIK').setTargetProvider(() => owned);
-    f.puppet.syncPose();
+    f.puppet.posePipeline.syncPose();
     f.handles.refreshAvailability();
     assert.isNull(f.state.ikTargetDrag);
     assert.deepEqual(f.state.ikTargetDraft, { mix: 0.4 });
@@ -442,7 +442,7 @@ test.each(['unsupported-scale', 'singular-transform'] as const)(
       f.state.selectIKConstraint('handIK');
       const root = f.puppet.getBone('upper');
       root.pose.scaleX = status === 'unsupported-scale' ? 2 : 0;
-      f.puppet.syncPose();
+      f.puppet.posePipeline.syncPose();
       f.handles.refreshAvailability();
       assert.equal(f.puppet.getIK('handIK').status, status);
       assert.include(
@@ -452,7 +452,7 @@ test.each(['unsupported-scale', 'singular-transform'] as const)(
       assert.isFalse(f.state.beginIKTargetDrag('handIK'));
       assert.equal(f.state.historyLength, 0);
       root.pose.scaleX = 1;
-      f.puppet.syncPose();
+      f.puppet.posePipeline.syncPose();
       f.handles.refreshAvailability();
       assert.isNull(f.inspector.getSnapshot().disabledReason);
       assert.isTrue(f.state.beginIKTargetDrag('handIK'));

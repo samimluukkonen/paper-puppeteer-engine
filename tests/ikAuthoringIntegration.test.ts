@@ -142,7 +142,7 @@ test('root-only character → rig IK → animation → bake → package → Char
       runtime.update(0);
       assert.equal(runtime.getIK('tipIK').status, 'solved');
       runtime.getIK('tipIK').enabled = false;
-      runtime.syncPose();
+      runtime.posePipeline.syncPose();
       assert.equal(runtime.getIK('tipIK').status, 'inactive');
     } finally {
       runtime.destroy();

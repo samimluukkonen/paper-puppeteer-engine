@@ -287,7 +287,7 @@ test('live test bend and painted mesh match exported runtime skinning without au
     autoUpdate: false,
   });
   reloaded.getBone('forearm').pose.rotation += (65 * Math.PI) / 180;
-  reloaded.syncPose();
+  reloaded.posePipeline.syncPose();
   assert.deepEqual(puppet.getSlotMesh('sleeve')!.vertices, reloaded.getSlotMesh('sleeve')!.vertices);
   const projection = () => {
     const object = puppet.getSlotMesh('sleeve')!,
@@ -352,7 +352,7 @@ test('canvas brushes hit evaluated vertices through facing/zoom/pan; release com
   const puppet = new Puppet(scene, { rig: state.workingCopy, skin: state.activeSkin, x: 90, y: 70, autoUpdate: false });
   puppet.container.setScale(-1.5, 0.8);
   puppet.getBone('forearm').pose.rotation = 0.5;
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   const camera = {
     zoom: 2.3,
     scrollX: -120,
@@ -380,7 +380,7 @@ test('canvas brushes hit evaluated vertices through facing/zoom/pan; release com
       redo: () => state.redo(),
       refresh: () => {
         puppet.updateSlotDefinitions(state.workingCopy.attachments!, state.skins);
-        puppet.syncPose();
+        puppet.posePipeline.syncPose();
       },
       moveCharacter: vi.fn(),
       previewArtwork: vi.fn(),

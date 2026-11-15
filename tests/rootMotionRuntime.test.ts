@@ -152,7 +152,7 @@ test('elapsed evaluation rejects invalid clocks, modes, cycle bounds and overflo
 test('irregular playback and a large step agree with an absolute seek, without double application', () => {
   const { actor, puppet, player } = fixture();
   actor.play('walk', { rootMotion: 'apply' });
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   let elapsed = 0;
   for (const delta of [17, 103, 380, 400, 2200, 400, 5000, 0]) {
     elapsed += delta;
@@ -409,7 +409,7 @@ test('event-driven replacement captures already-applied travel without stale out
 test('pose synchronization failure still settles completion and releases translation ownership', async () => {
   const { actor, puppet, player } = fixture();
   const wait = actor.playAndWait('finite', { rootMotion: 'apply' });
-  vi.spyOn(puppet, 'syncPose').mockImplementationOnce(() => {
+  vi.spyOn(puppet.posePipeline, 'syncPose').mockImplementationOnce(() => {
     throw new Error('IK host failed');
   });
   assert.throws(() => puppet.update(1000), /IK host failed/);

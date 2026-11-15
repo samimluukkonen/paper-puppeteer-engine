@@ -364,8 +364,8 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const sourceJson = JSON.stringify(source);
     const notify = vi.fn();
     const events = vi.fn<(event: FiredAnimationEvent) => void>();
-    const sync = vi.spyOn(puppet, 'syncPose');
-    const prepare = vi.spyOn(puppet, 'preparePose');
+    const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
+    const prepare = vi.spyOn(puppet.posePipeline, 'preparePose');
     target.mockClear();
     const release = state.subscribe(notify);
     const releaseEvents = state.onAnimationEvent(events);

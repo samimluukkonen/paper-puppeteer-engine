@@ -175,7 +175,7 @@ test.each(['left', 'right'] as const)(
     puppet.sampleAnimation(500);
     reaches(puppet, { x: 30, y: 80 });
     puppet.getIK('arm').setEndOffset({ x: 3, y: 8 });
-    puppet.syncIK();
+    puppet.posePipeline.syncIK();
     reaches(puppet, { x: 30, y: 80 });
     puppet.destroy();
     parent.destroy();
@@ -205,24 +205,24 @@ test('manual world positions override animation positions; explicit mix and prov
   const puppet = fixture([clip('reach', [{ time: 0, x: -20, y: 80, mix: 0 }])]);
   const arm = puppet.getIK('arm');
   arm.setTarget(60, 60);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(arm.status, 'inactive', 'animated mix can affect an ordinary runtime target');
   arm.mix = 1;
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   reaches(puppet, { x: 60, y: 60 });
   arm.clearMixOverride();
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(arm.status, 'inactive');
   const provider = vi.fn(() => ({ x: 30, y: 80 }));
   arm.setTargetProvider(provider);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   reaches(puppet, { x: 30, y: 80 });
   assert.equal(provider.mock.calls.length, 1);
   arm.setTargetProvider(() => undefined);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(arm.status, 'inactive', 'a missing mandatory grip never falls back to a generic track');
   arm.target = undefined;
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(arm.status, 'inactive', 'clearing overrides restores animated zero mix');
   arm.enabled = false;
   puppet.destroy();
@@ -299,9 +299,9 @@ test('partial overlay fade-in and scrub share base-only sampling semantics', () 
   reaches(puppet, { x: 60, y: 70 });
   puppet.sampleAnimation(750);
   reaches(puppet, { x: 40, y: 70 });
-  puppet.preparePose();
+  puppet.posePipeline.preparePose();
   puppet.posePipeline.player.applyCurrentPose();
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   reaches(puppet, { x: 60, y: 70 });
   puppet.destroy();
 });
@@ -440,7 +440,7 @@ test('unreachable animated targets retain clamping and singular transforms retai
   assert.equal(puppet.getIK('arm').status, 'clamped');
   assert.approximately(Math.hypot(hand(puppet).x, hand(puppet).y), 110, 1e-8);
   puppet.container.setScale(0);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.equal(puppet.getIK('arm').status, 'singular-transform');
   puppet.destroy();
 });
@@ -453,7 +453,7 @@ test('old clips and empty tracks preserve static targets, disabled constraints, 
     const puppet = fixture([animation]);
     assert.equal(puppet.getIK('arm').status, 'inactive');
     puppet.setIKTarget('arm', 60, 60);
-    puppet.syncIK();
+    puppet.posePipeline.syncIK();
     reaches(puppet, { x: 60, y: 60 });
     puppet.update(500);
     reaches(puppet, { x: 60, y: 60 });
@@ -477,7 +477,7 @@ test('compilation owns IK maps and values; evaluation never alters source keys, 
   const bind = { ...puppet.getBone('upper').bindPose };
   for (const time of [500, 1000, 0, 250]) {
     puppet.sampleAnimation(time);
-    puppet.syncIK();
+    puppet.posePipeline.syncIK();
   }
   assert.equal(JSON.stringify(source), before);
   assert.deepEqual(puppet.getBone('upper').bindPose, bind);
@@ -576,7 +576,7 @@ test.each([{ mode: 'smooth' } as const, { mode: 'stepped', fps: 10 } as const])(
     assert.strictEqual(state.workingAnimation, working);
     preview.dispose();
     playerEvent.mockRestore();
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     reaches(puppet, { x: 60, y: 60 });
     puppet.destroy();
   },
@@ -611,7 +611,7 @@ test('late-bound weapon providers observe rendered animated primary and nested c
   assert.approximately(actual.x, expected.x, 1e-8);
   assert.approximately(actual.y, expected.y, 1e-8);
   grip.setTargetProvider(undefined);
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   assert.equal(grip.status, 'inactive', 'generic zero mix is restored after specialized ownership ends');
   puppet.destroy();
 });
@@ -635,7 +635,7 @@ test.each(['left', 'right'] as const)(
       animations: [{ name: 'sparse', duration: 100, loop: false, tracks: {}, ikTracks: { arm: [{ time: 0, x: 20 }] } }],
     });
     puppet.container.setRotation(0.4);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     reaches(puppet, { x: 40, y: 70 });
     assert.equal(puppet.getIK('arm').targetOwnership, 'animation');
     puppet.play('sparse');
@@ -643,15 +643,15 @@ test.each(['left', 'right'] as const)(
     reaches(puppet, { x: 20, y: 70 });
     const world = localToWorld({ x: 50, y: 60 }, puppet.container.getWorldTransformMatrix());
     puppet.getIK('arm').setTarget(world);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     reaches(puppet, { x: 50, y: 60 });
     puppet
       .getIK('arm')
       .setTargetProvider(() => localToWorld({ x: 30, y: 80 }, puppet.container.getWorldTransformMatrix()));
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     reaches(puppet, { x: 30, y: 80 });
     puppet.getIK('arm').target = undefined;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     reaches(puppet, { x: 20, y: 70 });
     puppet.destroy();
   },

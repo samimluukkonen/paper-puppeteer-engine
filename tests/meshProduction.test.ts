@@ -111,7 +111,7 @@ test('long hair, cape and clothing coexist with rigid artwork and corrections re
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false, skin: 'default' });
   const before = new Map(['hair', 'cape', 'sleeve'].map((id) => [id, [...puppet.getSlotMesh(id)!.vertices]]));
   puppet.attachPoseSource({ meshDeformation: new Map([['sleeve', new Map([['top-left', { x: 3, y: -2 }]])]]) });
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.deepEqual(puppet.getSlotMesh('hair')!.vertices, before.get('hair'));
   assert.deepEqual(puppet.getSlotMesh('cape')!.vertices, before.get('cape'));
   assert.notDeepEqual(puppet.getSlotMesh('sleeve')!.vertices, before.get('sleeve'));

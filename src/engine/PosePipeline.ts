@@ -78,12 +78,17 @@ export class PosePipeline {
     return bone;
   }
 
-  /** Attach external pose channels; the returned function detaches them (restoring the runtime player). */
+  /** Attach external pose channels and project them: prepare → attach → synchronize.
+   * The returned function detaches them (restoring the runtime player).
+   */
   attachPoseSource(source: PoseSource | undefined): () => void {
     if (this.destroyed) throw new Error('Puppet has been destroyed.');
+    // The attach owns the prepare so callers never sequence prepare → sample/copy → sync manually.
+    this.preparePose();
     this.poseSource = source;
     this.projectedPose = undefined;
     this.markPoseDirty();
+    this.syncPose();
     let detached = false;
     return () => {
       if (detached) return;
@@ -249,6 +254,11 @@ export class PosePipeline {
   /** Schedule one full synchronization on the next update in idleSync: 'dirty' mode. */
   markPoseDirty(): void {
     this.poseRevision += 1;
+  }
+
+  /** Refresh overlays from the final synchronized pose without running animation or IK again. */
+  refreshDebugViews(): void {
+    if (!this.destroyed) this.options.updateDebugViews(this.getOrderedConstraints());
   }
 
   /** Idle sync is required while a pose source is attached or the pose revision is unsynchronized. */

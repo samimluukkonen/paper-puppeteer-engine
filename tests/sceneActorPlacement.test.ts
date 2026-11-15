@@ -277,7 +277,7 @@ test('preview updates only changed Actor fields and layer properties without res
     position: vi.spyOn(actor, 'setPosition'),
     facing: vi.spyOn(actor, 'setFacing'),
     skin: vi.spyOn(actor, 'setSkin'),
-    pose: vi.spyOn(actor.puppet, 'syncPose'),
+    pose: vi.spyOn(actor.puppet.posePipeline, 'syncPose'),
     depth: vi.spyOn(actor.puppet.container, 'setDepth'),
     visible: vi.spyOn(actor.puppet.container, 'setVisible'),
   });

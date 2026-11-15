@@ -351,7 +351,7 @@ test('preview immediately samples the imported clip through the runtime evaluato
   const state = session();
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const joints = new Map(rig.bones.map((bone) => [bone.id, puppet.getBone(bone.id)]));
-  const syncPose = vi.spyOn(puppet, 'syncPose');
+  const syncPose = vi.spyOn(puppet.posePipeline, 'syncPose');
   const preview = new AnimationEditorPreview(state, puppet);
   const events = vi.fn();
   state.onAnimationEvent(events);

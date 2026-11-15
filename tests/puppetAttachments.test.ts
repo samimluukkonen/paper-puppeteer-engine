@@ -131,7 +131,7 @@ test('slot props inherit the slot transform and global depth, and retain attachm
   const { puppet, prop, mount, events } = fixture();
   puppet.setFacing('left');
   Object.assign(puppet.getBone('hand').pose, { x: 10, y: 20, rotation: 0.3, scaleX: 1.2, scaleY: 0.8 });
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   puppet.attachToSlot('propSlot', prop, { x: 2, y: 3 });
   const slotPoint = {
     x: 4 + 2 * Math.cos(0.2) - 3 * Math.sin(0.2),

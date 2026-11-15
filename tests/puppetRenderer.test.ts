@@ -340,8 +340,12 @@ test('render order reads reuse an immutable snapshot while previous orders remai
 test('invalid slot patches leave every transform unchanged and do not synchronize', () => {
   const { renderer } = fixture();
   const syncPose = vi.fn();
-  // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
-  const puppet = { renderer, syncPose, setSlotTransform: Puppet.prototype.setSlotTransform } as unknown as Puppet;
+  const puppet = {
+    renderer,
+    posePipeline: { syncPose, markPoseDirty: vi.fn() },
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+    setSlotTransform: Puppet.prototype.setSlotTransform,
+  } as unknown as Puppet;
   const initial = slotTransform(renderer, 'item');
   for (const property of ['x', 'y', 'rotation', 'scaleX', 'scaleY']) {
     for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
@@ -381,8 +385,7 @@ test('slot transforms synchronize immediately by default and can defer synchroni
   const syncPose = vi.fn();
   const puppet = {
     renderer,
-    syncPose,
-    markPoseDirty: vi.fn(),
+    posePipeline: { syncPose, markPoseDirty: vi.fn() },
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setSlotTransform: Puppet.prototype.setSlotTransform,
   } as unknown as Puppet;
@@ -392,7 +395,7 @@ test('slot transforms synchronize immediately by default and can defer synchroni
   puppet.setSlotTransform('item', { y: 9 }, false);
   puppet.setSlotTransform('automatic', { x: 10 }, false);
   assert.equal(syncPose.mock.calls.length, 0);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.equal(syncPose.mock.calls.length, 1);
   assert.equal(slotTransform(renderer, 'item').y, 9);
   assert.equal(slotTransform(renderer, 'automatic').x, 10);
@@ -401,13 +404,12 @@ test('slot transforms synchronize immediately by default and can defer synchroni
 test('editor restores omitted slot transform defaults through undo and reset', () => {
   const { renderer, rig } = fixture();
   const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
+  const pipeline = { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() };
   const puppet = {
     rig,
     renderer,
     getBone: (id: string) => joints.get(id)!,
-    preparePose: vi.fn(),
-    syncPose: vi.fn(),
-    markPoseDirty: vi.fn(),
+    posePipeline: pipeline,
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setRenderOrder: Puppet.prototype.setRenderOrder,
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
@@ -421,12 +423,11 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getAttachment: vi.fn(),
   } as unknown as Puppet;
   const editor = new RigEditor({} as Phaser.Scene, puppet, vi.fn());
-  const mockedPuppet = vi.mocked(puppet);
   const defaults = { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
   for (const field of ['x', 'y', 'rotation', 'scaleX', 'scaleY'] as const) {
-    mockedPuppet.syncPose.mockClear();
+    pipeline.syncPose.mockClear();
     editor.editSlot('automatic', field, 8);
-    assert.equal(mockedPuppet.syncPose.mock.calls.length, 1, 'refresh synchronizes once for all three slots');
+    assert.equal(pipeline.syncPose.mock.calls.length, 1, 'refresh synchronizes once for all three slots');
     assert.deepEqual(slotTransform(renderer, 'automatic'), { ...defaults, [field]: 8 });
     editor.undo();
     assert.deepEqual(slotTransform(renderer, 'automatic'), defaults);
@@ -577,9 +578,7 @@ test.each([undefined, 0, -5, 40])(
       rig,
       renderer,
       getBone: (id: string) => joints.get(id)!,
-      preparePose: vi.fn(),
-      syncPose: vi.fn(),
-      markPoseDirty: vi.fn(),
+      posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setRenderOrder: Puppet.prototype.setRenderOrder,
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.

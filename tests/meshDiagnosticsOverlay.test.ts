@@ -36,10 +36,10 @@ test('overlay inspects visible selected attachments, leaves geometry intact and 
   puppet.setFacing('left');
   assert.notInclude(overlay.render(puppet, mesh), '1 inverted');
   puppet.getBone('upper').container.setVisible(false);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   assert.include(overlay.render(puppet, mesh), 'skin displaying it');
   puppet.getBone('upper').container.setVisible(true);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   puppet.clearAttachment('cloth');
   const drawn = graphics.strokeTriangle.mock.calls.length;
   assert.include(overlay.render(puppet, mesh), 'skin displaying it');

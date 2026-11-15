@@ -103,23 +103,23 @@ test('attachPoseSource projects a sampled pose once and keeps direct edits until
   try {
     const armPose = { x: 5, y: 6, rotation: 0.5, scaleX: 1, scaleY: 1 };
     const detach = puppet.attachPoseSource({ pose: new Map([['arm', armPose]]) });
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.deepEqual({ ...puppet.getBone('arm').pose }, armPose, 'the source pose is projected onto the bone');
     assert.approximately(puppet.getBone('arm').container.x, 5, 1e-12, 'and rendered');
 
     puppet.getBone('arm').pose.x = 99;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.equal(puppet.getBone('arm').pose.x, 99, 'later syncs keep direct edits while the source is attached');
 
     const reattach = puppet.attachPoseSource({ pose: new Map([['arm', { ...armPose, x: 7 }]]) });
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.equal(puppet.getBone('arm').pose.x, 7, 'a newly attached source projects again');
 
     reattach();
     detach();
     detach(); // idempotent
     puppet.getBone('arm').pose.x = 42;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.equal(puppet.getBone('arm').pose.x, 42, 'detached sources never project again');
   } finally {
     puppet.destroy();

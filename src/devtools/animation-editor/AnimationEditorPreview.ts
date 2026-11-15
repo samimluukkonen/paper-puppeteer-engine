@@ -28,7 +28,7 @@ export class AnimationEditorPreview {
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'preparePose' | 'syncPose' | 'attachPoseSource'> &
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'attachPoseSource' | 'posePipeline'> &
       Partial<Pick<Puppet, 'container'>>,
     private readonly motion?: MotionPreviewController,
   ) {
@@ -65,7 +65,7 @@ export class AnimationEditorPreview {
     if (this.state.editorMode === 'rig') {
       this.detachPoseSource?.();
       this.detachPoseSource = undefined;
-      if (force) this.puppet.syncPose();
+      if (force) this.puppet.posePipeline.syncPose();
       return;
     }
     const rig = this.state.rig ?? this.puppet.rig;
@@ -111,7 +111,6 @@ export class AnimationEditorPreview {
         : undefined;
       this.player?.dispose();
       // Reset sparse animation properties without clearing pose presets or disabling optional IK.
-      this.puppet.preparePose();
       for (const bone of this.puppet.rig.bones) this.puppet.getBone(bone.id).reset();
       this.player = next;
       this.rig = rig;
@@ -123,10 +122,8 @@ export class AnimationEditorPreview {
       }
     }
     // Restore even untracked temporary properties before sampling. Drafts belong before presets/IK/rendering.
-    this.puppet.preparePose();
     for (const joint of this.joints?.values() ?? []) joint.reset();
-    // Build the pose source as live views over the detached preview joints and player, attach it,
-    // then sample and let the puppet project — no manual pose copying into the live puppet.
+    // Build the pose source as live views over the detached preview joints and player.
     const joints = this.joints;
     const player = this.player;
     const source: PoseSource = {
@@ -148,8 +145,8 @@ export class AnimationEditorPreview {
         return player?.meshDeformation;
       },
     };
-    this.detachPoseSource?.();
-    this.detachPoseSource = this.puppet.attachPoseSource(source);
+    // Sample the working copy into the detached joints, then attach: the pipeline owns
+    // prepare → project, so there is no manual pose copying or prepare/sync call here.
     player?.sample(time, { mode: 'playback' });
     // Editor drafts overlay the sampled pose on the detached joints before projection.
     const selectedId = this.state.selectedBoneId;
@@ -161,7 +158,8 @@ export class AnimationEditorPreview {
       const joint = joints?.get(id);
       if (joint) Object.assign(joint.pose, values);
     }
-    this.puppet.syncPose();
+    this.detachPoseSource?.();
+    this.detachPoseSource = this.puppet.attachPoseSource(source);
     this.sampledTime = sampledTime;
     this.draft = draft;
     this.ikDraft = ikDraft;

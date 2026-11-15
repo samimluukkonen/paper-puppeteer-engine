@@ -61,7 +61,7 @@ test('creates a root-only independent workspace without any loaded character or 
   assert.deepEqual(draft.rig.validationIssues(), []);
   const puppet = new Puppet(puppetScene(), { definition: draft.definition, autoUpdate: false });
   puppet.setSkin('default');
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   puppet.destroy();
 });
 

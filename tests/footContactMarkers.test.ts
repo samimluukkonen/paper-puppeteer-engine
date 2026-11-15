@@ -158,7 +158,7 @@ test.each(['right', 'left'] as const)(
     const parent = puppet.container.scene.add.container(100, -40).setRotation(0.4).setScale(3, 2);
     parent.add(puppet.container);
     puppet.container.setRotation(-0.2);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     const pose = new Map(rig.bones.map((bone) => [bone.id, Object.freeze({ ...puppet.getBone(bone.id).pose })]));
     const before = structuredClone([...pose]);
     const expected = puppet

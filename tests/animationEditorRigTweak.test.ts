@@ -426,7 +426,7 @@ test('mode activation and scene/controller disposal balance input, overlays and 
   scene.events.emit('shutdown');
   assert.equal(destroy.mock.calls.length, 4);
   assert.sameDeepMembers(browser.addEventListener.mock.calls, browser.removeEventListener.mock.calls);
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   state.setEditorMode('animation');
   state.setCurrentTime(0.8);
   assert.equal(sync.mock.calls.length, 0);

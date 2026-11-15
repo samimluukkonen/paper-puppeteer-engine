@@ -109,7 +109,7 @@ export class Actor {
     assertFinite(y, 'Actor y');
     this.puppet.container.setPosition(x, y);
     // World-space IK targets and debug views must observe the new outer transform immediately.
-    this.puppet.syncPose();
+    this.puppet.posePipeline.syncPose();
     return this;
   }
 

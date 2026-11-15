@@ -294,7 +294,7 @@ test('preview authoring and skin switching preserve player, IK, bone pose, facin
   const mount = image.parentContainer;
   const order = puppet.getRenderOrder();
   const player = puppet.posePipeline.player;
-  const prepare = vi.spyOn(puppet, 'preparePose');
+  const prepare = vi.spyOn(puppet.posePipeline, 'preparePose');
   controller.assign('grip');
   assert.equal(puppet.getAttachment('hand-art'), 'grip');
   assert.strictEqual(puppet.getSlotImage('hand-art')!.parentContainer, mount);

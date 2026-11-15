@@ -35,7 +35,7 @@ test('dirty idle puppets skip bones, rendering, IK, meshes and debug while still
     vi.spyOn(view.prototype, 'update').mockImplementation(() => {}),
   );
   puppet.setDebug(true).setIKDebug(true).setSlotDebug(true);
-  puppet.syncPose();
+  puppet.posePipeline.syncPose();
   for (const update of debug) update.mockClear();
   const bones = vi.spyOn(Bone.prototype, 'syncTransform');
   const rendering = vi.spyOn(PuppetRenderer.prototype, 'sync');
@@ -61,14 +61,16 @@ test('direct edits opt into one coalesced synchronization and explicit syncPose 
   const rendering = vi.spyOn(PuppetRenderer.prototype, 'sync');
   puppet.getIK('arm').enabled = false;
   puppet.getBone('lower').pose.x = 60;
-  assert.strictEqual(puppet.markPoseDirty().markPoseDirty(), puppet);
+  puppet.posePipeline.markPoseDirty();
+  puppet.posePipeline.markPoseDirty();
   puppet.update(16);
   assert.equal(puppet.getBone('lower').container.x, 60);
   assert.notDeepEqual(puppet.getSlotMesh('cloth')!.vertices, vertices);
   puppet.update(16);
   assert.equal(rendering.mock.calls.length, 1);
   puppet.getBone('lower').pose.x = 50;
-  puppet.markPoseDirty().syncPose();
+  puppet.posePipeline.markPoseDirty();
+  puppet.posePipeline.syncPose();
   assert.equal(puppet.getBone('lower').container.x, 50);
   puppet.update(16);
   assert.equal(rendering.mock.calls.length, 2);
@@ -136,7 +138,8 @@ test.each(['paused', 'stopped', 'completed'] as const)(
     puppet.update(16);
     assert.equal(rendering.mock.calls.length, 0);
     puppet.getBone('root').pose.x = 30;
-    puppet.markPoseDirty().update(16);
+    puppet.posePipeline.markPoseDirty();
+    puppet.update(16);
     assert.equal(puppet.getBone('root').container.x, 30);
     puppet.update(16);
     assert.equal(rendering.mock.calls.length, 1);
@@ -165,9 +168,9 @@ test('Puppet target and batched slot APIs invalidate idle synchronization', () =
 
 test('IK-only synchronization does not consume pending full pose edits', () => {
   const puppet = fixture('dirty');
-  puppet.preparePose();
+  puppet.posePipeline.preparePose();
   puppet.getBone('root').pose.x = 12;
-  puppet.syncIK();
+  puppet.posePipeline.syncIK();
   puppet.update(16);
   assert.equal(puppet.getBone('root').container.x, 12);
   puppet.destroy();
@@ -181,18 +184,21 @@ test('failed explicit synchronization is retried on update before returning to s
   meshes.mockImplementationOnce(() => {
     throw new Error('projection failed');
   });
-  assert.throws(() => puppet.syncPose(), /projection failed/);
+  assert.throws(() => puppet.posePipeline.syncPose(), /projection failed/);
   puppet.update(16);
   puppet.update(16);
   assert.equal(meshes.mock.calls.length, 2);
   assert.equal(listener.mock.calls.length, 2);
-  puppet.markPoseDirty();
+  puppet.posePipeline.markPoseDirty();
   assert.throws(() => puppet.update(-1), /negative/);
   assert.throws(() => puppet.update(NaN), /finite/);
   puppet.update(16);
   assert.equal(meshes.mock.calls.length, 3);
   puppet.destroy();
-  assert.doesNotThrow(() => puppet.markPoseDirty().update(16));
+  assert.doesNotThrow(() => {
+    puppet.posePipeline.markPoseDirty();
+    puppet.update(16);
+  });
 });
 
 test('invalidation from an update callback is preserved for the next idle frame', () => {
@@ -200,7 +206,7 @@ test('invalidation from an update callback is preserved for the next idle frame'
   const rendering = vi.spyOn(PuppetRenderer.prototype, 'sync');
   const unsubscribe = puppet.onUpdate(() => {
     puppet.getBone('root').pose.x = 12;
-    puppet.markPoseDirty();
+    puppet.posePipeline.markPoseDirty();
   });
   puppet.update(16);
   unsubscribe();
@@ -217,7 +223,7 @@ test('invalidation during synchronization survives even when a provider removes 
   const constraint = puppet.getIK('arm');
   constraint.setTargetProvider(() => {
     puppet.getBone('root').pose.x = 12;
-    puppet.markPoseDirty();
+    puppet.posePipeline.markPoseDirty();
     constraint.setTargetProvider(undefined);
     return undefined;
   });

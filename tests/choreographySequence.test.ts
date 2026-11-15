@@ -526,7 +526,7 @@ test.each(['preparePose', 'syncPose'] as const)(
   async (method) => {
     const { actor, puppet } = fixture();
     const sequence = new ChoreographySequence(actor).playAnimation('draw').playAnimation('attack');
-    vi.spyOn(puppet, method).mockImplementationOnce(() => sequence.cancel());
+    vi.spyOn(puppet.posePipeline, method).mockImplementationOnce(() => sequence.cancel());
     const result = await sequence.run();
     assert.equal(result.status, 'cancelled');
     assert.equal(puppet.getPlaybackStatus()?.status, 'stopped');

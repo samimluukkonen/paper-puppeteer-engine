@@ -273,7 +273,7 @@ export class ActorMovement {
         fraction === 1 ? destination.x : x + (destination.x - x) * fraction,
         fraction === 1 ? destination.y : y + (destination.y - y) * fraction,
       );
-      this.puppet.syncPose();
+      this.puppet.posePipeline.syncPose();
       if (fraction === 1 && this.current === request) this.finish('completed');
     } catch (error) {
       if (this.current === request) this.finish('cancelled');

@@ -522,7 +522,7 @@ test('runtime guards reuse unchanged configurations and invalidate every ownersh
     ownership.mockClear();
     const revision = chain.configurationRevision;
     for (let frame = 0; frame < 60; frame++) {
-      puppet.syncPose();
+      puppet.posePipeline.syncPose();
       chain.enabled = true;
       chain.priority = 1;
       chain.bendDirection = 1;
@@ -668,7 +668,7 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const releaseEvent = state.onAnimationEvent(events);
     const release = state.subscribe(notifications);
     puppet.onAnimationEvent(runtimeEvents);
-    const sync = vi.spyOn(puppet, 'syncPose');
+    const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
     const reset = vi.spyOn(Joint.prototype, 'reset');
     try {
       const expected = sampleIKBake(working, skeleton, ['arm', 'leg']);

@@ -210,10 +210,9 @@ test.each(dragCases)(
       getAttachment: () => 'part',
       resetToBindPose: vi.fn().mockReturnThis(),
       setFacing: vi.fn().mockReturnThis(),
-      preparePose: vi.fn(),
-      syncPose: vi.fn(),
+      posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
+      attachPoseSource: vi.fn(() => vi.fn()),
       setRenderOrder: vi.fn(),
-      markPoseDirty: vi.fn(),
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setSlotTransform: Puppet.prototype.setSlotTransform,
       setSlotDepth: vi.fn(),
@@ -243,7 +242,7 @@ test.each(dragCases)(
     editor.state.gridSnap = 5;
     vi.spyOn(RigEditorOverlay.prototype, 'pick').mockReturnValue(type === 'attachment' ? null : selection);
     editor.enable();
-    puppet.syncPose.mockClear();
+    puppet.posePipeline.syncPose.mockClear();
     const emit = (event: string, x: number, y: number, id = 1) => {
       const [, handler, context] = input.on.mock.calls.filter(([name]) => name === event).at(-1)!;
       handler.call(context, { id, x, y, isDown: true, leftButtonDown: () => true, middleButtonDown: () => false });
@@ -266,7 +265,7 @@ test.each(dragCases)(
     emit('pointerupoutside', 300, 300, 2);
     assert.equal(validate.mock.calls.length, 0, 'full validation waits until the drag finishes');
     assert.isTrue(editor.state.validationPending);
-    assert.equal(puppet.syncPose.mock.calls.length, 2);
+    assert.equal(puppet.posePipeline.syncPose.mock.calls.length, 2);
     assert.equal(parse.mock.calls.length, 0, 'refresh does not rebuild and parse a rig');
     assert.equal(onChange.mock.calls.length, 2);
     assert.isFalse(editor.state.canUndo);

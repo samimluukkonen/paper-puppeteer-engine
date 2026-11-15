@@ -1035,8 +1035,8 @@ test('all shipped animations, IK and baked IK round-trip through ZIP → Charact
       for (const time of [0, clip.duration * 0.25, clip.duration * 0.5, clip.duration - 0.001]) {
         original.posePipeline.player.sample(time);
         reloaded.posePipeline.player.sample(time);
-        original.syncPose();
-        reloaded.syncPose();
+        original.posePipeline.syncPose();
+        reloaded.posePipeline.syncPose();
         assert.deepEqual(evaluatedFootContacts(reloaded), evaluatedFootContacts(original));
         for (const bone of definition.rig.bones) {
           assert.deepEqual(reloaded.getBone(bone.id).pose, original.getBone(bone.id).pose);

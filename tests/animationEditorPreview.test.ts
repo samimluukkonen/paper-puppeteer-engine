@@ -122,13 +122,13 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
       const history = state.historyLength;
       for (const facing of ['left', 'right', 'left', 'right'] as const) {
         puppet.setFacing(facing);
-        puppet.syncPose();
+        puppet.posePipeline.syncPose();
         check();
         assert.strictEqual(state.workingAnimation, working);
         assert.equal(state.historyLength, history);
       }
       constraint.enabled = false;
-      puppet.syncPose();
+      puppet.posePipeline.syncPose();
       assert.approximately(puppet.getBone('upper').pose.rotation, authoredAt(state.currentTime), 1e-12);
       assert.equal(JSON.stringify(input), before);
       assert.deepEqual(state.sourceAnimation!.tracks, input.tracks);
@@ -162,7 +162,7 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 1 
     const source = JSON.stringify(input);
     const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
     const preview = new AnimationEditorPreview(state, puppet);
-    const sync = vi.spyOn(puppet, 'syncPose');
+    const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
     const expected = (time: number) => (playback.mode === 'stepped' && time < 1 ? 0 : time);
     try {
       for (const time of [0, 0.25, 0.5, 0.75, 1]) {
@@ -345,7 +345,7 @@ test('held stepped frames skip projection while drafts, authored edits and endpo
   state.selectAnimation('move');
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const preview = new AnimationEditorPreview(state, puppet);
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   state.play();
   for (let frame = 0; frame < 60; frame++) state.advancePlayback(1 / 120);
   assert.approximately(state.currentTime, 0.5, 1e-12);
@@ -563,7 +563,7 @@ test('status changes skip sampling and rendering while time and authored changes
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const preview = new AnimationEditorPreview(state, puppet);
   const sample = vi.spyOn(AnimationPlayer.prototype, 'sample');
-  const sync = vi.spyOn(puppet, 'syncPose');
+  const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
   try {
     state.setPreviewLoop(true);
     state.setPlaybackSpeed(0.5);
@@ -858,7 +858,7 @@ test.each([0.5, 1])('preview preserves optional IK, presets and facing through r
     }
     state.pause();
     const pose = { ...puppet.getBone('upper').pose };
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.deepEqual(puppet.getBone('upper').pose, pose, 'partial IK/preset mix must not accumulate');
   }
   state.setAuthoredPlaybackMode('stepped');
@@ -1026,13 +1026,13 @@ test.each(['right', 'left'] as const)(
     assert.approximately(state.selectedBoneTransform!.rotation, 0.7, 1e-12);
     assert.notEqual(puppet.getBone('lower').pose.rotation, 0.7, 'redo retains IK as a separate preview pass');
     puppet.setFacing(facing === 'right' ? 'left' : 'right');
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     puppet.setFacing(facing);
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.strictEqual(state.workingAnimation, keyed);
     assert.deepEqual(state.findBonePropertyKeyframe('lower', 'rotation'), { time: 500, value: 0.7 });
     constraint.enabled = false;
-    puppet.syncPose();
+    puppet.posePipeline.syncPose();
     assert.approximately(puppet.getBone('lower').pose.rotation, 0.7, 1e-12);
     state.setTemporaryBoneProperty('y', 75);
     state.commitBoneProperty('y');
