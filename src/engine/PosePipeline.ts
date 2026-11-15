@@ -266,6 +266,8 @@ export class PosePipeline {
   /** Live deformation channels for synchronous rendering; public reads remain immutable snapshots. */
   getMeshDeformationForRendering(): MeshDeformationPose {
     const source = this.poseSource;
+    // An attached player exposes live channels only through the rendering read; its public
+    // meshDeformation getter is the frozen snapshot and must not be consumed per frame.
     if (source instanceof AnimationPlayer) return source.getMeshDeformationForRendering();
     return source?.meshDeformation ?? this.player.getMeshDeformationForRendering();
   }
