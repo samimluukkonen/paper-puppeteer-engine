@@ -133,7 +133,7 @@ src/engine/
   index.ts             Public library entry point
   core.ts              Renderer-independent public entry point for Node and asset tooling
   runtime.ts           Explicit public Phaser runtime; index.ts remains its compatibility entry
-  data.ts              Type-only shared authored data contracts
+  data.ts              Type-only re-export of all core barrel types
   serialization.ts     Versioned validation, parsing and pose serialization
   loadSceneCharacter.ts  Cancellation-aware scene metadata/artwork loading
 src/devtools/rig-editor/
