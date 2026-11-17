@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Allow picomatch advisory `GHSA-fc5q-39xc-vjpf` in `npm run audit`, which now runs `scripts/audit.mjs`. The ReDoS has no patched release (all versions up to 4.0.7) and reaches the project only through Vite and Vitest dev tooling, never the runtime package or built output; `npm audit fix --force` would have downgraded Vite to 6.2.7. Every other advisory of any severity still fails the audit, and an allowlist entry npm no longer reports fails it too. Remove the entry when picomatch ships a fix.
+
 - Fix a throwing UI subscriber turning a successful devtools edit into a thrown error. Environment preview, IK inspector, motion preview, foot-contact ground and ground guide changes now finish, notify every remaining subscriber and pass the failure to `reportError`. The IK inspector and foot-contact controllers also deliver to a snapshot of their subscribers, so subscribing or unsubscribing during a notification affects only the next one. The rig tweak, new animation, variation, mirror tools, keyframe retiming and IK bake panels report subscriber failures the same way instead of rethrowing them.
 
 - Give every devtools listener owner one shared `Subscribers` module (subscribing, snapshot delivery, error isolation and the revision counter) with a named error policy: `report` (the default) or `collect`, replacing about 25 hand-written listener sets and `notifySubscribers`. `AnimationEditSession` and `GuideController` collect and rethrow, keeping their callers' existing error behaviour. `npm run lint` now fails on a hand-written listener `Set` or loop in `src/devtools`. Subscription and snapshot APIs are unchanged.
