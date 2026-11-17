@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Fix Scene Editor dialogue-line, audio-clip and transition selection publishing two selection changes per click; each now notifies selection subscribers once.
+
 - Let a `PoseSource` provide live mesh-deformation channels through an optional `getMeshDeformationForRendering()`, and use it in the Animation Editor preview. Rendering no longer deep-copies a deformation snapshot on every sampled frame, which had been happening since the preview switched to an attached pose source. Deformation output is unchanged.
 
 - Add a post-build check (`npm run check:demo`) that fails CI before the Pages upload when a built demo page lacks its entry module script or references missing assets, so a broken artifact can no longer deploy an editor that stays on the loading screen.

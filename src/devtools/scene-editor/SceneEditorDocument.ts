@@ -626,20 +626,24 @@ export class SceneEditorDocument {
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
+    this.replaceActorSelection(id);
+    this.notify('selection');
+  }
+  private replaceActorSelection(id: string | null): void {
+    const entry = this.entry!;
     this.cancelCameraDrag();
     this.cancelImageDrag();
     if (id !== this.selectedActorId) this.cancelActorDrag();
     this.cancelAudioDrag();
     this.cancelActionDrag();
-    this.entry.selectedAction = null;
-    this.entry.selectedActions = [];
-    this.entry.selectedImage = null;
-    this.entry.cameraSelected = false;
-    this.entry.selectedTransition = null;
-    this.entry.selectedAudioClip = null;
-    this.entry.selectedDialogueLine = null;
-    this.entry.selectedActor = id;
-    this.notify('selection');
+    entry.selectedAction = null;
+    entry.selectedActions = [];
+    entry.selectedImage = null;
+    entry.cameraSelected = false;
+    entry.selectedTransition = null;
+    entry.selectedAudioClip = null;
+    entry.selectedDialogueLine = null;
+    entry.selectedActor = id;
   }
   private nextActorId(stem = 'actor'): string {
     let index = 1;
@@ -871,7 +875,7 @@ export class SceneEditorDocument {
   }
   selectDialogueLine(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.dialogue?.some((line) => line.id === id))) return;
-    this.selectActor(null);
+    this.replaceActorSelection(null);
     this.entry.selectedDialogueLine = id;
     this.notify('selection');
   }
@@ -893,7 +897,7 @@ export class SceneEditorDocument {
   }
   selectAudioClip(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.audioClips?.some((clip) => clip.id === id))) return;
-    this.selectActor(null);
+    this.replaceActorSelection(null);
     this.entry.selectedAudioClip = id;
     this.notify('selection');
   }
@@ -942,7 +946,7 @@ export class SceneEditorDocument {
   }
   selectTransition(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.transitions?.some((effect) => effect.id === id))) return;
-    this.selectActor(null);
+    this.replaceActorSelection(null);
     this.entry.selectedTransition = id;
     this.notify('selection');
   }
