@@ -458,7 +458,7 @@ export class SceneEditorDocument {
     this.notify('selection');
   }
   setCameraPreview(enabled: boolean): void {
-    this.selectCamera(this.cameraSelected);
+    this.gestures.cancel();
     this.groundGuide.cancelDrag();
     if (!this.entry) return;
     this.entry.cameraPreview = enabled;

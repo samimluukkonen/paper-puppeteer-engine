@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Fix toggling Scene Editor camera preview clearing a selected dialogue line, audio clip, transition or camera key; preview now only cancels active gestures and leaves selection unchanged.
+
 - Fix Scene Editor dialogue-line, audio-clip and transition selection publishing two selection changes per click; each now notifies selection subscribers once.
 
 - Let a `PoseSource` provide live mesh-deformation channels through an optional `getMeshDeformationForRendering()`, and use it in the Animation Editor preview. Rendering no longer deep-copies a deformation snapshot on every sampled frame, which had been happening since the preview switched to an attached pose source. Deformation output is unchanged.

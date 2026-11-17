@@ -51,3 +51,22 @@ test('selecting a dialogue line, audio clip or transition publishes one selectio
     assert.equal(listener.mock.calls.length, 1);
   }
 });
+
+test('toggling camera preview keeps the dialogue, audio, transition or camera-key selection', () => {
+  const doc = document();
+  for (const [select, selected] of [
+    [() => doc.selectDialogueLine('line'), () => doc.selectedDialogueLine?.id],
+    [() => doc.selectAudioClip('clip'), () => doc.selectedAudioClip?.id],
+    [() => doc.selectTransition('fade'), () => doc.selectedTransition?.id],
+  ] as const) {
+    select();
+    doc.setCameraPreview(true);
+    doc.setCameraPreview(false);
+    assert.isDefined(selected());
+  }
+  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  const key = doc.workingScene!.cameraTracks!.x![0]!;
+  doc.selectCameraKey('x', key.id);
+  doc.setCameraPreview(true);
+  assert.equal(doc.selectedCameraKey?.key.id, key.id);
+});
