@@ -37,6 +37,8 @@ export interface AnimationEditActions {
   cancelActiveDrags(): boolean;
   pause(): void;
   endScrub(): void;
+  stopPlayback(): void;
+  beginGesture(): void;
   updateTime(time: Seconds): boolean;
   updateTimeMilliseconds(time: Milliseconds): boolean;
   clearTransformDraft(): boolean;
@@ -142,6 +144,19 @@ export class AnimationEditSession implements AnimationEditActions {
   endScrub(): void {
     this.deps.endScrub();
   }
+  /** Stop the editor clock for authoring: pause playback, then release any scrub. */
+  stopPlayback(): void {
+    this.deps.pausePlayback();
+    this.deps.endScrub();
+  }
+  /**
+   * Gesture/navigation boundary: cancel active drags, then stop the clock. Runs inside the
+   * caller's batch; the caller publishes its own notification after changing state.
+   */
+  beginGesture(): void {
+    this.cancelActiveDrags();
+    this.stopPlayback();
+  }
   updateTime(time: Seconds): boolean {
     return this.deps.updateTime(time);
   }
@@ -195,10 +210,7 @@ export class AnimationEditSession implements AnimationEditActions {
         return false;
       }
       if (next === undefined) return false;
-      if (opts.pause ?? true) {
-        this.pause();
-        this.endScrub();
-      }
+      if (opts.pause ?? true) this.stopPlayback();
       if (opts.time !== undefined) this.updateTime(opts.time);
       opts.after?.(next);
       return this.installCore(next, opts);

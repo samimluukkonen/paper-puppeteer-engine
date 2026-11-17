@@ -8,6 +8,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 - Introduce `AnimationEditSession`, a deep edit-transaction module that owns the mutation ordering once (cancel active drags, pause, end scrub, seek, freeze + install one history entry, batch-notify), replacing the per-command copies in the keyframe, event, IK, deformation, graph, preview and root-motion modules. Collapse their private `*Actions` interfaces into one shared actions shape, shrink the `AnimationEditorState` wiring accordingly, and remove the permanent `setSelectedKeyframeInterpolation` stub, keeping editor APIs and behavior unchanged.
 
+- Route every remaining drag-begin, select-at-time and preview-start path in the animation editor through two new `AnimationEditSession` steps, `stopPlayback()` (pause, then end scrub) and `beginGesture()` (cancel active drags, then stop playback), so command modules no longer pause or end scrubbing by hand. Graph-gesture and preview starts now also release an active scrub, matching every other gesture.
+
 - Add matching Lucide icons to Animation Editor timeline tabs and an icon-only Graph / Timeline toggle. Switch the toggle icon, hover text and accessible label with its destination, leaving more room for duration controls.
 
 - Add matching Lucide icons to Scene Editor Edit-row buttons, inspector tabs and timeline tabs, preserving visible labels and keyboard controls.

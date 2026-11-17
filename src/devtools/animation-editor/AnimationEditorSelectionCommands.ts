@@ -24,17 +24,11 @@ export class AnimationEditorSelectionCommands {
     private readonly session: AnimationEditActions,
   ) {}
 
-  private prepareSelection(): void {
-    this.session.cancelActiveDrags();
-    this.playback.pause();
-    this.playback.endScrub();
-  }
-
   /** Transient navigation only: preview sampling never dispatches authored events. */
   selectAnimationEvent(ref: AnimationEventRef): boolean {
     const event = findAnimationEvent(this.document.workingAnimation, ref);
     if (!event) return false;
-    this.prepareSelection();
+    this.session.beginGesture();
     this.selection.selectEvent(ref);
     this.session.updateTimeMilliseconds(event.time);
     this.session.notify();
@@ -56,7 +50,7 @@ export class AnimationEditorSelectionCommands {
     if (!this.document.rig?.hasBone(boneId) || !animation) return false;
     const key = findBonePropertyKeyframe(animation, boneId, property, toMilliseconds(time));
     if (!key) return false;
-    this.prepareSelection();
+    this.session.beginGesture();
     const clicked = Object.freeze({ boneId, property, time: toSeconds(key.time) });
     const anchor = this.selection.anchor;
     if (modifiers.range && anchor) {
@@ -95,7 +89,7 @@ export class AnimationEditorSelectionCommands {
 
   /** Resolve externally supplied references before installing transient box selection. */
   selectKeyframes(keys: readonly KeyframeSelection[], additive = false): void {
-    this.prepareSelection();
+    this.session.beginGesture();
     const resolved = keys.flatMap((key) => {
       const ref = resolveKey(this.document.workingAnimation, key);
       return ref ? [ref] : [];

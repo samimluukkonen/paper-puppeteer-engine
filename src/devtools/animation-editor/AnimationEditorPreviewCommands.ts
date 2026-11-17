@@ -17,7 +17,6 @@ type PreviewState = Pick<
   | 'isPlaying'
   | 'currentTimeMilliseconds'
   | 'poseLibrary'
-  | 'pause'
   | 'setWorldDisplacementView'
 >;
 
@@ -71,7 +70,7 @@ export class AnimationEditorPreviewCommands {
       this.document.rig,
     );
     this.session.batch(() => {
-      this.state.pause();
+      this.session.stopPlayback();
       this.cancelCleanupPreview();
       this.cancelVariationPreview();
       this.state.rootMotionEditing = false;
@@ -93,8 +92,7 @@ export class AnimationEditorPreviewCommands {
     return this.session.batch(() => {
       const animation = this.trajectoryCopy!.animation;
       this.trajectoryCopy = null;
-      this.state.pause();
-      return this.session.commit(() => animation, { pause: false });
+      return this.session.commit(() => animation);
     });
   }
 
@@ -121,7 +119,7 @@ export class AnimationEditorPreviewCommands {
     if (!Number.isFinite(timeMs) || timeMs < 0 || timeMs > animation.duration) throw new Error('Invalid preview time.');
     getValidatedEditorAnimation(animation, this.document.rig);
     this.session.batch(() => {
-      this.state.pause();
+      this.session.stopPlayback();
       this.variationPreview = null;
       this.posePreview = null;
       this.cleanupPreview = { base: this.document.workingAnimation!, rig: this.document.rig!, animation, timeMs };
@@ -181,7 +179,7 @@ export class AnimationEditorPreviewCommands {
       throw new Error('Preview progress must be from 0 to 1.');
     const animation = createAnimationVariation(this.document.workingAnimation, this.document.rig, options);
     this.session.batch(() => {
-      this.state.pause();
+      this.session.stopPlayback();
       this.posePreview = null;
       this.cancelCleanupPreview();
       this.variationPreview = {
@@ -217,7 +215,7 @@ export class AnimationEditorPreviewCommands {
     )
       return false;
     return this.session.batch(() => {
-      this.state.pause();
+      this.session.stopPlayback();
       this.cancelCleanupPreview();
       this.cancelVariationPreview();
       this.posePreview = {

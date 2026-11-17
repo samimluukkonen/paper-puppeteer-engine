@@ -25,8 +25,6 @@ type DeformationState = Pick<
   | 'rootMotionSelected'
   | 'selectedRootKey'
   | 'keyframeFPS'
-  | 'pause'
-  | 'endScrub'
 >;
 
 /** Own provisional mesh corrections and key commands; the session owns the commit ordering and history. */
@@ -59,9 +57,7 @@ export class AnimationEditorDeformationCommands {
     )
       return false;
     this.session.batch(() => {
-      this.session.cancelActiveDrags();
-      this.state.pause();
-      this.state.endScrub();
+      this.session.beginGesture();
       this.session.clearBoneSelection();
       this.state.rootMotionSelected = false;
       this.state.selectedRootKey = null;
@@ -153,8 +149,7 @@ export class AnimationEditorDeformationCommands {
       this.cancelDeformationEdit();
       this.state.deformationEditing = enabled;
       if (enabled) {
-        this.state.pause();
-        this.state.endScrub();
+        this.session.stopPlayback();
       }
       this.session.notify();
     });
@@ -179,8 +174,7 @@ export class AnimationEditorDeformationCommands {
       this.state.selectedMeshId = meshId;
       this.state.selectedDeformationTime = time ?? null;
       if (time !== undefined) {
-        this.state.pause();
-        this.state.endScrub();
+        this.session.stopPlayback();
         this.session.updateTime(time);
       }
       this.session.notify();

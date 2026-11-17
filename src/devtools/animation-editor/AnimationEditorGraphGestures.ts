@@ -38,9 +38,8 @@ export class AnimationEditorGraphGestures {
     )
       return false;
     return this.session.batch(() => {
-      this.session.cancelActiveDrags();
+      this.session.beginGesture();
       this.session.clearTransformDraft();
-      this.session.pause();
       this.graphGesture = {
         base: this.context.workingAnimation!,
         ref: { channel: { ...ref.channel }, time: ref.time },

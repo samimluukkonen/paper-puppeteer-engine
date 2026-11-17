@@ -317,3 +317,33 @@ test('selectKeyframe clears the root selection inside one batched boundary', () 
   assert.isTrue(session.selectKeyframe(key));
   assert.deepEqual(calls, ['clearRootSelection', 'selectKeyframe']);
 });
+
+test('stopPlayback pauses before ending the scrub and never cancels drags or notifies', () => {
+  const { deps, calls } = mockDeps();
+  const session = new AnimationEditSession(deps);
+  const listener = vi.fn();
+  session.subscribe(listener);
+  session.stopPlayback();
+  assert.deepEqual(calls, ['pause', 'endScrub']);
+  assert.equal(listener.mock.calls.length, 0);
+});
+
+test('beginGesture cancels active drags before stopping the clock and leaves notification to the caller', () => {
+  const { deps, calls } = mockDeps();
+  const session = new AnimationEditSession(deps);
+  const listener = vi.fn();
+  session.subscribe(listener);
+  session.beginGesture();
+  assert.deepEqual(calls, ['cancelActiveDrags', 'pause', 'endScrub']);
+  assert.equal(listener.mock.calls.length, 0);
+});
+
+test('commit stops the clock through the same pause-then-end-scrub step as gestures', () => {
+  const { deps, calls } = mockDeps();
+  const session = new AnimationEditSession(deps);
+  session.commit((working) => ({ ...working }));
+  const pause = calls.indexOf('pause');
+  assert.isAbove(pause, calls.indexOf('cancelActiveDrags'));
+  assert.equal(calls[pause + 1], 'endScrub');
+  assert.isBelow(pause, calls.indexOf('install'));
+});

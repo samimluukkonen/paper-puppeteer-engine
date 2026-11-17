@@ -210,8 +210,7 @@ export class AnimationEditorKeyframeCommands {
     const originalPrimary = this.selection.key;
     const selected = this.selection.hasKey(key);
     if (selected) {
-      this.playback.pause();
-      this.playback.endScrub();
+      this.session.stopPlayback();
       this.selection.setKeys(this.selectedKeys, key);
       this.session.updateTime(key.time);
     } else if (!this.session.selectKeyframe(key)) return false;
@@ -353,8 +352,7 @@ export class AnimationEditorKeyframeCommands {
   deleteSelectedKeyframes(): boolean {
     this.cancelKeyframeDrag();
     if (!this.selectedKeys.length || !this.working || !this.rig) return false;
-    this.playback.pause();
-    return this.editKeyframes((animation, rig) => {
+    return this.session.commit((animation, rig) => {
       const next = removeBonePropertyKeyframes(
         animation,
         rig,

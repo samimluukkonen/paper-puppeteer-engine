@@ -98,8 +98,7 @@ export class AnimationEditorRootMotion {
       this.rootMotionProperty = property;
       this.selectedRootKey = time === undefined ? null : Object.freeze({ property, time });
       if (time !== undefined) {
-        this.session.pause();
-        this.session.endScrub();
+        this.session.stopPlayback();
         this.session.updateTime(time);
       }
       this.session.notify();
@@ -160,9 +159,7 @@ export class AnimationEditorRootMotion {
     )
       return false;
     return this.session.batch(() => {
-      this.session.cancelActiveDrags();
-      this.session.pause();
-      this.session.endScrub();
+      this.session.beginGesture();
       this.session.clearTransformDraft();
       this.rootGesture = { base: this.context.workingAnimation!, preview: this.context.workingAnimation! };
       this.session.notify();

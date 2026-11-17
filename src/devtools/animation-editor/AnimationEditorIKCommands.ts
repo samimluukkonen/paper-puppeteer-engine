@@ -43,10 +43,8 @@ export class AnimationEditorIKCommands {
   beginIKTargetDrag(id: string): boolean {
     if (!this.working || this.getIKManipulationDisabledReason(id) || !this.rig?.ik?.some((entry) => entry.name === id))
       return false;
-    this.session.cancelActiveDrags();
+    this.session.beginGesture();
     if (id !== this.selectedIKConstraintId) this.selection.selectIK(id);
-    this.session.pause();
-    this.session.endScrub();
     this.drag = Object.freeze({ constraintId: id, draft: this.selection.ikDraft });
     this.selection.setIKExpanded(id, true);
     this.session.notify();
@@ -185,9 +183,7 @@ export class AnimationEditorIKCommands {
       return false;
     }
     if (!key) return false;
-    this.session.cancelActiveDrags();
-    this.session.pause();
-    this.session.endScrub();
+    this.session.beginGesture();
     this.selection.selectIK(ref.constraintId, ref.property, Object.freeze({ ...ref, time: toSeconds(key.time) }));
     this.session.updateTimeMilliseconds(key.time);
     this.session.notify();
@@ -199,9 +195,7 @@ export class AnimationEditorIKCommands {
   }
   beginIKEdit(): void {
     if (!this.selectedIKConstraintId || !this.working) return;
-    this.session.cancelActiveDrags();
-    this.session.pause();
-    this.session.endScrub();
+    this.session.beginGesture();
   }
   setTemporaryIKProperty(property: IKAnimationProperty, value: number): boolean {
     if (
