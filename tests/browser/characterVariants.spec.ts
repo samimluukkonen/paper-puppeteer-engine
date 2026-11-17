@@ -31,8 +31,9 @@ test('character variants expose shared ownership, independent templates and port
   const token = new URL(frame.url()).searchParams.get('projectSession')!;
   await page.evaluate((token) => {
     const context = window.paperProjectEditor?.(token);
-    context!.characterDocuments!.rig.createSkin('blue-armor');
-    context!.changed();
+    if (context?.kind !== 'character') throw new Error('Character context is unavailable.');
+    context.characterDocuments.rig.createSkin('blue-armor');
+    context.changed();
   }, token);
   await frame.getByRole('button', { name: '← Project', exact: true }).click();
   await row('Samurai').getByRole('button', { name: 'Create Character Variant', exact: true }).click();

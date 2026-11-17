@@ -8,7 +8,14 @@ import {
 import type { AnimationClip, CharacterDefinition } from '../../engine/data.js';
 import type { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { buildCharacterPackage, openPackageRuntime, packageJson } from '../shared/package/characterPackage.js';
-import type { ProjectEditorContext, ProjectRenderer } from './projectBridge.js';
+import type {
+  CharacterEditorContext,
+  ProjectEditorContext,
+  ProjectHostContext,
+  ProjectImage,
+  ProjectRenderer,
+  SceneEditorContext,
+} from './projectBridge.js';
 import { ProjectValidationError, requireValidExport, type ProjectInspection } from './projectInspection.js';
 import { buildProjectScenePackage, characterFileFetcher } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
@@ -20,13 +27,13 @@ export interface ProjectSession {
   /** Stops the autosave lifecycle and disposes the autosave. */
   detachAutosave: () => void;
 }
-export interface ProjectEditorHost {
+export interface ProjectEditorHost<Context extends ProjectEditorContext = ProjectEditorContext> {
   token: string;
   session: ProjectSession;
   asset: string;
-  kind: 'character' | 'scene';
+  kind: Context['kind'];
   src: string;
-  context: ProjectEditorContext;
+  context: Context;
   active: boolean;
   renderer?: ProjectRenderer;
   pending?: () => boolean;
@@ -39,6 +46,14 @@ export interface ProjectEditorHost {
   createAnimation?: (clip: AnimationClip) => boolean;
   pendingCreation?: { run(): void; reject(error: Error): void };
 }
+/**
+ * Merges the shared host members into a kind's own members. Descriptors are copied, not values, so shared
+ * getters such as projectName keep reading the live workspace.
+ */
+function withHost<T extends object>(shared: ProjectHostContext, own: T): ProjectHostContext & T {
+  return Object.defineProperties(own, Object.getOwnPropertyDescriptors(shared)) as ProjectHostContext & T;
+}
+
 interface RuntimeLease {
   definition: CharacterDefinition;
   dispose(): void;
@@ -154,7 +169,8 @@ export class ProjectEditorHosts {
     id = session.workspace.rigOwner(id);
     await this.open(session, 'character', id, 'animation');
     const host = [...this.owners.values()].find(
-      (entry) => entry.session === session && entry.kind === 'character' && entry.asset === id,
+      (entry): entry is ProjectEditorHost<CharacterEditorContext> =>
+        entry.session === session && entry.context.kind === 'character' && entry.asset === id,
     );
     if (!host) throw new Error('Target editor is unavailable. Return to Project and retry.');
     if (host.pendingCreation) throw new Error('An animation is already being created.');
@@ -243,7 +259,10 @@ export class ProjectEditorHosts {
     let existing = [...this.owners.values()].find(
       (host) => host.session === session && host.kind === kind && host.asset === id,
     );
-    if (existing && kind === 'character' && existing.context.characterDocuments !== workspace.character(id).documents) {
+    if (
+      existing?.context.kind === 'character' &&
+      existing.context.characterDocuments !== workspace.character(id).documents
+    ) {
       this.evict(existing.token);
       existing = undefined;
     }
@@ -313,23 +332,9 @@ export class ProjectEditorHosts {
         for (const renderer of renderers) renderer.dispose();
       },
     };
-    const documents = kind === 'character' ? workspace.characterDocuments(id) : undefined;
-    // The document owns edits and artwork overrides; this lease supplies only original source textures.
-    const initialLease = kind === 'character' ? await this.runtime(workspace, id, undefined, signal, true) : undefined;
-    if (initialLease) ownedLeases.add(initialLease);
-    const definition = initialLease?.definition;
     if (kind === 'scene') workspace.scenes.selectScene(id);
-    const choices = workspace.definition.characters.map((entry) => ({
-      id: entry.id,
-      rigIdentity: workspace.rigOwner(entry.id),
-      label: entry.name,
-      manifest: entry.manifest,
-    }));
-    // Scene runtime definitions are fresh on every opening. The document remains the same owner.
-    const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
     let lastAuthoredRevision = workspace.autosaveRevision;
-    const context: ProjectEditorContext = {
-      ...(documents ? { characterDocuments: documents } : {}),
+    const shared: ProjectHostContext = {
       bindRenderer: (renderer) => {
         const host = this.owners.get(token);
         if (!host || closed) {
@@ -355,13 +360,6 @@ export class ProjectEditorHosts {
           ? (workspace.definition.characters.find((entry) => entry.id === id)?.name ?? id)
           : (workspace.scenes.scene(id)?.name ?? id);
       },
-      get sharedRigNotice() {
-        if (kind !== 'character' || !workspace.definition.characters.some((entry) => entry.id === id)) return undefined;
-        const users = workspace.sharedRigUsers(id);
-        return users.length > 1
-          ? `Shared rig and animations: edits here affect ${users.join(', ')}. Return to Project and create an independent character copy for a different skeleton or private artwork.`
-          : undefined;
-      },
       subscribe: workspace.subscribe,
       bindGuide: (open) => {
         const host = this.owners.get(token)!;
@@ -375,118 +373,8 @@ export class ProjectEditorHosts {
           delete host.openGuide;
         };
       },
-      ...(definition
-        ? {
-            definition,
-            characterId: id,
-            sourceDefinition: workspace.character(id).definition,
-            fetcher: characterFileFetcher(workspace.character(id).files),
-          }
-        : { scenes: workspace.scenes }),
-      imageAssets: workspace.scenes.images,
-      ...(kind === 'character'
-        ? {
-            get animationPreviewPreferences() {
-              return workspace.animationPreviewPreferences(id);
-            },
-            saveAnimationPreviewPreferences: (preferences: unknown) =>
-              workspace.setAnimationPreviewPreferences(id, preferences),
-          }
-        : {}),
-      choices,
-      changed: () => {
-        const revision = workspace.autosaveRevision;
-        if (revision === lastAuthoredRevision) return;
-        lastAuthoredRevision = revision;
-        workspace.refresh();
-      },
-      characterLoadFailed: () => {
-        if (kind !== 'character' || closed) return;
-        const entry = workspace.character(id);
-        if (!entry.loading) return;
-        failed = true;
-        entry.loading = false;
-        this.owners
-          .get(token)
-          ?.pendingCreation?.reject(new Error('Target character failed to load. Repair it and retry.'));
-        workspace.refresh();
-      },
-      get sceneReuse() {
-        return workspace.sceneReuse;
-      },
-      saveSceneReuse: (input) => workspace.setSceneReuse(input),
-      createSceneCopy: (scene) => {
-        workspace.addScene(scene);
-      },
-      animationLibrary: () => workspace.animationLibrary(),
-      animationLibraryRevision: workspace.getSnapshot,
-      loadAnimationPreview: async (characterId, signal) =>
-        openPackageRuntime(
-          await buildCharacterPackage(
-            workspace.captureCharacter(characterId),
-            characterFileFetcher(workspace.character(characterId).files),
-            signal,
-          ),
-          signal,
-        ),
-      openAnimation: (characterId, name, copy = false) => {
-        // Reopen scenes after character editing so their runtime definitions include new variations.
-        if (kind === 'scene') context.navigate('project');
-        return this.open(session, 'character', characterId, 'animation', false, undefined, { name, copy });
-      },
-      bindAnimationSelection: (select) => {
-        const host = this.owners.get(token)!;
-        host.selectAnimation = select;
-        if (host.animationRequest) {
-          const request = host.animationRequest;
-          host.animationRequest = undefined;
-          select(request.name, request.copy);
-        }
-        return () => {
-          delete host.selectAnimation;
-        };
-      },
-      bindAnimationCreation: (create) => {
-        const host = this.owners.get(token)!;
-        host.createAnimation = create;
-        host.pendingCreation?.run();
-        return () => {
-          delete host.createAnimation;
-        };
-      },
-      bindScene: (dispose) => {
-        disposeScene = dispose;
-      },
-      validateScene: (scene) => {
-        const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(scene)));
-        this.options.validate(workspace, report);
-        requireValidExport(report);
-        workspace.validateScene(scene);
-      },
-      confirmReplacement: (assetKind, assetId) => {
-        const dependents = workspace
-          .dependents({ kind: assetKind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind !== 'character' || from.owner !== id);
-        return (
-          !dependents.length ||
-          window.confirm(
-            `Replace ${assetKind} "${assetId}"? This affects:\n${dependents.map(({ label }) => label).join('\n')}\n\nReferences will be kept. Continue?`,
-          )
-        );
-      },
-      assetReferences: (kind, assetId) =>
-        workspace
-          .dependents({ kind, owner: id, id: assetId })
-          .filter(({ from }) => from.kind === 'actor' || (from.kind === 'character' && from.owner !== id))
-          .map(({ label }) => label),
-      buildScenePackage: (scene) =>
-        buildProjectScenePackage(workspace, scene).catch((error: unknown) => {
-          if (error instanceof ProjectValidationError) this.options.validate(workspace, error.report);
-          throw error;
-        }),
       loadProjectImages: async () => {
-        const images: { id: string; name: string; bytes: Uint8Array<ArrayBuffer>; width: number; height: number }[] =
-          [];
+        const images: ProjectImage[] = [];
         for (const { id: characterId } of workspace.definition.characters) {
           const packaged = await buildCharacterPackage(
             workspace.captureCharacter(characterId),
@@ -507,43 +395,6 @@ export class ProjectEditorHosts {
         }
         return images;
       },
-      loadCharacter: (reference) => {
-        const characterId = workspace.resolveCharacter(reference);
-        let request = runtimeCharacters.get(reference);
-        if (!request) {
-          request = this.runtime(
-            workspace,
-            characterId,
-            `project_${token.replaceAll('-', '_')}_${runtimeCharacters.size}`,
-            signal,
-          ).then((lease) => {
-            if (closed) {
-              this.releaseLease(lease);
-              throw new Error('Scene preview closed.');
-            }
-            ownedLeases.add(lease);
-            return lease.definition;
-          });
-          runtimeCharacters.set(reference, request);
-        }
-        return request;
-      },
-      bindCharacter: (pending, navigate) => {
-        failed = false;
-        const entry = workspace.character(id);
-        entry.pending = pending;
-        entry.loading = false;
-        const host = this.owners.get(token)!;
-        host.pending = pending;
-        host.openView = navigate;
-        workspace.refresh();
-        return () => {
-          delete entry.pending;
-          entry.loading = false;
-          delete host.pending;
-          delete host.openView;
-        };
-      },
       navigate: () => {
         if (closed) return;
         this.activateHost(undefined);
@@ -555,6 +406,169 @@ export class ProjectEditorHosts {
         }
       },
     };
+    const characterContext = async (): Promise<CharacterEditorContext> => {
+      const characterDocuments = workspace.characterDocuments(id);
+      // The document owns edits and artwork overrides; this lease supplies only original source textures.
+      const initialLease = await this.runtime(workspace, id, undefined, signal, true);
+      ownedLeases.add(initialLease);
+      return withHost(shared, {
+        kind: 'character',
+        characterDocuments,
+        definition: initialLease.definition,
+        sourceDefinition: workspace.character(id).definition,
+        fetcher: characterFileFetcher(workspace.character(id).files),
+        imageAssets: workspace.scenes.images,
+        get sharedRigNotice() {
+          if (!workspace.definition.characters.some((entry) => entry.id === id)) return undefined;
+          const users = workspace.sharedRigUsers(id);
+          return users.length > 1
+            ? `Shared rig and animations: edits here affect ${users.join(', ')}. Return to Project and create an independent character copy for a different skeleton or private artwork.`
+            : undefined;
+        },
+        get animationPreviewPreferences() {
+          return workspace.animationPreviewPreferences(id);
+        },
+        saveAnimationPreviewPreferences: (preferences) => workspace.setAnimationPreviewPreferences(id, preferences),
+        changed: () => {
+          const revision = workspace.autosaveRevision;
+          if (revision === lastAuthoredRevision) return;
+          lastAuthoredRevision = revision;
+          workspace.refresh();
+        },
+        characterLoadFailed: () => {
+          if (closed) return;
+          const entry = workspace.character(id);
+          if (!entry.loading) return;
+          failed = true;
+          entry.loading = false;
+          this.owners
+            .get(token)
+            ?.pendingCreation?.reject(new Error('Target character failed to load. Repair it and retry.'));
+          workspace.refresh();
+        },
+        confirmReplacement: (assetKind, assetId) => {
+          const dependents = workspace
+            .dependents({ kind: assetKind, owner: id, id: assetId })
+            .filter(({ from }) => from.kind !== 'character' || from.owner !== id);
+          return (
+            !dependents.length ||
+            window.confirm(
+              `Replace ${assetKind} "${assetId}"? This affects:\n${dependents.map(({ label }) => label).join('\n')}\n\nReferences will be kept. Continue?`,
+            )
+          );
+        },
+        bindCharacter: (pending, navigate) => {
+          failed = false;
+          const entry = workspace.character(id);
+          entry.pending = pending;
+          entry.loading = false;
+          const host = this.owners.get(token)!;
+          host.pending = pending;
+          host.openView = navigate;
+          workspace.refresh();
+          return () => {
+            delete entry.pending;
+            entry.loading = false;
+            delete host.pending;
+            delete host.openView;
+          };
+        },
+        bindAnimationSelection: (select) => {
+          const host = this.owners.get(token)!;
+          host.selectAnimation = select;
+          if (host.animationRequest) {
+            const request = host.animationRequest;
+            host.animationRequest = undefined;
+            select(request.name, request.copy);
+          }
+          return () => {
+            delete host.selectAnimation;
+          };
+        },
+        bindAnimationCreation: (create) => {
+          const host = this.owners.get(token)!;
+          host.createAnimation = create;
+          host.pendingCreation?.run();
+          return () => {
+            delete host.createAnimation;
+          };
+        },
+      } satisfies Omit<CharacterEditorContext, keyof ProjectHostContext>);
+    };
+    const sceneContext = (): SceneEditorContext => {
+      // Scene runtime definitions are fresh on every opening. The document remains the same owner.
+      const runtimeCharacters = new Map<string, Promise<CharacterDefinition>>();
+      const context: SceneEditorContext = withHost(shared, {
+        kind: 'scene',
+        scenes: workspace.scenes,
+        choices: workspace.definition.characters.map((entry) => ({
+          id: entry.id,
+          rigIdentity: workspace.rigOwner(entry.id),
+          label: entry.name,
+          manifest: entry.manifest,
+        })),
+        get sceneReuse() {
+          return workspace.sceneReuse;
+        },
+        loadCharacter: (reference) => {
+          const characterId = workspace.resolveCharacter(reference);
+          let request = runtimeCharacters.get(reference);
+          if (!request) {
+            request = this.runtime(
+              workspace,
+              characterId,
+              `project_${token.replaceAll('-', '_')}_${runtimeCharacters.size}`,
+              signal,
+            ).then((lease) => {
+              if (closed) {
+                this.releaseLease(lease);
+                throw new Error('Scene preview closed.');
+              }
+              ownedLeases.add(lease);
+              return lease.definition;
+            });
+            runtimeCharacters.set(reference, request);
+          }
+          return request;
+        },
+        bindScene: (dispose) => {
+          disposeScene = dispose;
+        },
+        saveSceneReuse: (input) => workspace.setSceneReuse(input),
+        createSceneCopy: (scene) => {
+          workspace.addScene(scene);
+        },
+        validateScene: (scene) => {
+          const report = workspace.inspect('export', true, parseSceneJson(JSON.stringify(scene)));
+          this.options.validate(workspace, report);
+          requireValidExport(report);
+          workspace.validateScene(scene);
+        },
+        buildScenePackage: (scene) =>
+          buildProjectScenePackage(workspace, scene).catch((error: unknown) => {
+            if (error instanceof ProjectValidationError) this.options.validate(workspace, error.report);
+            throw error;
+          }),
+        animationLibrary: () => workspace.animationLibrary(),
+        animationLibraryRevision: workspace.getSnapshot,
+        loadAnimationPreview: async (characterId, signal) =>
+          openPackageRuntime(
+            await buildCharacterPackage(
+              workspace.captureCharacter(characterId),
+              characterFileFetcher(workspace.character(characterId).files),
+              signal,
+            ),
+            signal,
+          ),
+        openAnimation: (characterId, name, copy = false) => {
+          // Reopen scenes after character editing so their runtime definitions include new variations.
+          context.navigate('project');
+          return this.open(session, 'character', characterId, 'animation', false, undefined, { name, copy });
+        },
+      } satisfies Omit<SceneEditorContext, keyof ProjectHostContext>);
+      return context;
+    };
+    const context: ProjectEditorContext = kind === 'character' ? await characterContext() : sceneContext();
     const url = new URL(`../${kind === 'scene' ? 'scene' : view}-editor/`, this.options.baseUrl);
     url.searchParams.set('projectSession', token);
     if (kind === 'character') {

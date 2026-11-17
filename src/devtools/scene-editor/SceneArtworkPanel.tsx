@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import { useSceneProject } from './sceneProject.js';
 
 /** Collapsed inspector uses the same binary registry as project imports and recovery. */
 export function SceneArtworkPanel({ document }: { document: SceneEditorDocument }) {
   useSyncExternalStore(document.images.subscribe, document.images.getSnapshot, document.images.getSnapshot);
+  const project = useSceneProject();
   const input = useRef<HTMLInputElement>(null);
   const request = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
@@ -58,7 +59,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
             setReplacement(false);
             setChoosing(true);
             run(async (signal) => {
-              const choices = await projectEditorContext()?.loadProjectImages?.();
+              const choices = await project?.loadProjectImages();
               signal.throwIfAborted();
               setProjectImages(choices ?? []);
             });

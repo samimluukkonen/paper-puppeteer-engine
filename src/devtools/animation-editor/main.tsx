@@ -7,8 +7,9 @@ import { EditorContext } from '../../ui/EditorContext.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
+import { ProjectContextProvider } from '../../ui/projectContext.js';
 import { buildCharacterDraft } from '../project/editorDrafts.js';
-import { projectEditorContext } from '../project/projectBridge.js';
+import { projectCharacterContext } from '../project/projectBridge.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
@@ -56,7 +57,7 @@ import './style.css';
 const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
 if (!host) throw new Error('Missing character workspace host.');
 host.id = 'character-workspace';
-const projectContext = projectEditorContext();
+const projectContext = projectCharacterContext();
 const initialDraft = (() => {
   if (projectContext) return undefined;
   try {
@@ -88,13 +89,13 @@ const environment = new EnvironmentPreviewController(projectContext?.imageAssets
 const motionPreview = new MotionPreviewController();
 const packages = new PackageController(undefined, projectContext?.fetcher);
 const artwork =
-  projectContext?.characterDocuments?.artwork ??
+  projectContext?.characterDocuments.artwork ??
   new ArtworkController(
     undefined,
     projectContext ? (key) => projectContext.confirmReplacement('texture', key) : undefined,
   );
 const attachments = new AttachmentController(artwork);
-const rigTweak = new RigTweakController(attachments);
+const rigTweak = new RigTweakController(attachments, { projectHosted: !!projectContext });
 const newAnimation = new NewAnimationController();
 const variations = new AnimationVariationController();
 const animationLibrary = new AnimationLibraryController();
@@ -214,452 +215,458 @@ function CharacterWorkspace() {
     </FeatureGuide>
   );
 }
-const unmount = mountView(host, <CharacterWorkspace />, (root) => {
-  let autosave: LocalAutosave | undefined;
-  let previewPreferences: AnimationPreviewPreferencesBinding | undefined;
-  const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
-  const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
-  const releaseRigExport = bindExportShortcut(rigApp, () =>
-    rigApp.querySelector<HTMLButtonElement>('#rig-tools-open')?.click(),
-  );
-  const releaseAnimationExport = bindExportShortcut(app, () => {
-    if (stateOwner?.editorMode === 'rig-tweak') {
-      app.dispatchEvent(new Event('workspace:reveal-inspector'));
-      app.querySelector<HTMLButtonElement>('#tweak-download-json')?.focus();
-    } else app.querySelector<HTMLButtonElement>('#animation-tools-open')?.click();
-  });
-  const deleteRigSelection = (event: KeyboardEvent): void => {
-    if (
-      blocksEditorShortcut(event) ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      (event.key !== 'Delete' && event.key !== 'Backspace') ||
-      stateOwner?.editorMode === 'animation'
-    )
-      return;
-    const editor = scene?.rigEditor;
-    if (
-      !editor ||
-      editor.previewName ||
-      editor.state.selectedIKConstraintId ||
-      editor.state.selectedFootContactMarkerId
-    )
-      return;
-    const selection = editor.state.selection;
-    if (!selection) return;
-    event.preventDefault();
-    if (event.repeat) return;
-    if (selection.type === 'bone') attachments.removeBone();
-    else attachments.removeSlot();
-  };
-  window.addEventListener('keydown', deleteRigSelection);
-  let focusViewOnMove = false;
-  const rigWorkspace = createRigWorkspaceController(
-    rigApp,
-    () => editorScene,
-    () => {
-      // Inspector edits suppress scene notifications to preserve focused input text.
-      // Still notify the shared rig recovery owner used by both editor views.
-      rigTweak.refresh();
-      packages.refresh();
-      projectContext?.changed();
-      autosave?.update();
-      guides.refresh();
-    },
-  );
-  const releaseCharacterSelection = bindCharacterSelection(app);
-  const timeline = new TimelineController(app, guideTargets);
-  const inspector = new BoneInspectorController(app);
-  const releaseNavigationGuard = protectUnsavedChanges(
-    () =>
-      (!!initialDraft && (!packages.getSnapshot().ready || packages.hasUnsavedCharacter)) ||
-      timeline.hasUnsavedChanges ||
-      packages.getSnapshot().modified.includes('Poses') ||
-      !!stateOwner?.hasPendingAnimationEdits ||
-      rigTweak.hasUnsavedChanges ||
-      artwork.hasPendingChanges,
-    { hostGuarded: !!projectContext },
-  );
-  const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
-    app.querySelector<HTMLElement>('#animation-draft-status')!,
-    app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
-    app.querySelector<HTMLButtonElement>('#animation-clear-retained-drafts')!,
-  );
-  const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
-  const releaseArtworkPackage = artwork.subscribe(() => {
-    packages.refresh();
-    projectContext?.changed();
-    autosave?.update();
-  });
-  let releaseAnimationPackage: (() => void) | undefined;
-  let releaseWorkspaceSelection: (() => void) | undefined;
-  let releaseProject: (() => void) | undefined;
-  let detachAutosave: (() => void) | undefined;
-  const editorScene = new AnimationEditorScene(
-    (state, id) => {
-      stateOwner = state;
-      state.setReplacementGuard(
-        projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
-      );
-      if (!projectContext?.characterDocuments) editorScene.rigEditor!.state.skinReferences = undefined;
-      detachAutosave?.();
-      detachAutosave = undefined;
-      releaseProject?.();
-      releaseProject = projectContext?.bindCharacter(
-        () =>
-          editorScene.hasPendingArtworkProposal ||
-          artwork.getSnapshot().importing ||
-          !!editorScene.rigEditor?.state.validationPending ||
-          state.hasPendingAnimationEdits,
-        (view) => {
-          workspaceRoutes?.navigate(view);
-        },
-      );
-      previewPreferences?.dispose();
-      if (projectContext) {
-        groundGuide.bind(`project:${projectContext.projectId}:character:${id}`);
-        groundGuide.restore(defaultGroundGuide('animation-preview-world'));
-      }
-      previewPreferences = new AnimationPreviewPreferencesBinding(
-        environment,
-        motionPreview,
-        groundGuide,
-        projectContext?.animationPreviewPreferences,
-        (preferences) => {
-          projectContext?.saveAnimationPreviewPreferences?.(preferences);
-          autosave?.update();
-        },
-      );
-      guides.refresh();
-      newAnimation.bind(state);
-      variations.bind(state);
-      animationLibrary.bind(state, id);
-      releaseLibrarySelection?.();
-      releaseLibrarySelection = projectContext?.bindAnimationSelection?.((name, copy) => {
-        if (copy) animationLibrary.copy(name);
-        else animationLibrary.select(name);
-      });
-      releaseAnimationCreation?.();
-      releaseAnimationCreation = projectContext?.bindAnimationCreation?.((clip) => state.createDerivedAnimation(clip));
-      rigTweak.bind(state, editorScene.rigEditor!);
-      rigWorkspace.render(editorScene.rigEditor!);
-      editorScene.fitPreview();
-      mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
-      poseLibrary.bind(state);
-      ikBake.bind(state);
-      retiming.bind(state);
-      motionDiagnostics.bind(state);
-      timeline.bind(state, id);
-      inspector.bind(state);
-      ikInspector.bind(state);
-      releaseWorkspaceSelection?.();
-      let selectedIK = state.selectedIKConstraintId;
-      let selectedBone = state.selectedBoneId;
-      let selectedEvent = state.selectedEvent;
-      let selectedRoot = state.rootMotionSelected;
-      let selectedRootKey = state.selectedRootKey;
-      let selectedKeys = state.selectedKeys;
-      let authoringMode = state.editorMode;
-      releaseWorkspaceSelection = state.subscribe(() => {
-        guides.refresh();
-        if (state.editorMode !== authoringMode) {
-          authoringMode = state.editorMode;
-          mirrorTools.hidePreview();
-          ikBake.hidePreview();
-          for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
-        }
-        if (
-          (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
-          (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
-          (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
-          (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
-          (state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey))
-        )
-          workspace.revealInspector();
-        if (!app.hidden && state.editorMode !== 'rig-tweak') {
-          const id =
-            state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey)
-              ? 'animation-inspector-root'
-              : state.selectedEvent && state.selectedEvent !== selectedEvent
-                ? 'animation-inspector-selection'
-                : state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK
-                  ? 'animation-inspector-ik'
-                  : state.selectedBoneId &&
-                      state.selectedBoneId !== selectedBone &&
-                      !app.querySelector('#animation-bones:focus-within')
-                    ? 'animation-inspector-selection'
-                    : undefined;
-          if (id)
-            app
-              .querySelector(`[data-editor-tab-panel="${id}"]`)
-              ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
-        }
-        selectedIK = state.selectedIKConstraintId;
-        selectedBone = state.selectedBoneId;
-        selectedEvent = state.selectedEvent;
-        selectedRoot = state.rootMotionSelected;
-        selectedRootKey = state.selectedRootKey;
-        selectedKeys = state.selectedKeys;
-      });
-      if (!projectContext) recovery.bind(state, id);
-      else
-        app.querySelector<HTMLElement>('#animation-draft-status')!.textContent =
-          'Project session: export a project ZIP to keep your work.';
-      packages.bind(() => {
-        const snapshot = editorScene.packageSnapshot();
-        return projectContext?.sourceDefinition
-          ? { ...snapshot, definition: projectContext.sourceDefinition }
-          : snapshot;
-      }, !!initialDraft);
-      if (!projectContext) {
-        const fingerprints = new PackageFingerprints();
-        const key = `character:${new URL('../', location.href).pathname}:${id}`;
-        const projectId = crypto.randomUUID();
-        autosave = new LocalAutosave(key, localDrafts, () => {
-          if (
-            editorScene.hasPendingArtworkProposal ||
-            artwork.getSnapshot().importing ||
-            editorScene.rigEditor?.state.validationPending ||
-            state.hasPendingAnimationEdits
-          )
-            return undefined;
-          const snapshot = editorScene.packageSnapshot();
-          return {
-            name: snapshot.rig.name ?? id,
-            revision: canonicalJson({
-              character: fingerprints.compute(snapshot),
-              preview: previewPreferences?.preferences,
-              images: environment.images.getSnapshot(),
-            }),
-            dirty: packages.hasUnsavedChanges || !!previewPreferences?.dirty,
-            build: (signal) =>
-              buildCharacterDraft(
-                editorScene.packageSnapshot(),
-                projectId,
-                signal,
-                previewPreferences
-                  ? { preferences: previewPreferences.preferences, images: environment.images }
-                  : undefined,
-              ),
-          };
-        });
-        detachAutosave = attachLocalAutosave(autosave);
-        showAutosave?.(autosave);
-      }
-      releaseAnimationPackage?.();
-      releaseAnimationPackage = state.subscribe(() => {
+const unmount = mountView(
+  host,
+  <ProjectContextProvider value={projectContext}>
+    <CharacterWorkspace />
+  </ProjectContextProvider>,
+  (root) => {
+    let autosave: LocalAutosave | undefined;
+    let previewPreferences: AnimationPreviewPreferencesBinding | undefined;
+    const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
+    const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
+    const releaseRigExport = bindExportShortcut(rigApp, () =>
+      rigApp.querySelector<HTMLButtonElement>('#rig-tools-open')?.click(),
+    );
+    const releaseAnimationExport = bindExportShortcut(app, () => {
+      if (stateOwner?.editorMode === 'rig-tweak') {
+        app.dispatchEvent(new Event('workspace:reveal-inspector'));
+        app.querySelector<HTMLButtonElement>('#tweak-download-json')?.focus();
+      } else app.querySelector<HTMLButtonElement>('#animation-tools-open')?.click();
+    });
+    const deleteRigSelection = (event: KeyboardEvent): void => {
+      if (
+        blocksEditorShortcut(event) ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.altKey ||
+        (event.key !== 'Delete' && event.key !== 'Backspace') ||
+        stateOwner?.editorMode === 'animation'
+      )
+        return;
+      const editor = scene?.rigEditor;
+      if (
+        !editor ||
+        editor.previewName ||
+        editor.state.selectedIKConstraintId ||
+        editor.state.selectedFootContactMarkerId
+      )
+        return;
+      const selection = editor.state.selection;
+      if (!selection) return;
+      event.preventDefault();
+      if (event.repeat) return;
+      if (selection.type === 'bone') attachments.removeBone();
+      else attachments.removeSlot();
+    };
+    window.addEventListener('keydown', deleteRigSelection);
+    let focusViewOnMove = false;
+    const rigWorkspace = createRigWorkspaceController(
+      rigApp,
+      () => editorScene,
+      () => {
+        // Inspector edits suppress scene notifications to preserve focused input text.
+        // Still notify the shared rig recovery owner used by both editor views.
+        rigTweak.refresh();
         packages.refresh();
         projectContext?.changed();
         autosave?.update();
-      });
-      if (initialRigView) state.setEditorMode('rig');
-      guides.refresh();
-      movePreview?.();
-    },
-    (message) => {
-      previewPreferences?.dispose();
-      previewPreferences = undefined;
-      projectContext?.characterLoadFailed();
-      stateOwner = undefined;
-      guides.refresh();
-      newAnimation.unbind();
-      variations.unbind();
-      releaseLibrarySelection?.();
-      releaseLibrarySelection = undefined;
-      releaseAnimationCreation?.();
-      releaseAnimationCreation = undefined;
-      animationLibrary.unbind();
-      rigWorkspace.showError(message);
-      packages.unbind();
-      releaseAnimationPackage?.();
-      releaseAnimationPackage = undefined;
-      rigTweak.unbind();
-      releaseWorkspaceSelection?.();
-      releaseWorkspaceSelection = undefined;
-      recovery.unbind();
-      mirrorTools.unbind();
-      poseLibrary.unbind();
-      ikBake.unbind();
-      retiming.unbind();
-      motionDiagnostics.unbind();
-      ikInspector.unbind();
-      inspector.unbind();
-      timeline.showError(message);
-    },
-    {
-      characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
-      ...(projectContext?.definition
-        ? { definition: projectContext.definition }
-        : initialDraft
-          ? { definition: initialDraft.definition }
-          : {}),
-      ...(projectContext?.characterDocuments ? { documents: projectContext.characterDocuments } : {}),
-      ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
-      groundGuide,
-      environment,
-      motionPreview,
-      footContacts,
-    },
-    artwork,
-    () => {
-      rigTweak.refresh();
-      if (editorScene.rigEditor) rigWorkspace.render(editorScene.rigEditor);
+        guides.refresh();
+      },
+    );
+    const releaseCharacterSelection = bindCharacterSelection(app);
+    const timeline = new TimelineController(app, guideTargets);
+    const inspector = new BoneInspectorController(app);
+    const releaseNavigationGuard = protectUnsavedChanges(
+      () =>
+        (!!initialDraft && (!packages.getSnapshot().ready || packages.hasUnsavedCharacter)) ||
+        timeline.hasUnsavedChanges ||
+        packages.getSnapshot().modified.includes('Poses') ||
+        !!stateOwner?.hasPendingAnimationEdits ||
+        rigTweak.hasUnsavedChanges ||
+        artwork.hasPendingChanges,
+      { hostGuarded: !!projectContext },
+    );
+    const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
+      app.querySelector<HTMLElement>('#animation-draft-status')!,
+      app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
+      app.querySelector<HTMLButtonElement>('#animation-clear-retained-drafts')!,
+    );
+    const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
+    const releaseArtworkPackage = artwork.subscribe(() => {
       packages.refresh();
       projectContext?.changed();
       autosave?.update();
-      guides.refresh();
-    },
-  );
-  rigTweak.initialize(app, () => editorScene);
-  scene = editorScene;
-  const previewControls = new AbortController();
-  app.querySelector<HTMLSelectElement>('#animation-facing')!.addEventListener(
-    'change',
-    (event) => {
-      const facing = (event.target as HTMLSelectElement).value;
-      if (facing === 'left' || facing === 'right') editorScene.setFacing(facing);
-    },
-    { signal: previewControls.signal },
-  );
-  app.querySelector<HTMLInputElement>('#animation-show-bones')!.addEventListener(
-    'change',
-    (event) => {
-      editorScene.setBonesVisible((event.target as HTMLInputElement).checked);
-    },
-    { signal: previewControls.signal },
-  );
-  for (const [id, apply] of [
-    ['#animation-ik-handles', (value: boolean) => editorScene.setIKHandlesVisible(value)],
-    ['#animation-ik-drag', (value: boolean) => editorScene.setIKHandlesInteractive(value)],
-  ] as const) {
-    app.querySelector<HTMLInputElement>(id)!.addEventListener(
+    });
+    let releaseAnimationPackage: (() => void) | undefined;
+    let releaseWorkspaceSelection: (() => void) | undefined;
+    let releaseProject: (() => void) | undefined;
+    let detachAutosave: (() => void) | undefined;
+    const editorScene = new AnimationEditorScene(
+      (state, id) => {
+        stateOwner = state;
+        state.setReplacementGuard(
+          projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
+        );
+        if (!projectContext) editorScene.rigEditor!.state.skinReferences = undefined;
+        detachAutosave?.();
+        detachAutosave = undefined;
+        releaseProject?.();
+        releaseProject = projectContext?.bindCharacter(
+          () =>
+            editorScene.hasPendingArtworkProposal ||
+            artwork.getSnapshot().importing ||
+            !!editorScene.rigEditor?.state.validationPending ||
+            state.hasPendingAnimationEdits,
+          (view) => {
+            workspaceRoutes?.navigate(view);
+          },
+        );
+        previewPreferences?.dispose();
+        if (projectContext) {
+          groundGuide.bind(`project:${projectContext.projectId}:character:${id}`);
+          groundGuide.restore(defaultGroundGuide('animation-preview-world'));
+        }
+        previewPreferences = new AnimationPreviewPreferencesBinding(
+          environment,
+          motionPreview,
+          groundGuide,
+          projectContext?.animationPreviewPreferences,
+          (preferences) => {
+            projectContext?.saveAnimationPreviewPreferences(preferences);
+            autosave?.update();
+          },
+        );
+        guides.refresh();
+        newAnimation.bind(state);
+        variations.bind(state);
+        animationLibrary.bind(state, id);
+        releaseLibrarySelection?.();
+        releaseLibrarySelection = projectContext?.bindAnimationSelection((name, copy) => {
+          if (copy) animationLibrary.copy(name);
+          else animationLibrary.select(name);
+        });
+        releaseAnimationCreation?.();
+        releaseAnimationCreation = projectContext?.bindAnimationCreation((clip) => state.createDerivedAnimation(clip));
+        rigTweak.bind(state, editorScene.rigEditor!);
+        rigWorkspace.render(editorScene.rigEditor!);
+        editorScene.fitPreview();
+        mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
+        poseLibrary.bind(state);
+        ikBake.bind(state);
+        retiming.bind(state);
+        motionDiagnostics.bind(state);
+        timeline.bind(state, id);
+        inspector.bind(state);
+        ikInspector.bind(state);
+        releaseWorkspaceSelection?.();
+        let selectedIK = state.selectedIKConstraintId;
+        let selectedBone = state.selectedBoneId;
+        let selectedEvent = state.selectedEvent;
+        let selectedRoot = state.rootMotionSelected;
+        let selectedRootKey = state.selectedRootKey;
+        let selectedKeys = state.selectedKeys;
+        let authoringMode = state.editorMode;
+        releaseWorkspaceSelection = state.subscribe(() => {
+          guides.refresh();
+          if (state.editorMode !== authoringMode) {
+            authoringMode = state.editorMode;
+            mirrorTools.hidePreview();
+            ikBake.hidePreview();
+            for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
+          }
+          if (
+            (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
+            (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
+            (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
+            (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
+            (state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey))
+          )
+            workspace.revealInspector();
+          if (!app.hidden && state.editorMode !== 'rig-tweak') {
+            const id =
+              state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey)
+                ? 'animation-inspector-root'
+                : state.selectedEvent && state.selectedEvent !== selectedEvent
+                  ? 'animation-inspector-selection'
+                  : state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK
+                    ? 'animation-inspector-ik'
+                    : state.selectedBoneId &&
+                        state.selectedBoneId !== selectedBone &&
+                        !app.querySelector('#animation-bones:focus-within')
+                      ? 'animation-inspector-selection'
+                      : undefined;
+            if (id)
+              app
+                .querySelector(`[data-editor-tab-panel="${id}"]`)
+                ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
+          }
+          selectedIK = state.selectedIKConstraintId;
+          selectedBone = state.selectedBoneId;
+          selectedEvent = state.selectedEvent;
+          selectedRoot = state.rootMotionSelected;
+          selectedRootKey = state.selectedRootKey;
+          selectedKeys = state.selectedKeys;
+        });
+        if (!projectContext) recovery.bind(state, id);
+        else
+          app.querySelector<HTMLElement>('#animation-draft-status')!.textContent =
+            'Project session: export a project ZIP to keep your work.';
+        packages.bind(() => {
+          const snapshot = editorScene.packageSnapshot();
+          return projectContext?.sourceDefinition
+            ? { ...snapshot, definition: projectContext.sourceDefinition }
+            : snapshot;
+        }, !!initialDraft);
+        if (!projectContext) {
+          const fingerprints = new PackageFingerprints();
+          const key = `character:${new URL('../', location.href).pathname}:${id}`;
+          const projectId = crypto.randomUUID();
+          autosave = new LocalAutosave(key, localDrafts, () => {
+            if (
+              editorScene.hasPendingArtworkProposal ||
+              artwork.getSnapshot().importing ||
+              editorScene.rigEditor?.state.validationPending ||
+              state.hasPendingAnimationEdits
+            )
+              return undefined;
+            const snapshot = editorScene.packageSnapshot();
+            return {
+              name: snapshot.rig.name ?? id,
+              revision: canonicalJson({
+                character: fingerprints.compute(snapshot),
+                preview: previewPreferences?.preferences,
+                images: environment.images.getSnapshot(),
+              }),
+              dirty: packages.hasUnsavedChanges || !!previewPreferences?.dirty,
+              build: (signal) =>
+                buildCharacterDraft(
+                  editorScene.packageSnapshot(),
+                  projectId,
+                  signal,
+                  previewPreferences
+                    ? { preferences: previewPreferences.preferences, images: environment.images }
+                    : undefined,
+                ),
+            };
+          });
+          detachAutosave = attachLocalAutosave(autosave);
+          showAutosave?.(autosave);
+        }
+        releaseAnimationPackage?.();
+        releaseAnimationPackage = state.subscribe(() => {
+          packages.refresh();
+          projectContext?.changed();
+          autosave?.update();
+        });
+        if (initialRigView) state.setEditorMode('rig');
+        guides.refresh();
+        movePreview?.();
+      },
+      (message) => {
+        previewPreferences?.dispose();
+        previewPreferences = undefined;
+        projectContext?.characterLoadFailed();
+        stateOwner = undefined;
+        guides.refresh();
+        newAnimation.unbind();
+        variations.unbind();
+        releaseLibrarySelection?.();
+        releaseLibrarySelection = undefined;
+        releaseAnimationCreation?.();
+        releaseAnimationCreation = undefined;
+        animationLibrary.unbind();
+        rigWorkspace.showError(message);
+        packages.unbind();
+        releaseAnimationPackage?.();
+        releaseAnimationPackage = undefined;
+        rigTweak.unbind();
+        releaseWorkspaceSelection?.();
+        releaseWorkspaceSelection = undefined;
+        recovery.unbind();
+        mirrorTools.unbind();
+        poseLibrary.unbind();
+        ikBake.unbind();
+        retiming.unbind();
+        motionDiagnostics.unbind();
+        ikInspector.unbind();
+        inspector.unbind();
+        timeline.showError(message);
+      },
+      {
+        characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
+        ...(projectContext
+          ? { definition: projectContext.definition }
+          : initialDraft
+            ? { definition: initialDraft.definition }
+            : {}),
+        ...(projectContext ? { documents: projectContext.characterDocuments } : {}),
+        ikChains: getCharacterPreviewSettings(selectedCharacterId()).ikChains,
+        groundGuide,
+        environment,
+        motionPreview,
+        footContacts,
+      },
+      artwork,
+      () => {
+        rigTweak.refresh();
+        if (editorScene.rigEditor) rigWorkspace.render(editorScene.rigEditor);
+        packages.refresh();
+        projectContext?.changed();
+        autosave?.update();
+        guides.refresh();
+      },
+    );
+    rigTweak.initialize(app, () => editorScene);
+    scene = editorScene;
+    const previewControls = new AbortController();
+    app.querySelector<HTMLSelectElement>('#animation-facing')!.addEventListener(
       'change',
       (event) => {
-        apply((event.target as HTMLInputElement).checked);
+        const facing = (event.target as HTMLSelectElement).value;
+        if (facing === 'left' || facing === 'right') editorScene.setFacing(facing);
       },
       { signal: previewControls.signal },
     );
-  }
-  const onionControls = new OnionSkinControlsController(app, editorScene, guides.refresh);
-  app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
-    'change',
-    (event) => {
-      editorScene.setIKPreview((event.target as HTMLInputElement).checked);
-      ikBake.refreshRuntime();
-    },
-    { signal: previewControls.signal },
-  );
-  const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene, {
-    width: 630,
-    height: 891,
-  });
-  let rendererActive = true;
-  // Phaser may finish booting after its host was already suspended.
-  game.events.once('ready', () =>
-    queueMicrotask(() => {
-      if (!rendererActive && game.isRunning) game.loop.stop();
-    }),
-  );
-  const releaseRenderer = projectContext?.bindRenderer({
-    activate: () => {
-      rendererActive = true;
-      if (game.isRunning && !game.loop.running) game.loop.start(game.loop.callback);
-      game.scale.refresh();
-    },
-    suspend: () => {
-      rendererActive = false;
-      stateOwner?.pause();
-      packages.closePreview();
-      game.loop.stop();
-    },
-    dispose: () => unmount(),
-  });
-  movePreview = () => {
-    const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
-    const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
-    if (game.canvas && game.canvas.parentElement !== target) target.append(game.canvas);
-    game.scale.parent = target;
-    const facingControl = app.querySelector<HTMLSelectElement>('#animation-facing');
-    if (facingControl && editorScene.rigEditor) facingControl.value = editorScene.rigEditor.state.facing;
-    game.scale.getParentBounds();
-    game.scale.refresh();
-    const characterStatus = app.querySelector<HTMLElement>('#character-status');
-    if (characterStatus) characterStatus.textContent = `Character: ${editorScene.characterId}`;
-    document.title = `${rigView ? 'Rig Editor' : 'Animation Editor'} · Paper Puppeteer Engine`;
-    const shell = target.closest<HTMLElement>('.workspace-shell');
-    if (focusViewOnMove && shell && !shell.hidden) {
-      shell.querySelector<HTMLHeadingElement>('h1')?.focus();
-      focusViewOnMove = false;
+    app.querySelector<HTMLInputElement>('#animation-show-bones')!.addEventListener(
+      'change',
+      (event) => {
+        editorScene.setBonesVisible((event.target as HTMLInputElement).checked);
+      },
+      { signal: previewControls.signal },
+    );
+    for (const [id, apply] of [
+      ['#animation-ik-handles', (value: boolean) => editorScene.setIKHandlesVisible(value)],
+      ['#animation-ik-drag', (value: boolean) => editorScene.setIKHandlesInteractive(value)],
+    ] as const) {
+      app.querySelector<HTMLInputElement>(id)!.addEventListener(
+        'change',
+        (event) => {
+          apply((event.target as HTMLInputElement).checked);
+        },
+        { signal: previewControls.signal },
+      );
     }
-  };
-  const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
-  const rigLayout = new RigWorkspaceLayoutController(rigApp);
-  workspaceRoutes = bindWorkspaceNavigation(root, (view) => {
-    if (!stateOwner) return view === (initialRigView ? 'rig' : 'animation');
-    if (!rigTweak.setMode(view === 'rig' ? 'rig' : 'animation')) return 'cancel';
-    for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]:not(.feature-guide-dialog)'))
-      dialog.close();
-    packages.closePreview();
-    focusViewOnMove = true;
-    movePreview?.();
-    return true;
-  });
-  const workspace = new AnimationWorkspaceController(app, () => {
-    game.scale.getParentBounds();
-    game.scale.refresh();
-  });
+    const onionControls = new OnionSkinControlsController(app, editorScene, guides.refresh);
+    app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
+      'change',
+      (event) => {
+        editorScene.setIKPreview((event.target as HTMLInputElement).checked);
+        ikBake.refreshRuntime();
+      },
+      { signal: previewControls.signal },
+    );
+    const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene, {
+      width: 630,
+      height: 891,
+    });
+    let rendererActive = true;
+    // Phaser may finish booting after its host was already suspended.
+    game.events.once('ready', () =>
+      queueMicrotask(() => {
+        if (!rendererActive && game.isRunning) game.loop.stop();
+      }),
+    );
+    const releaseRenderer = projectContext?.bindRenderer({
+      activate: () => {
+        rendererActive = true;
+        if (game.isRunning && !game.loop.running) game.loop.start(game.loop.callback);
+        game.scale.refresh();
+      },
+      suspend: () => {
+        rendererActive = false;
+        stateOwner?.pause();
+        packages.closePreview();
+        game.loop.stop();
+      },
+      dispose: () => unmount(),
+    });
+    movePreview = () => {
+      const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
+      const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
+      if (game.canvas && game.canvas.parentElement !== target) target.append(game.canvas);
+      game.scale.parent = target;
+      const facingControl = app.querySelector<HTMLSelectElement>('#animation-facing');
+      if (facingControl && editorScene.rigEditor) facingControl.value = editorScene.rigEditor.state.facing;
+      game.scale.getParentBounds();
+      game.scale.refresh();
+      const characterStatus = app.querySelector<HTMLElement>('#character-status');
+      if (characterStatus) characterStatus.textContent = `Character: ${editorScene.characterId}`;
+      document.title = `${rigView ? 'Rig Editor' : 'Animation Editor'} · Paper Puppeteer Engine`;
+      const shell = target.closest<HTMLElement>('.workspace-shell');
+      if (focusViewOnMove && shell && !shell.hidden) {
+        shell.querySelector<HTMLHeadingElement>('h1')?.focus();
+        focusViewOnMove = false;
+      }
+    };
+    const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
+    const rigLayout = new RigWorkspaceLayoutController(rigApp);
+    workspaceRoutes = bindWorkspaceNavigation(root, (view) => {
+      if (!stateOwner) return view === (initialRigView ? 'rig' : 'animation');
+      if (!rigTweak.setMode(view === 'rig' ? 'rig' : 'animation')) return 'cancel';
+      for (const dialog of root.querySelectorAll<HTMLDialogElement>('dialog[open]:not(.feature-guide-dialog)'))
+        dialog.close();
+      packages.closePreview();
+      focusViewOnMove = true;
+      movePreview?.();
+      return true;
+    });
+    const workspace = new AnimationWorkspaceController(app, () => {
+      game.scale.getParentBounds();
+      game.scale.refresh();
+    });
 
-  return () => {
-    releaseRenderer?.();
-    previewPreferences?.dispose();
-    detachAutosave?.();
-    detachAutosave = undefined;
-    workspaceRoutes?.dispose();
-    releaseRigExport();
-    releaseAnimationExport();
-    window.removeEventListener('keydown', deleteRigSelection);
-    releaseProject?.();
-    workspaceRoutes = undefined;
-    releaseRigResize();
-    rigLayout.dispose();
-    rigWorkspace.dispose();
-    stateOwner = undefined;
-    movePreview = undefined;
-    releaseArtworkPackage();
-    releaseAnimationPackage?.();
-    packages.dispose();
-    recovery.dispose();
-    rigTweak.dispose();
-    releaseWorkspaceSelection?.();
-    mirrorTools.dispose();
-    poseLibrary.dispose();
-    ikBake.dispose();
-    retiming.dispose();
-    motionDiagnostics.dispose();
-    newAnimation.dispose();
-    variations.dispose();
-    releaseLibrarySelection?.();
-    releaseAnimationCreation?.();
-    animationLibrary.dispose();
-    workspace.dispose();
-    recoveryControls.dispose();
-    releaseNavigationGuard();
-    timeline.dispose();
-    inspector.dispose();
-    ikInspector.dispose();
-    onionControls.dispose();
-    previewControls.abort();
-    releaseCharacterSelection();
-    editorScene.disposePreview();
-    projectContext?.characterDocuments?.releaseRenderer();
-    game.scene.stop(editorScene);
-    destroyEditorGame(game);
-    environment.dispose();
-    motionPreview.dispose();
-    attachments.dispose();
-    if (!projectContext?.characterDocuments) artwork.dispose();
-    scene = undefined;
-  };
-});
+    return () => {
+      releaseRenderer?.();
+      previewPreferences?.dispose();
+      detachAutosave?.();
+      detachAutosave = undefined;
+      workspaceRoutes?.dispose();
+      releaseRigExport();
+      releaseAnimationExport();
+      window.removeEventListener('keydown', deleteRigSelection);
+      releaseProject?.();
+      workspaceRoutes = undefined;
+      releaseRigResize();
+      rigLayout.dispose();
+      rigWorkspace.dispose();
+      stateOwner = undefined;
+      movePreview = undefined;
+      releaseArtworkPackage();
+      releaseAnimationPackage?.();
+      packages.dispose();
+      recovery.dispose();
+      rigTweak.dispose();
+      releaseWorkspaceSelection?.();
+      mirrorTools.dispose();
+      poseLibrary.dispose();
+      ikBake.dispose();
+      retiming.dispose();
+      motionDiagnostics.dispose();
+      newAnimation.dispose();
+      variations.dispose();
+      releaseLibrarySelection?.();
+      releaseAnimationCreation?.();
+      animationLibrary.dispose();
+      workspace.dispose();
+      recoveryControls.dispose();
+      releaseNavigationGuard();
+      timeline.dispose();
+      inspector.dispose();
+      ikInspector.dispose();
+      onionControls.dispose();
+      previewControls.abort();
+      releaseCharacterSelection();
+      editorScene.disposePreview();
+      projectContext?.characterDocuments.releaseRenderer();
+      game.scene.stop(editorScene);
+      destroyEditorGame(game);
+      environment.dispose();
+      motionPreview.dispose();
+      attachments.dispose();
+      if (!projectContext) artwork.dispose();
+      scene = undefined;
+    };
+  },
+);
 if (import.meta.hot) import.meta.hot.dispose(unmount);

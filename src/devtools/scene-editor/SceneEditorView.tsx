@@ -23,7 +23,6 @@ import { EditorContext } from '../../ui/EditorContext.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
 import { sceneDraftSource } from '../project/editorDrafts.js';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -33,6 +32,7 @@ import type { SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneInspector } from './SceneInspector.js';
 import { bindSceneShortcuts } from './SceneKeyboardController.js';
+import { useSceneProject } from './sceneProject.js';
 import { SceneReusePanel } from './SceneReusePanel.js';
 import { SceneStageView } from './SceneStage.js';
 import { SceneTimeline } from './SceneTimeline.js';
@@ -50,7 +50,7 @@ export function SceneEditorView({
 }) {
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const scene = document.workingScene;
-  const project = projectEditorContext();
+  const project = useSceneProject();
   const [, refreshProject] = useState(0);
   useEffect(() => project?.subscribe(() => refreshProject((revision) => revision + 1)), [project]);
   const [playback] = useState(() => new SceneEditorPlayback());

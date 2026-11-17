@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { readJsonFile } from '../../engine/core.js';
 import type { SceneCharacterAssets, SceneDefinition } from '../../engine/data.js';
 import { downloadJson } from '../../shared/downloadJson.js';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import {
   captureChoreography,
@@ -16,6 +15,7 @@ import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneEditorDocument, type ReadonlyScene } from './SceneEditorDocument.js';
 import { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { ScenePlaybackControls, SceneTimeInput } from './ScenePlaybackControls.js';
+import { useSceneProject } from './sceneProject.js';
 import { SceneStageView } from './SceneStage.js';
 
 type Preview = {
@@ -61,7 +61,7 @@ export function SceneReusePanel({
   playback: SceneEditorPlayback;
   close(this: void): void;
 }) {
-  const project = projectEditorContext();
+  const project = useSceneProject();
   useSyncExternalStore(document.subscribe, document.getSnapshot, document.getSnapshot);
   const [, refresh] = useState(0);
   useEffect(() => project?.subscribe(() => refresh((value) => value + 1)), [project]);
@@ -113,10 +113,10 @@ export function SceneReusePanel({
   );
   const rigIdentity = (manifest: string) => {
     const choice = project?.choices.find((choice) => choice.manifest === manifest);
-    return choice ? `${project!.projectId ?? 'project'}:${choice.rigIdentity ?? choice.id}` : manifest;
+    return choice ? `${project!.projectId}:${choice.rigIdentity ?? choice.id}` : manifest;
   };
   const save = (next: SceneReuseLibrary) => {
-    if (project?.saveSceneReuse) project.saveSceneReuse(next);
+    if (project) project.saveSceneReuse(next);
     else document.setSceneReuse(next);
     invalidate();
   };
@@ -556,7 +556,7 @@ export function SceneReusePanel({
               onClick={() =>
                 attempt(() => {
                   const next = proposal('template');
-                  if (project?.createSceneCopy) project.createSceneCopy(next);
+                  if (project) project.createSceneCopy(next);
                   else if (!document.createSceneCopy(next)) return;
                   invalidate();
                   setNewId(`scene-${crypto.randomUUID()}`);

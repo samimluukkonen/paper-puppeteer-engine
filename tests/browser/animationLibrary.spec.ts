@@ -120,13 +120,12 @@ test('project library previews runtime assets, blocks other rigs, creates a vari
   const token = new URL(sceneEditor.url()).searchParams.get('projectSession')!;
   await expect
     .poll(() =>
-      page.evaluate(
-        (token) =>
-          window
-            .paperProjectEditor?.(token)
-            ?.scenes?.workingScene?.actions.map((action) => (action.type === 'animation' ? action.animation : '')),
-        token,
-      ),
+      page.evaluate((token) => {
+        const context = window.paperProjectEditor?.(token);
+        return context?.kind === 'scene'
+          ? context.scenes.workingScene?.actions.map((action) => (action.type === 'animation' ? action.animation : ''))
+          : undefined;
+      }, token),
     )
     .toEqual(['sword-cut-variation']);
   await sceneEditor.getByRole('button', { name: '← Project', exact: true }).click();

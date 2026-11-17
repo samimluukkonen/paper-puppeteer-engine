@@ -1,9 +1,9 @@
 import { useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../engine/data.js';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { AnimationLibrary } from '../shared/AnimationLibrary.js';
 import { existingAnimationReference } from '../shared/animationLibraryData.js';
 import { AnimationLibraryPreview, type AnimationPreviewLease } from '../shared/AnimationLibraryPreviewDialog.js';
+import { useSceneProject } from './sceneProject.js';
 
 const noSubscribe = () => () => {};
 const emptySnapshot = () => 0;
@@ -18,12 +18,13 @@ export function SceneAnimationLibrary({
   manifest: string;
   onUse(this: void, name: string): void;
 }) {
-  const project = projectEditorContext();
-  useSyncExternalStore(project?.subscribe ?? noSubscribe, project?.animationLibraryRevision ?? emptySnapshot);
+  const project = useSceneProject();
+  const revision = project?.animationLibraryRevision ?? emptySnapshot;
+  useSyncExternalStore(project?.subscribe ?? noSubscribe, revision, revision);
   const choice = project?.choices.find((choice) => choice.manifest === manifest);
   const targetRig = choice?.rigIdentity ?? choice?.id ?? manifest;
   const entries =
-    project?.animationLibrary?.() ??
+    project?.animationLibrary() ??
     definition.animations.map((clip) => ({
       character: manifest,
       characterName: definition.id,
@@ -56,26 +57,26 @@ export function SceneAnimationLibrary({
         onPreview={(entry) =>
           setPreview({
             animation: entry.clip.name,
-            load: project?.loadAnimationPreview
-              ? (signal) => project.loadAnimationPreview!(entry.character, signal)
+            load: project
+              ? (signal) => project.loadAnimationPreview(entry.character, signal)
               : async () => ({ definition, dispose() {} }),
           })
         }
         onLocate={
-          project?.openAnimation
+          project
             ? (entry) => {
-                void project.openAnimation!(entry.character, entry.clip.name).catch((error: unknown) =>
-                  setMessage(String(error)),
-                );
+                void project
+                  .openAnimation(entry.character, entry.clip.name)
+                  .catch((error: unknown) => setMessage(String(error)));
               }
             : undefined
         }
         onCopy={
-          project?.openAnimation
+          project
             ? (entry) => {
-                void project.openAnimation!(entry.character, entry.clip.name, true).catch((error: unknown) =>
-                  setMessage(String(error)),
-                );
+                void project
+                  .openAnimation(entry.character, entry.clip.name, true)
+                  .catch((error: unknown) => setMessage(String(error)));
               }
             : undefined
         }

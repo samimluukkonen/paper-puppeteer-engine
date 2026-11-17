@@ -18,7 +18,6 @@ import type { CharacterDefinition } from '../../engine/data.js';
 import { loadSceneCharacter, Puppet } from '../../engine/runtime.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import { roundEditorNumber } from '../shared/editorData.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
@@ -31,6 +30,7 @@ import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ActorGroundContact, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundHandle } from './SceneGroundHandle.js';
+import { useSceneProject } from './sceneProject.js';
 import { draggedPosition, stagePoint } from './stageCoordinates.js';
 
 type Point = { x: number; y: number };
@@ -715,6 +715,7 @@ export function SceneStageView({
   const [stage, setStage] = useState<SceneStage>();
   const [grid, setGrid] = useState(true);
   const [previewScroll, setPreviewScroll] = useState<Point>({ x: 0, y: 0 });
+  const project = useSceneProject();
   useLayoutEffect(() => {
     const scene = new SceneStage(document, registry, playback, setError);
     setStage(scene);
@@ -726,7 +727,7 @@ export function SceneStageView({
         if (!rendererActive && game.isRunning) game.loop.stop();
       }),
     );
-    const releaseRenderer = projectEditorContext()?.bindRenderer({
+    const releaseRenderer = project?.bindRenderer({
       activate: () => {
         rendererActive = true;
         if (game.isRunning && !game.loop.running) game.loop.start(game.loop.callback);
@@ -749,7 +750,7 @@ export function SceneStageView({
       game.scene.stop(scene);
       destroyEditorGame(game);
     };
-  }, [document, registry, playback, canvasId]);
+  }, [document, registry, playback, canvasId, project]);
   return (
     <>
       <div className="scene-stage-toolbar" data-guide-id={GUIDE_TARGETS.sceneParallaxPreview}>

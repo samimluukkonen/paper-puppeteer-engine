@@ -36,7 +36,7 @@ Ordinary authoring and Undo/Redo retain their existing histories. There are no a
 - `ProjectWorkspace.dependents(reference)` and `assetDependents(report, reference)` return direct incoming uses with scene/Actor/clip labels.
 - `requireValidExport(report)` throws `ProjectValidationError` for blocking errors. `packageExportFailure()` retains final exporter failures in the same report shape.
 - `buildProjectPackage()` and `buildProjectScenePackage()` enforce production preflight before their existing exporters.
-- `projectBridge.ts` supplies shared-replacement confirmation and skin-reference lookup to the existing editor owners.
+- `projectBridge.ts` supplies shared-replacement confirmation to the existing character editor owners.
 
 Explicit checks and production export clear the semantic caches. Once the panel is open, committed workspace revisions schedule checks after 250 ms without further edits. Character fingerprints reuse unchanged validation results; scenes cache against their own document and the animation/skin catalogs of their referenced characters. Changes to an unrelated catalog do not revalidate a scene. Image availability and headers are always checked afresh. Playback ticks, selection and preview-only movement do not initiate whole-project validation; authored gestures settle before the debounced panel refresh. Caches belong to one workspace and release removed registrations.
 

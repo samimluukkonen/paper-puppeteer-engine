@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { CharacterDefinition } from '../../engine/data.js';
-import { projectEditorContext } from '../project/projectBridge.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import { sceneCharacterChoices, type SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import type { ReadonlyScene, SceneEditorDocument } from './SceneEditorDocument.js';
+import { useSceneProject } from './sceneProject.js';
 
 type ActorData = ReadonlyScene['actors'][number];
 
@@ -142,7 +142,8 @@ export function SceneActorsPanel({
 }) {
   useSyncExternalStore(registry.subscribe, registry.getSnapshot, registry.getSnapshot);
   const dialog = useRef<HTMLDialogElement>(null);
-  const choices = projectEditorContext()?.choices ?? sceneCharacterChoices;
+  const project = useSceneProject();
+  const choices = project?.choices ?? sceneCharacterChoices;
   const [manifest, setManifest] = useState(choices[0]?.manifest ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -297,7 +298,7 @@ export function SceneActorsPanel({
             <input required value={manifest} onChange={(event) => setManifest(event.target.value)} disabled={loading} />
           </label>
           <p className="workspace-caption">
-            {projectEditorContext()
+            {project
               ? 'Choose a registered project character. Add other characters from the project workspace.'
               : 'Choose a workspace package or enter a permanent character.json path/URL. Unsaved character drafts need an exported, hosted package first.'}
           </p>

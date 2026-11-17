@@ -1,4 +1,3 @@
-import { projectEditorContext } from '../project/projectBridge.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';
 import { createInspectorController } from '../rig-editor/InspectorController.js';
@@ -41,7 +40,14 @@ export class RigTweakController {
   readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): typeof emptySnapshot => this.snapshot;
 
-  constructor(private readonly attachments?: AttachmentController) {}
+  /**
+   * @param options.projectHosted A project host keeps the authored rig, so rig-tweak drafts are not recovered
+   *   locally.
+   */
+  constructor(
+    private readonly attachments?: AttachmentController,
+    private readonly options: { readonly projectHosted?: boolean } = {},
+  ) {}
 
   setMode(mode: EditorMode): boolean {
     if (!this.state) return false;
@@ -131,7 +137,7 @@ export class RigTweakController {
       app.querySelector<HTMLSelectElement>('#tweak-rotation-snap')!.value = String(editor.state.rotationSnap);
     };
     this.bindDraft = () => {
-      if (projectEditorContext()) return;
+      if (this.options.projectHosted) return;
       const editor = this.editor;
       if (!editor) return;
       // Older draft identities stored name beside the rig. Preserve that source fingerprint format.

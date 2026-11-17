@@ -46,7 +46,8 @@ test('project scene authoring rejects missing animation dependencies atomically 
   // Public authoring commands now reject unavailable dependencies before they enter history.
   const token = new URL(frame.url()).searchParams.get('projectSession')!;
   await page.evaluate((token) => {
-    const document = window.paperProjectEditor?.(token)?.scenes;
+    const context = window.paperProjectEditor?.(token);
+    const document = context?.kind === 'scene' ? context.scenes : undefined;
     if (!document) throw new Error('Scene document is unavailable.');
     const before = document.workingScene;
     const history = [document.canUndo, document.canRedo];
@@ -68,7 +69,8 @@ test('project scene authoring rejects missing animation dependencies atomically 
   const reopened = await activeEditor(page);
   const reopenedToken = new URL(reopened.url()).searchParams.get('projectSession')!;
   await page.evaluate((token) => {
-    if (!window.paperProjectEditor?.(token)?.scenes?.undo()) throw new Error('Undo failed.');
+    const context = window.paperProjectEditor?.(token);
+    if (context?.kind !== 'scene' || !context.scenes.undo()) throw new Error('Undo failed.');
   }, reopenedToken);
   await reopened.getByRole('button', { name: '← Project', exact: true }).click();
   await expect(panel).toContainText('No problems found');

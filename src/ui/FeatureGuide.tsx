@@ -9,11 +9,11 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from 'react';
-import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import type { GuideLauncher } from '../devtools/shared/guides/GuideLauncher.js';
 import type { GuideEditor, GuideTargetResolver } from '../devtools/shared/guides/types.js';
 import { FeatureGuideCatalog } from './FeatureGuideCatalog.js';
 import { GuideSpotlight } from './GuideSpotlight.js';
+import { useProjectContext } from './projectContext.js';
 
 const OpenFeatureGuide = createContext<(() => void) | null>(null);
 
@@ -61,7 +61,8 @@ export function FeatureGuide({
     },
     [launcher],
   );
-  useEffect(() => projectEditorContext()?.bindGuide(open), [open]);
+  const project = useProjectContext();
+  useEffect(() => project?.bindGuide(open), [project, open]);
   useEffect(() => {
     if (!requestedGuide) return;
     const guide = launcher.registry.getGuideById(requestedGuide);

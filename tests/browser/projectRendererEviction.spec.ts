@@ -83,7 +83,8 @@ test('project renderer eviction preserves drafts, animation and rig history when
   await expect(await inspectorControl(reopened, '#inspector [data-scope=bone][data-field=x]')).toHaveValue('42');
   expect(
     await page.evaluate((token) => {
-      const document = window.paperProjectEditor?.(token)?.characterDocuments;
+      const context = window.paperProjectEditor?.(token);
+      const document = context?.kind === 'character' ? context.characterDocuments : undefined;
       return {
         clips: document?.animation.animationIds,
         undo: document?.rig.undo(),

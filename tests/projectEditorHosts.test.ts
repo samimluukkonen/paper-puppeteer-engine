@@ -1,5 +1,6 @@
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
+import type { CharacterEditorContext, SceneEditorContext } from '../src/devtools/project/projectBridge.js';
 import {
   ProjectEditorHosts,
   type ProjectEditorHost,
@@ -44,6 +45,16 @@ async function session(): Promise<ProjectSession> {
   };
 }
 
+function characterContext(host: ProjectEditorHost): CharacterEditorContext {
+  if (host.context.kind !== 'character') throw new Error(`Expected a character host, got ${host.context.kind}.`);
+  return host.context;
+}
+
+function sceneContext(host: ProjectEditorHost): SceneEditorContext {
+  if (host.context.kind !== 'scene') throw new Error(`Expected a scene host, got ${host.context.kind}.`);
+  return host.context;
+}
+
 function fixture(changed?: (hosts: readonly ProjectEditorHost[]) => void) {
   let hosts: readonly ProjectEditorHost[] = [];
   const activate = vi.fn<(token: string | undefined) => void>();
@@ -71,11 +82,10 @@ test('variant editor requests share the sole owner host and expose shared impact
     await f.controller.open(owner, 'character', 'blue');
     const host = f.hosts()[0]!;
     assert.equal(host.asset, 'hero');
-    assert.strictEqual(host.context.characterDocuments, owner.workspace.characterDocuments('hero'));
-    assert.include(host.context.sharedRigNotice!, 'Blue Soldier');
-    assert.include(host.context.sharedRigNotice!, 'independent character copy');
-    assert.equal(host.context.choices.find((entry) => entry.id === 'blue')!.rigIdentity, 'hero');
-    host.context.bindCharacter(
+    assert.strictEqual(characterContext(host).characterDocuments, owner.workspace.characterDocuments('hero'));
+    assert.include(characterContext(host).sharedRigNotice!, 'Blue Soldier');
+    assert.include(characterContext(host).sharedRigNotice!, 'independent character copy');
+    characterContext(host).bindCharacter(
       () => false,
       () => {},
     );
@@ -106,13 +116,13 @@ test('renderer cache suspends inactive hosts and evicts LRU renderers without lo
       await f.controller.open(owner, 'character', 'hero');
       const host = f.hosts().find((entry) => entry.session === owner)!;
       tokens.push(host.token);
-      const document = host.context.characterDocuments!;
+      const document = characterContext(host).characterDocuments;
       document.rig.editBone('root', 'x', 42);
       expect(
         document.animation.createDerivedAnimation({ name: 'draft', duration: 1000, loop: false, tracks: {} }),
       ).toBe(true);
       expect(document.animation.setAuthoredPlaybackMode('stepped')).toBe(true);
-      const unbind = host.context.bindCharacter(
+      const unbind = characterContext(host).bindCharacter(
         () => false,
         () => {},
       );
@@ -134,8 +144,8 @@ test('renderer cache suspends inactive hosts and evicts LRU renderers without lo
     await f.controller.open(owner, 'character', 'hero', 'animation');
     const reopened = f.hosts().find((host) => host.session === owner)!;
     expect(reopened.token).not.toBe(tokens[0]);
-    expect(reopened.context.characterDocuments).toBe(document);
-    reopened.context.bindCharacter(
+    expect(characterContext(reopened).characterDocuments).toBe(document);
+    characterContext(reopened).bindCharacter(
       () => false,
       () => {},
     );
@@ -165,7 +175,7 @@ test('temporary edits pin suspended hosts without letting the renderer cache gro
     for (const owner of owners.slice(0, 2)) {
       await f.controller.open(owner, 'character', 'hero');
       const host = f.hosts().find((entry) => entry.session === owner)!;
-      host.context.bindCharacter(
+      characterContext(host).bindCharacter(
         () => pending,
         () => {},
       );
@@ -197,9 +207,9 @@ test('reusing a collected character ID replaces its cached renderer and document
   try {
     await f.controller.open(owner, 'character', 'hero');
     const previous = f.hosts()[0]!;
-    const documents = previous.context.characterDocuments!;
+    const documents = characterContext(previous).characterDocuments;
     documents.rig.editBone('root', 'x', 42);
-    const unbind = previous.context.bindCharacter(
+    const unbind = characterContext(previous).bindCharacter(
       () => false,
       () => {},
     );
@@ -212,9 +222,9 @@ test('reusing a collected character ID replaces its cached renderer and document
     await f.controller.open(owner, 'character', 'hero');
     const current = f.hosts()[0]!;
     expect(current.token).not.toBe(previous.token);
-    expect(current.context.characterDocuments).toBe(owner.workspace.characterDocuments('hero'));
-    expect(current.context.characterDocuments).not.toBe(documents);
-    expect(current.context.characterDocuments!.rig.recoveryDraft.bones[0]!.x ?? 0).toBe(0);
+    expect(characterContext(current).characterDocuments).toBe(owner.workspace.characterDocuments('hero'));
+    expect(characterContext(current).characterDocuments).not.toBe(documents);
+    expect(characterContext(current).characterDocuments.rig.recoveryDraft.bones[0]!.x ?? 0).toBe(0);
     expect(dispose).toHaveBeenCalledOnce();
     expect(release).toHaveBeenCalledOnce();
     expect(f.controller.resolve(previous.token)).toBeUndefined();
@@ -236,7 +246,7 @@ test('concurrent opens share one renderer and reactivate the retained host', asy
   );
   const navigate = vi.fn();
   const f = fixture((hosts) => {
-    hosts[0]?.context.bindCharacter(() => false, navigate);
+    characterContext(hosts[0]!).bindCharacter(() => false, navigate);
   });
   try {
     const first = f.controller.open(owner, 'character', 'hero');
@@ -256,10 +266,10 @@ test('concurrent opens share one renderer and reactivate the retained host', asy
     const guide = vi.fn();
     const select = vi.fn();
     host.context.bindGuide(guide);
-    host.context.bindAnimationSelection!(select);
+    characterContext(host).bindAnimationSelection(select);
     expect(guide).toHaveBeenCalledExactlyOnceWith('animation-guide');
     expect(select).toHaveBeenCalledExactlyOnceWith('walk', true);
-    expect(owner.workspace.character('hero').capture).toBe(host.context.characterDocuments!.capture);
+    expect(owner.workspace.character('hero').capture).toBe(characterContext(host).characterDocuments.capture);
     const renderer = { activate: vi.fn(), suspend: vi.fn(), dispose: vi.fn() };
     host.context.bindRenderer(renderer);
     host.context.navigate('project');
@@ -382,7 +392,7 @@ test('closing a scene aborts and releases late character preview leases', async 
   try {
     await f.controller.open(owner, 'scene', 'scene');
     const host = f.hosts()[0]!;
-    const loading = host.context.loadCharacter(owner.workspace.characterReference('hero'));
+    const loading = sceneContext(host).loadCharacter(owner.workspace.characterReference('hero'));
     const rejected = expect(loading).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(runtime).toHaveBeenCalledOnce());
     host.context.navigate('project');
@@ -410,7 +420,7 @@ test('character hosts retain one owner across view changes and release independe
     await f.controller.open(first, 'character', 'hero');
     const host = f.hosts()[0]!;
     const navigate = vi.fn();
-    const unbind = host.context.bindCharacter(() => false, navigate);
+    const unbind = characterContext(host).bindCharacter(() => false, navigate);
     host.context.navigate('project');
     await f.controller.open(first, 'character', 'hero', 'animation');
     assert.equal(runtime.mock.calls.length, 1);
@@ -441,7 +451,7 @@ test('failed initial hosts unblock exports and are removed before a new opening'
     await f.controller.open(owner, 'character', 'hero');
     const failed = f.hosts()[0]!;
     assert.isUndefined(owner.workspace.autosaveRevision);
-    failed.context.characterLoadFailed();
+    characterContext(failed).characterLoadFailed();
     assert.isDefined(owner.workspace.autosaveRevision);
     await packages.buildCharacterPackage(owner.workspace.captureCharacter('hero'));
     failed.context.navigate('project');
@@ -463,13 +473,13 @@ test('teardown releases all scene hosts even if one preview cleanup throws', asy
   const f = fixture();
   await f.controller.open(owner, 'scene', 'one');
   const first = f.hosts()[0]!;
-  first.context.bindScene(() => {
+  sceneContext(first).bindScene(() => {
     throw new Error('Preview cleanup failed');
   });
   await f.controller.open(owner, 'scene', 'two');
   const second = f.hosts()[1]!;
   const release = vi.fn();
-  second.context.bindScene(release);
+  sceneContext(second).bindScene(release);
   assert.throws(() => f.controller.dispose(), /Preview cleanup failed/);
   assert.equal(release.mock.calls.length, 1);
   assert.isUndefined(f.controller.resolve(first.token));
@@ -512,7 +522,7 @@ test('library asset requests reach the original editor once, before or after its
     await f.controller.open(owner, 'character', 'hero', 'animation', false, undefined, { name: 'cut', copy: false });
     const host = f.hosts()[0]!;
     const select = vi.fn();
-    const release = host.context.bindAnimationSelection!(select);
+    const release = characterContext(host).bindAnimationSelection(select);
     assert.deepEqual(select.mock.calls, [['cut', false]]);
     await f.controller.open(owner, 'character', 'hero', 'animation', false, undefined, { name: 'cut', copy: true });
     assert.deepEqual(select.mock.calls, [
@@ -522,7 +532,7 @@ test('library asset requests reach the original editor once, before or after its
     assert.equal(f.hosts().length, 1);
     release();
     const next = vi.fn();
-    host.context.bindAnimationSelection!(next);
+    characterContext(host).bindAnimationSelection(next);
     assert.equal(next.mock.calls.length, 0);
   } finally {
     f.controller.dispose();
@@ -542,11 +552,11 @@ test('generated animation waits for the sole target owner and commits one recove
     await vi.waitFor(() => expect(f.hosts()[0]?.pendingCreation).toBeDefined());
     expect(owner.workspace.animationLibrary()).toEqual([]);
     const host = f.hosts()[0]!;
-    host.context.bindCharacter(
+    characterContext(host).bindCharacter(
       () => false,
       () => {},
     );
-    host.context.bindAnimationCreation!((clip) => state.createDerivedAnimation(clip));
+    characterContext(host).bindAnimationCreation((clip) => state.createDerivedAnimation(clip));
     await creation;
     expect(state.selectedAnimationId).toBe(clip.name);
     expect(state.hasUnsavedChanges).toBe(true);
@@ -572,22 +582,22 @@ test('failed target loading, stale revisions and disposal reject creation before
   const creation = f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig));
   const failed = expect(creation).rejects.toThrow(/failed to load/);
   await vi.waitFor(() => expect(f.hosts()[0]?.pendingCreation).toBeDefined());
-  f.hosts()[0]!.context.characterLoadFailed();
+  characterContext(f.hosts()[0]!).characterLoadFailed();
   await failed;
   expect(f.hosts()).toHaveLength(0);
   await f.controller.open(owner, 'character', 'hero', 'animation');
   const host = f.hosts()[0]!;
   const create = vi.fn(() => true);
-  host.context.bindCharacter(
+  characterContext(host).bindCharacter(
     () => false,
     () => {},
   );
-  host.context.bindAnimationCreation!(create);
+  characterContext(host).bindAnimationCreation(create);
   await expect(f.controller.createAnimation(owner, 'hero', clip, `rig-v1:${'0'.repeat(64)}`)).rejects.toThrow(
     /Target rig changed/,
   );
   expect(create).not.toHaveBeenCalled();
-  const unbind = host.context.bindAnimationCreation!(create);
+  const unbind = characterContext(host).bindAnimationCreation(create);
   unbind();
   const pending = f.controller.createAnimation(owner, 'hero', clip, rigCompatibilityRevision(snapshot.rig));
   const disposed = expect(pending).rejects.toThrow(/closed/);

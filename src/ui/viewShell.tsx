@@ -4,7 +4,6 @@ import LayoutTemplate from 'lucide-react/icons/layout-template';
 import Network from 'lucide-react/icons/network';
 import { useSyncExternalStore, type ReactNode, type Ref } from 'react';
 import packageInfo from '../../package.json';
-import { projectEditorContext } from '../devtools/project/projectBridge.js';
 import { AutosaveStatus } from '../devtools/shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../devtools/shared/guides/anchors.js';
 import { defaultCharacterId } from '../shared/characterCatalog.js';
@@ -12,6 +11,7 @@ import { selectedCharacterId, workspaceCharacterChoices } from './characterSelec
 import { FeatureGuideButton } from './FeatureGuide.js';
 import puppetLogo from './images/puppet-running-header.png';
 import { NewCharacterDialog } from './NewCharacterDialog.js';
+import { useProjectContext } from './projectContext.js';
 import './theme.css';
 import './viewShell.css';
 import './workspace.css';
@@ -60,13 +60,15 @@ export function ViewHeader({
   afterHeader?: ReactNode;
 }) {
   const current = views[view];
-  const project = projectEditorContext();
+  const project = useProjectContext();
   const projectIdentity = useSyncExternalStore(project?.subscribe ?? noSubscribe, () =>
     project
       ? `Project: ${project.projectName} · ${view === 'scene' ? 'Scene' : 'Character'}: ${project.assetName}`
       : '',
   );
-  const sharedRigNotice = useSyncExternalStore(project?.subscribe ?? noSubscribe, () => project?.sharedRigNotice);
+  const sharedRigNotice = useSyncExternalStore(project?.subscribe ?? noSubscribe, () =>
+    project?.kind === 'character' ? project.sharedRigNotice : undefined,
+  );
   const root = '../';
   const characterId = selectedCharacterId();
   const choices = workspaceCharacterChoices();
@@ -183,7 +185,7 @@ export function ViewHeader({
 
 /** Local/project save controls share the editor's Local draft tab. */
 export function EditorDraftControls({ children }: { children?: ReactNode }) {
-  const project = projectEditorContext();
+  const project = useProjectContext();
   return (
     <>
       {children}
