@@ -69,20 +69,20 @@
     "phaser": "4.2.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.64.1",
+    "@playwright/test": "1.65.1",
     "@types/node": "26.6.6",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
-    "lucide-react": "1.66.0",
-    "oxfmt": "0.75.0",
-    "oxlint": "1.90.0",
-    "oxlint-tsgolint": "7.0.2005",
+    "lucide-react": "1.74.0",
+    "oxfmt": "0.79.0",
+    "oxlint": "1.94.0",
+    "oxlint-tsgolint": "7.0.2007",
     "phaser": "4.2.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "typescript": "7.0.2",
-    "vite": "8.3.5",
-    "vitest": "5.0.5"
+    "vite": "8.3.8",
+    "vitest": "5.1.0"
   },
   "engines": {
     "node": ">=24.22.1"

@@ -89,6 +89,7 @@ export async function profileEditorWorkflow(baseUrl, sourceRig, channel) {
         };
         const expandMs = measure(() => button('Expand root properties').click());
         const lane = document.querySelector('.timeline-track-lane[data-bone-id="root"][data-property="x"]');
+        // oxlint-disable-next-line typescript/no-unnecessary-type-assertion -- JS cannot pass type arguments
         const markers = /** @type {NodeListOf<HTMLButtonElement>} */ (
           lane.querySelectorAll('button.timeline-keyframe')
         );
