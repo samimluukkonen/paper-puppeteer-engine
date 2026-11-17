@@ -89,7 +89,8 @@ test('cinematic framing, independent navigation, clean preview, parallax, Actor 
   await sceneInspectorGroup(page, 'Artwork');
   await page.locator('.scene-layers').getByRole('button', { name: 'hero', exact: true }).click();
   await sceneInspectorGroup(page, 'Camera');
-  await page.getByRole('button', { name: 'Frame Selected Actor', exact: true }).click();
+  await expect(page.getByLabel('Actor to frame', { exact: true })).toHaveValue('hero');
+  await page.getByRole('button', { name: 'Frame Actor', exact: true }).click();
   expect(Number(await page.getByLabel('Center X', { exact: true }).inputValue())).toBeLessThan(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await page.getByRole('button', { name: 'Select Cinematic Camera', exact: true }).click();

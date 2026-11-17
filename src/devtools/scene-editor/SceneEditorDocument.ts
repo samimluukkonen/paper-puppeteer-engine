@@ -455,6 +455,7 @@ export class SceneEditorDocument {
       this.entry.selectedImage = null;
       this.entry.selectedAction = null;
       this.entry.selectedActions = [];
+      this.entry.selectedActor = null;
     }
     this.notify('selection');
   }
@@ -487,12 +488,12 @@ export class SceneEditorDocument {
   resetCamera(): boolean {
     return this.updateCamera(DEFAULT_CINEMATIC_CAMERA);
   }
-  /** Measurements stay in the view; frame only the explicitly selected Actor. */
+  /** Measurements stay in the view; frame only an explicitly chosen Actor. */
   setActorBoundsProvider(provider: ((id: string) => CameraViewport | undefined) | undefined): void {
     this.actorBounds = provider;
   }
-  frameSelectedActor(): boolean {
-    const actor = this.workingScene?.actors.find((actor) => actor.id === this.selectedActorId);
+  frameActor(id: string): boolean {
+    const actor = this.workingScene?.actors.find((actor) => actor.id === id);
     if (!actor) return false;
     const bounds = this.actorBounds?.(actor.id);
     const camera =

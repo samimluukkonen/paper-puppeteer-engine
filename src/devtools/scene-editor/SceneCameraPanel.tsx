@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { CINEMATIC_CAMERA_MAX_ZOOM, CINEMATIC_CAMERA_MIN_ZOOM, DEFAULT_CINEMATIC_CAMERA } from '../../engine/core.js';
 import type { PropertyCurve } from '../../engine/data.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -17,6 +17,12 @@ export function SceneCameraPanel({
   const camera = document.cameraKeyEditing
     ? document.cinematicCamera
     : (document.workingScene?.camera ?? DEFAULT_CINEMATIC_CAMERA);
+  const actors = document.workingScene?.actors ?? [];
+  const [frameChoice, setFrameChoice] = useState<string | null>(null);
+  // Selecting the camera deselects Actors, so the framing target is panel state, not selection.
+  const frameTarget = actors.some((actor) => actor.id === frameChoice)
+    ? frameChoice!
+    : (document.selectedActorId ?? actors[0]?.id ?? '');
   return (
     <details className="scene-camera">
       <summary>Cinematic Camera</summary>
@@ -109,16 +115,28 @@ export function SceneCameraPanel({
         >
           Reset Camera
         </button>
+        <select
+          aria-label="Actor to frame"
+          value={frameTarget}
+          disabled={!actors.length || document.hasActiveGesture}
+          onChange={(event) => setFrameChoice(event.target.value)}
+        >
+          {actors.map((actor) => (
+            <option key={actor.id} value={actor.id}>
+              {actor.id}
+            </option>
+          ))}
+        </select>
         <button
           type="button"
           data-guide-id={GUIDE_TARGETS.sceneCameraFrameActor}
-          disabled={!document.selectedActorId || document.hasActiveGesture}
+          disabled={!frameTarget || document.hasActiveGesture}
           onClick={() => {
             playback.pause();
-            document.frameSelectedActor();
+            document.frameActor(frameTarget);
           }}
         >
-          Frame Selected Actor
+          Frame Actor
         </button>
         <button
           type="button"
@@ -130,11 +148,11 @@ export function SceneCameraPanel({
       </div>
       <p className="workspace-caption">
         1000 × 700 · 10:7 output. Center coordinates use scene pixels. Select the camera and drag its center or frame
-        edge. Frame Selected Actor fits current rendered bounds with 20% space; unavailable bounds use the initial Actor
-        origin and retain zoom. In Camera Key Edit mode, Apply, Reset, framing and frame dragging author keys at{' '}
-        {playback.time / 1000} s. Otherwise controls edit initial settings; animated frames require Key Edit mode to
-        drag. Set Camera Key explicitly captures all three channels. View navigation never creates keys. Camera edits
-        use scene Undo/Redo.
+        edge. Frame Actor fits the chosen Actor's current rendered bounds with 20% space; unavailable bounds use the
+        initial Actor origin and retain zoom. In Camera Key Edit mode, Apply, Reset, framing and frame dragging author
+        keys at {playback.time / 1000} s. Otherwise controls edit initial settings; animated frames require Key Edit
+        mode to drag. Set Camera Key explicitly captures all three channels. View navigation never creates keys. Camera
+        edits use scene Undo/Redo.
       </p>
       <CameraKeyInspector document={document} playback={playback} />
     </details>

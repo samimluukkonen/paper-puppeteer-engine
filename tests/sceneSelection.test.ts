@@ -87,3 +87,26 @@ test('enabling camera key editing keeps the selected key; disabling clears the k
   assert.isTrue(doc.cameraSelected);
   assert.isNull(doc.selectedDialogueLine);
 });
+
+test('selecting the camera deselects the actor, so deselecting the camera leaves nothing selected', () => {
+  const doc = document();
+  for (const select of [() => doc.selectActor('hero'), () => doc.selectAction('walk')]) {
+    select();
+    doc.selectCamera();
+    assert.isTrue(doc.cameraSelected);
+    assert.isNull(doc.selectedActorId);
+    doc.selectCamera(false);
+    assert.isFalse(doc.cameraSelected);
+    assert.isNull(doc.selectedActorId);
+    assert.isNull(doc.selectedActionId);
+  }
+});
+
+test('framing an actor takes the actor explicitly and works while the camera is selected', () => {
+  const doc = document();
+  doc.selectCamera();
+  assert.isTrue(doc.frameActor('friend'));
+  assert.deepEqual(doc.cinematicCamera, { x: 100, y: 10, zoom: 1 });
+  assert.isTrue(doc.cameraSelected);
+  assert.isFalse(doc.frameActor('missing'));
+});

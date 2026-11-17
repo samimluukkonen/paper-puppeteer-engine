@@ -161,12 +161,13 @@ test('Actor framing fits rendered bounds, falls back to origin and preserves Act
   document.createScene({ id: 'camera' });
   document.addActor('hero.json', { x: 75, y: 120 });
   const before = document.workingScene!;
+  const id = document.selectedActorId!;
   document.selectCamera();
-  assert.isTrue(document.frameSelectedActor());
+  assert.isTrue(document.frameActor(id));
   assert.deepEqual(document.cinematicCamera, { x: 75, y: 120, zoom: 1 });
   const bounds = { x: -40, y: -200, width: 240, height: 300 };
   document.setActorBoundsProvider(() => bounds);
-  document.frameSelectedActor();
+  document.frameActor(id);
   assert.deepEqual(document.cinematicCamera, cameraForBounds(bounds));
   const frame = cinematicFrame(document.cinematicCamera);
   assert.isBelow(frame.x, bounds.x);

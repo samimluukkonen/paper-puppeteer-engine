@@ -395,7 +395,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'mode',
         'Choose explicit camera key editing',
         T.sceneCameraKeyMode,
-        '**Camera Key Edit** mode makes **Apply camera key**, **Reset Camera**, Frame Selected Actor and frame dragging author keys at the playhead. With the mode off, numeric controls edit initial settings. Wheel zoom and middle/right/Alt-drag always navigate the editor without creating keys; animated frames require Key Edit mode to drag. The tour leaves your mode unchanged.',
+        '**Camera Key Edit** mode makes **Apply camera key**, **Reset Camera**, **Frame Actor** and frame dragging author keys at the playhead. With the mode off, numeric controls edit initial settings. Wheel zoom and middle/right/Alt-drag always navigate the editor without creating keys; animated frames require Key Edit mode to drag. The tour leaves your mode unchanged.',
       ),
       step(
         'time',
@@ -407,7 +407,7 @@ const workflowGuides: readonly GuideDefinition[] = [
         'values',
         'Pan and zoom into the next shot',
         T.sceneCameraKeyValues,
-        'With **Camera Key Edit** mode enabled, change **Center X/Y** and **Camera zoom**, then choose Apply camera key. Centers use scene pixels; zoom ranges from 0.1 to 8. For example, pan toward an Actor at 3 seconds and add a closer zoom at 5 seconds. Frame Selected Actor can capture one explicit shot when an Actor is selected; it never enables continuous tracking.',
+        'With **Camera Key Edit** mode enabled, change **Center X/Y** and **Camera zoom**, then choose Apply camera key. Centers use scene pixels; zoom ranges from 0.1 to 8. For example, pan toward an Actor at 3 seconds and add a closer zoom at 5 seconds. **Frame Actor** can capture one explicit shot of the chosen Actor; it never enables continuous tracking.',
       ),
       step(
         'tracks',
@@ -473,9 +473,9 @@ const workflowGuides: readonly GuideDefinition[] = [
       ),
       step(
         'actor',
-        'Frame a selected Actor',
+        'Frame an Actor',
         T.sceneCameraFrameActor,
-        'Select an Actor in **Scene Layers**, the **Actor list** or its timeline track, then choose **Frame Selected Actor**. The camera fits the current rendered bounds with 20% breathing room and bounded zoom. If reliable bounds are unavailable, it centers on the initial Actor origin and keeps zoom. With no Actor selected the button is disabled; you can still author the camera in an empty scene. The tour preserves your selection.',
+        'Choose an Actor in **Actor to frame**, then choose **Frame Actor**. The list starts at the selected Actor, or the first Actor when none is selected. The camera fits the current rendered bounds with 20% breathing room and bounded zoom. If reliable bounds are unavailable, it centers on the initial Actor origin and keeps zoom. In a scene without Actors the button is disabled; you can still author the camera. The tour preserves your selection.',
       ),
       step(
         'preview',
