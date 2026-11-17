@@ -110,3 +110,53 @@ test('framing an actor takes the actor explicitly and works while the camera is 
   assert.isTrue(doc.cameraSelected);
   assert.isFalse(doc.frameActor('missing'));
 });
+
+test('action selection selects its actor, toggles additively and steps back to the actor', () => {
+  const doc = document();
+  doc.selectAction('walk');
+  assert.deepEqual([doc.selectedActionIds, doc.selectedActionId, doc.selectedActorId], [['walk'], 'walk', 'hero']);
+  doc.selectAction('wave', true);
+  assert.deepEqual(
+    [doc.selectedActionIds, doc.selectedActionId, doc.selectedActorId],
+    [['walk', 'wave'], 'wave', 'friend'],
+  );
+  doc.selectAction('wave', true);
+  assert.deepEqual([doc.selectedActionIds, doc.selectedActionId, doc.selectedActorId], [['walk'], 'walk', 'hero']);
+  doc.selectAction('walk', true);
+  assert.deepEqual([doc.selectedActionIds, doc.selectedActionId, doc.selectedActorId], [[], null, 'hero']);
+  doc.selectAction('cue');
+  doc.selectAction(null);
+  assert.deepEqual([doc.selectedActionIds, doc.selectedActionId, doc.selectedActorId], [[], null, 'hero']);
+  doc.selectActor(null);
+  assert.isNull(doc.selectedActorId);
+});
+
+test('every selectable kind replaces the others', () => {
+  const doc = document();
+  const state = () => ({
+    actor: doc.selectedActorId,
+    actions: doc.selectedActionIds,
+    camera: doc.cameraSelected,
+    dialogue: doc.selectedDialogueLine?.id ?? null,
+    audio: doc.selectedAudioClip?.id ?? null,
+    transition: doc.selectedTransition?.id ?? null,
+  });
+  const none = { actor: null, actions: [], camera: false, dialogue: null, audio: null, transition: null };
+  const cases = [
+    [() => doc.selectActor('hero'), { ...none, actor: 'hero' }],
+    [() => doc.selectAction('walk'), { ...none, actor: 'hero', actions: ['walk'] }],
+    [() => doc.selectCamera(), { ...none, camera: true }],
+    [() => doc.selectDialogueLine('line'), { ...none, dialogue: 'line' }],
+    [() => doc.selectAudioClip('clip'), { ...none, audio: 'clip' }],
+    [() => doc.selectTransition('fade'), { ...none, transition: 'fade' }],
+  ] as const;
+  for (const [before] of cases)
+    for (const [select, expected] of cases) {
+      before();
+      select();
+      assert.deepEqual(state(), expected);
+    }
+  doc.selectAction('walk');
+  doc.selectImage(null);
+  assert.deepEqual(state(), none);
+});

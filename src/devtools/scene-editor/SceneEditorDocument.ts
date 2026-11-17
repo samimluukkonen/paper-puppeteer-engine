@@ -40,6 +40,14 @@ import { SceneDialogueCommands, type SceneDialoguePatch } from './SceneDialogueC
 import { SceneEditorGestures } from './SceneEditorGestures.js';
 import { SceneEditorNotifications } from './SceneEditorNotifications.js';
 import { SceneImageRegistry } from './SceneImageRegistry.js';
+import {
+  cameraKeyOf,
+  idOf,
+  selectAction,
+  selectedActionIdsOf,
+  selectedActorOf,
+  type SceneSelection,
+} from './SceneSelection.js';
 import { SceneSnapshotParser } from './SceneSnapshotParser.js';
 import { SceneTransitionCommands } from './SceneTransitionCommands.js';
 
@@ -54,18 +62,10 @@ interface SceneEntry {
   saved: ReadonlyScene;
   working: ReadonlyScene;
   unsavedNew: boolean;
-  cameraSelected: boolean;
+  selection: SceneSelection;
   cameraKeyEdit: boolean;
-  selectedCameraKey: { property: CameraProperty; id: string } | null;
   cameraPreview: boolean;
   cameraOverlays: boolean;
-  selectedImage: string | null;
-  selectedActor: string | null;
-  selectedAction: string | null;
-  selectedActions: string[];
-  selectedTransition: string | null;
-  selectedAudioClip: string | null;
-  selectedDialogueLine: string | null;
   readonly history: SnapshotHistory<ReadonlyScene>;
 }
 
@@ -270,18 +270,10 @@ export class SceneEditorDocument {
       saved: source,
       working: source,
       unsavedNew,
-      cameraSelected: false,
+      selection: null,
       cameraKeyEdit: false,
-      selectedCameraKey: null,
       cameraPreview: false,
       cameraOverlays: false,
-      selectedImage: null,
-      selectedActor: null,
-      selectedAction: null,
-      selectedActions: [],
-      selectedTransition: null,
-      selectedAudioClip: null,
-      selectedDialogueLine: null,
       history: new SnapshotHistory(
         () => entry.working,
         (snapshot) => {
@@ -386,16 +378,15 @@ export class SceneEditorDocument {
     this.notify('presentation');
   }
   get selectedCameraKey(): { property: CameraProperty; key: Readonly<CameraKeyframe> } | null {
-    const selected = this.cameraSelected && this.entry?.selectedCameraKey;
+    const selected = cameraKeyOf(this.entry?.selection ?? null);
     const key = selected && this.workingScene?.cameraTracks?.[selected.property]?.find((key) => key.id === selected.id);
     return selected && key ? { property: selected.property, key } : null;
   }
   selectCameraKey(property: CameraProperty, id: string): void {
     this.selectCamera();
     if (!this.entry || !this.workingScene?.cameraTracks?.[property]?.some((key) => key.id === id)) return;
-    this.entry.selectedCameraKey = { property, id };
     this.entry.cameraKeyEdit = true;
-    this.notify('selection');
+    this.setSelection({ kind: 'camera', key: { property, id } });
   }
   /** Explicit capture; channels at the same time are replaced without duplicating keys. */
   setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
@@ -435,7 +426,7 @@ export class SceneEditorDocument {
       : false;
   }
   get cameraSelected(): boolean {
-    return this.entry?.cameraSelected ?? false;
+    return this.entry?.selection?.kind === 'camera';
   }
   get cameraPreviewing(): boolean {
     return this.entry?.cameraPreview ?? false;
@@ -446,17 +437,11 @@ export class SceneEditorDocument {
   selectCamera(selected = true): void {
     this.gestures.cancel();
     if (!this.entry) return;
-    this.entry.selectedTransition = null;
-    this.entry.selectedAudioClip = null;
-    this.entry.selectedDialogueLine = null;
-    this.entry.cameraSelected = selected;
-    this.entry.selectedCameraKey = null;
-    if (selected) {
-      this.entry.selectedImage = null;
-      this.entry.selectedAction = null;
-      this.entry.selectedActions = [];
-      this.entry.selectedActor = null;
-    }
+    this.setSelection(selected ? { kind: 'camera', key: null } : this.cameraSelected ? null : this.entry.selection);
+  }
+  /** The single write path for selection: every select command replaces the whole value and notifies once. */
+  private setSelection(next: SceneSelection): void {
+    this.entry!.selection = next;
     this.notify('selection');
   }
   setCameraPreview(enabled: boolean): void {
@@ -527,7 +512,7 @@ export class SceneEditorDocument {
   }
 
   get selectedImageId(): string | null {
-    const id = this.entry?.selectedImage;
+    const id = idOf(this.entry?.selection ?? null, 'image');
     return this.workingScene?.images?.some((image) => image.id === id) ? id! : null;
   }
   isLayerLocked(id: string): boolean {
@@ -575,15 +560,7 @@ export class SceneEditorDocument {
     this.cancelAudioDrag();
     this.cancelActionDrag();
     if (id !== this.selectedImageId) this.cancelImageDrag();
-    this.entry.cameraSelected = false;
-    this.entry.selectedTransition = null;
-    this.entry.selectedAudioClip = null;
-    this.entry.selectedDialogueLine = null;
-    this.entry.selectedImage = id;
-    this.entry.selectedActor = null;
-    this.entry.selectedAction = null;
-    this.entry.selectedActions = [];
-    this.notify('selection');
+    this.setSelection(id === null ? null : { kind: 'image', id });
   }
   addImage(reference: string): boolean {
     return this.artworkCommands.addImage(reference);
@@ -620,7 +597,7 @@ export class SceneEditorDocument {
   }
 
   get selectedActorId(): string | null {
-    const id = this.entry?.selectedActor;
+    const id = selectedActorOf(this.entry?.selection ?? null);
     return this.workingScene?.actors.some((actor) => actor.id === id) ? id! : null;
   }
   get hasActiveGesture(): boolean {
@@ -628,24 +605,16 @@ export class SceneEditorDocument {
   }
   selectActor(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.actors.some((actor) => actor.id === id))) return;
-    this.replaceActorSelection(id);
-    this.notify('selection');
+    this.cancelDragsForActor(id);
+    this.setSelection(id === null ? null : { kind: 'actor', id });
   }
-  private replaceActorSelection(id: string | null): void {
-    const entry = this.entry!;
+  /** Actor and timeline-item selection cancel every drag except a continuing drag of the same Actor. */
+  private cancelDragsForActor(id: string | null): void {
     this.cancelCameraDrag();
     this.cancelImageDrag();
     if (id !== this.selectedActorId) this.cancelActorDrag();
     this.cancelAudioDrag();
     this.cancelActionDrag();
-    entry.selectedAction = null;
-    entry.selectedActions = [];
-    entry.selectedImage = null;
-    entry.cameraSelected = false;
-    entry.selectedTransition = null;
-    entry.selectedAudioClip = null;
-    entry.selectedDialogueLine = null;
-    entry.selectedActor = id;
   }
   private nextActorId(stem = 'actor'): string {
     let index = 1;
@@ -682,7 +651,7 @@ export class SceneEditorDocument {
           : {}),
       })),
     });
-    if (changed && this.entry?.selectedActor === id) this.selectActor(nextId);
+    if (changed && selectedActorOf(this.entry?.selection ?? null) === id) this.selectActor(nextId);
     return changed;
   }
   setActorAppearance(id: string, property: 'animation' | 'skin' | 'dialogueIdle', value: string | null): boolean {
@@ -873,13 +842,14 @@ export class SceneEditorDocument {
     return new Uint8Array(bytes);
   }
   get selectedDialogueLine(): Readonly<SceneDialogueLine> | null {
-    return this.workingScene?.dialogue?.find((line) => line.id === this.entry?.selectedDialogueLine) ?? null;
+    return (
+      this.workingScene?.dialogue?.find((line) => line.id === idOf(this.entry?.selection ?? null, 'dialogue')) ?? null
+    );
   }
   selectDialogueLine(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.dialogue?.some((line) => line.id === id))) return;
-    this.replaceActorSelection(null);
-    this.entry.selectedDialogueLine = id;
-    this.notify('selection');
+    this.cancelDragsForActor(null);
+    this.setSelection(id === null ? null : { kind: 'dialogue', id });
   }
   addDialogueLine(input: Omit<SceneDialogueLine, 'id'>): boolean {
     return this.dialogueCommands.add(input);
@@ -895,13 +865,14 @@ export class SceneEditorDocument {
   }
 
   get selectedAudioClip(): Readonly<SceneAudioClip> | null {
-    return this.workingScene?.audioClips?.find((clip) => clip.id === this.entry?.selectedAudioClip) ?? null;
+    return (
+      this.workingScene?.audioClips?.find((clip) => clip.id === idOf(this.entry?.selection ?? null, 'audio')) ?? null
+    );
   }
   selectAudioClip(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.audioClips?.some((clip) => clip.id === id))) return;
-    this.replaceActorSelection(null);
-    this.entry.selectedAudioClip = id;
-    this.notify('selection');
+    this.cancelDragsForActor(null);
+    this.setSelection(id === null ? null : { kind: 'audio', id });
   }
   addAudioTrack(category: AudioCategory): boolean {
     return this.audioCommands.addTrack(category);
@@ -940,17 +911,20 @@ export class SceneEditorDocument {
   }
 
   get selectedActionId(): string | null {
-    const id = this.entry?.selectedAction;
+    const id = selectedActionIdsOf(this.entry?.selection ?? null).at(-1);
     return this.workingScene?.actions.some((action) => action.id === id) ? id! : null;
   }
   get selectedTransition(): Readonly<SceneTransition> | null {
-    return this.workingScene?.transitions?.find((effect) => effect.id === this.entry?.selectedTransition) ?? null;
+    return (
+      this.workingScene?.transitions?.find(
+        (effect) => effect.id === idOf(this.entry?.selection ?? null, 'transition'),
+      ) ?? null
+    );
   }
   selectTransition(id: string | null): void {
     if (!this.entry || (id !== null && !this.workingScene?.transitions?.some((effect) => effect.id === id))) return;
-    this.replaceActorSelection(null);
-    this.entry.selectedTransition = id;
-    this.notify('selection');
+    this.cancelDragsForActor(null);
+    this.setSelection(id === null ? null : { kind: 'transition', id });
   }
   addTransition(input: Omit<SceneTransition, 'id'>): boolean {
     return this.transitionCommands.addTransition(input);
@@ -963,7 +937,7 @@ export class SceneEditorDocument {
   }
   get selectedActionIds(): readonly string[] {
     const existing = new Set(this.workingScene?.actions.map((action) => action.id));
-    return (this.entry?.selectedActions ?? []).filter((id) => existing.has(id));
+    return selectedActionIdsOf(this.entry?.selection ?? null).filter((id) => existing.has(id));
   }
   selectAction(id: string | null, additive = false): void {
     const action = this.workingScene?.actions.find((action) => action.id === id);
@@ -973,23 +947,8 @@ export class SceneEditorDocument {
     this.cancelCameraDrag();
     this.cancelActorDrag();
     if (id !== this.selectedActionId) this.cancelActionDrag();
-    this.entry.selectedImage = null;
-    this.entry.cameraSelected = false;
-    this.entry.selectedTransition = null;
-    this.entry.selectedAudioClip = null;
-    this.entry.selectedDialogueLine = null;
-    this.entry.selectedActions =
-      additive && id
-        ? this.entry.selectedActions.includes(id)
-          ? this.entry.selectedActions.filter((value) => value !== id)
-          : [...this.entry.selectedActions, id]
-        : id
-          ? [id]
-          : [];
-    this.entry.selectedAction = this.entry.selectedActions.at(-1) ?? null;
-    const primary = this.workingScene?.actions.find((value) => value.id === this.entry!.selectedAction);
-    if (primary) this.entry.selectedActor = primary.actorId;
-    this.notify('selection');
+    const actorOf = (actionId: string) => this.workingScene?.actions.find((value) => value.id === actionId)?.actorId;
+    this.setSelection(selectAction(this.entry.selection, id, actorOf, additive));
   }
   private nextActionId(): string {
     let index = 1;
