@@ -6,6 +6,7 @@ import {
   getGuidesForEditor,
   GuideRegistry,
   guideRegistry,
+  type GuideAnchorId,
   type GuideContext,
   type GuideDefinition,
 } from '../src/devtools/shared/guides/index.js';
@@ -109,7 +110,10 @@ test('invalid IDs, duplicate IDs, empty guides, and broken step targets reject a
     /duplicate step ID/,
   );
   assert.throws(() => new GuideRegistry([{ ...guide, steps: [{ ...guide.steps[0]!, id: '' }] }]), /step ID/);
-  assert.throws(() => new GuideRegistry([{ ...guide, steps: [{ ...guide.steps[0]!, targetId: '' }] }]), /no target/);
+  assert.throws(
+    () => new GuideRegistry([{ ...guide, steps: [{ ...guide.steps[0]!, targetId: '' as GuideAnchorId }] }]),
+    /no target/,
+  );
   assert.deepEqual(new GuideRegistry([]).getAllGuides(), []);
 });
 

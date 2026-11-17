@@ -1,8 +1,12 @@
 import type { WorkspaceView } from '../WorkspaceNavigation.js';
+import type { GUIDE_TARGETS } from './anchors.js';
 
 export type GuideEditor = WorkspaceView | 'scene' | 'project';
 export type GuideCategory = 'rigging' | 'artwork' | 'animation' | 'ik' | 'scene' | 'audio';
+/** Any spotlight target the resolver can look up: DOM anchors and geometry provider IDs. */
 export type GuideTargetId = string;
+/** A value of the anchor contract in anchors.ts. Guide steps may only target these; other strings do not compile. */
+export type GuideAnchorId = (typeof GUIDE_TARGETS)[keyof typeof GUIDE_TARGETS];
 export type GuideCapability =
   | 'character'
   | 'valid-rig'
@@ -35,7 +39,7 @@ export type GuideInteraction =
   | {
       readonly mode: 'try-it';
       readonly practice: {
-        readonly targetId: GuideTargetId;
+        readonly targetId: GuideAnchorId;
         /** Plain text with optional **keyword** emphasis. */
         readonly instruction: string;
         readonly changesProject: boolean;
@@ -49,7 +53,7 @@ export type GuideStep = GuideInteraction & {
   readonly title: string;
   /** Plain text with optional **keyword** emphasis; no HTML or general Markdown. */
   readonly description: string;
-  readonly targetId: GuideTargetId;
+  readonly targetId: GuideAnchorId;
   readonly prerequisites?: readonly GuidePrerequisite[];
   /** UI-only reveal hint, never an authored command. The spotlight may also reveal missing targets. */
   readonly preparation?: 'reveal-target';

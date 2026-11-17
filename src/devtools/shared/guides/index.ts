@@ -1,4 +1,5 @@
 export { GUIDE_TARGETS } from './anchors.js';
+export { guideStep } from './step.js';
 export { GuideController, type GuideSnapshot } from './GuideController.js';
 export { GuideLauncher, type GuideLaunchHost } from './GuideLauncher.js';
 export { GuideTargets, type GuideGeometryProvider } from './GuideTargets.js';
@@ -11,6 +12,7 @@ export {
   guideRegistry,
 } from './registry.js';
 export type {
+  GuideAnchorId,
   GuideAvailability,
   GuideCapability,
   GuideCategory,

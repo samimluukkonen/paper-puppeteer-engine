@@ -60,6 +60,23 @@ test('missing, duplicate, collapsed, hidden, inert, and invisible targets resolv
   assert.isFalse(duplicate.reveal('target'));
 });
 
+test('duplicate anchors stay unresolved and report their ID once in development', () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    const targets = new GuideTargets(
+      root([anchor('twice').element, anchor('twice').element, anchor('unique').element]).parent,
+    );
+    assert.isNull(targets.resolve('twice'));
+    assert.isNull(targets.resolveElement('twice'));
+    assert.isFalse(targets.reveal('twice'));
+    assert.deepEqual(targets.resolve('unique'), bounds);
+    assert.lengthOf(error.mock.calls, 1);
+    assert.include(String(error.mock.calls[0]![0]), '"twice"');
+  } finally {
+    error.mockRestore();
+  }
+});
+
 test('target IDs match exact attributes without becoming CSS selectors', () => {
   const id = 'target"], [data-danger="x';
   const item = anchor(id);

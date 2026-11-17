@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import type { GuideRectangle, GuideTargetId, GuideTargetResolver } from './types.js';
 
 export interface GuideGeometryProvider {
@@ -18,6 +19,7 @@ function rectangle(value: GuideRectangle | null): GuideRectangle | null {
 /** One editor-scoped resolver for DOM controls, whole panels, and opt-in canvas geometry. No Phaser imports. */
 export class GuideTargets implements GuideTargetResolver {
   private readonly geometry = new Map<GuideTargetId, { provider: GuideGeometryProvider }>();
+  private readonly reportedDuplicates = new Set<GuideTargetId>();
 
   constructor(private readonly root: ParentNode) {}
 
@@ -127,6 +129,10 @@ export class GuideTargets implements GuideTargetResolver {
       (element) => element.getAttribute('data-guide-id') === id,
     );
     // Duplicate anchors are a broken contract; never highlight an arbitrary editor control.
+    if (matches.length > 1 && import.meta.env.DEV && !this.reportedDuplicates.has(id)) {
+      this.reportedDuplicates.add(id);
+      console.error(`Guide target "${id}" is rendered ${matches.length} times; its guide steps stay unavailable.`);
+    }
     return matches.length === 1 ? matches[0]! : null;
   }
 }
