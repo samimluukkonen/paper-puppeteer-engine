@@ -1,9 +1,9 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { buildCharacterDraft } from '../src/devtools/project/editorDrafts.js';
+import { buildProjectDraft, draftImages } from '../src/devtools/project/projectDrafts.js';
 import { characterFileFetcher, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneImageRegistry } from '../src/devtools/scene-editor/SceneImageRegistry.js';
-import { buildCharacterDraft } from '../src/devtools/shared/autosave/editorDrafts.js';
-import { buildProjectDraft, draftImages } from '../src/devtools/shared/autosave/projectDrafts.js';
 import {
   buildCharacterPackage,
   CharacterDraftSerializer,

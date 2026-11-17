@@ -4,24 +4,24 @@ import {
   freezeData,
   parseSceneDefinition,
   type DeepReadonly,
-} from '../../../engine/core.js';
-import { parseProjectDefinition } from '../../project/ProjectDefinition.js';
-import { buildProjectPackage, packageHostedCharacter } from '../../project/projectPackage.js';
-import { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
-import type { SceneCharacterRegistry } from '../../scene-editor/SceneCharacterRegistry.js';
-import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument.js';
-import type { SceneImageRegistry } from '../../scene-editor/SceneImageRegistry.js';
-import { animationPreviewPreferencesSchema } from '../animationPreviewPreferences.js';
-import type { AnimationPreviewPreferences } from '../animationPreviewPreferences.js';
-import { draftSource } from '../draftSource.js';
+} from '../../engine/core.js';
+import type { SceneCharacterRegistry } from '../scene-editor/SceneCharacterRegistry.js';
+import type { SceneEditorDocument } from '../scene-editor/SceneEditorDocument.js';
+import type { SceneImageRegistry } from '../scene-editor/SceneImageRegistry.js';
+import { animationPreviewPreferencesSchema } from '../shared/animationPreviewPreferences.js';
+import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
+import { draftSource } from '../shared/draftSource.js';
 import {
   CharacterDraftSerializer,
   packageJson,
   type PackageFiles,
   type PackageSnapshot,
-} from '../package/characterPackage.js';
-import { sceneFingerprint } from '../sceneFingerprint.js';
+} from '../shared/package/characterPackage.js';
+import { sceneFingerprint } from '../shared/sceneFingerprint.js';
+import { parseProjectDefinition } from './ProjectDefinition.js';
 import { assembleProjectDraft, draftImages } from './projectDrafts.js';
+import { buildProjectPackage, packageHostedCharacter } from './projectPackage.js';
+import { ProjectWorkspace } from './ProjectWorkspace.js';
 
 function samePackage(first: PackageFiles, second: PackageFiles): boolean {
   return (

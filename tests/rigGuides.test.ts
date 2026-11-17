@@ -1,9 +1,9 @@
 import { assert, test, vi } from 'vitest';
+import { createCharacterDocuments, createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
+import { workspaceGuideHost } from '../src/devtools/animation-editor/workspaceGuideHost.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { getGuidesForEditor } from '../src/devtools/shared/guides/registry.js';
-import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
-import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { createRectangleMeshAttachment } from '../src/engine/meshAttachments.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 

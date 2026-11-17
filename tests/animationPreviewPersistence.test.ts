@@ -1,15 +1,15 @@
 import { assert, expect, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { AnimationPreviewPreferencesBinding } from '../src/devtools/animation-editor/AnimationPreviewPreferences.js';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { EnvironmentPreviewController } from '../src/devtools/animation-editor/EnvironmentPreviewController.js';
 import { MotionPreviewController } from '../src/devtools/animation-editor/MotionPreviewController.js';
+import { buildCharacterDraft } from '../src/devtools/project/editorDrafts.js';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { animationPreviewPreferencesSchema } from '../src/devtools/shared/animationPreviewPreferences.js';
-import { buildCharacterDraft } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { GroundGuideWorkspace } from '../src/devtools/shared/GroundGuideWorkspace.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, type PackageSnapshot } from '../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';

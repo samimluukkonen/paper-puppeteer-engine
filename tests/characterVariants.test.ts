@@ -1,5 +1,6 @@
 import { assert, expect, test, vi } from 'vitest';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
+import { buildProjectDraft } from '../src/devtools/project/projectDrafts.js';
 import {
   buildProjectPackage,
   buildProjectScenePackage,
@@ -8,7 +9,6 @@ import {
 } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { existingAnimationReference } from '../src/devtools/shared/animationLibraryData.js';
-import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
 import {
   buildCharacterPackage,
   validatePackage,

@@ -7,14 +7,14 @@ import { EditorContext } from '../../ui/EditorContext.js';
 import { FeatureGuide } from '../../ui/FeatureGuide.js';
 import { mountView } from '../../ui/mountView.js';
 import { observePreview } from '../../ui/observePreview.js';
+import { buildCharacterDraft } from '../project/editorDrafts.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
 import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
-import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
 import '../rig-editor/style.css';
+import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
-import { buildCharacterDraft } from '../shared/autosave/editorDrafts.js';
 import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
@@ -23,8 +23,6 @@ import { defaultGroundGuide } from '../shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
-import { workspaceGuideHost } from '../shared/guides/workspaceGuideHost.js';
-import { browserCharacterDrafts } from '../shared/newCharacter.js';
 import { PackageController } from '../shared/package/PackageController.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -37,6 +35,7 @@ import { AnimationPreviewPreferencesBinding } from './AnimationPreviewPreference
 import { AnimationVariationController } from './AnimationVariationController.js';
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
+import { browserCharacterDrafts } from './characterDocuments.js';
 import { AnimationEditorView } from './editorMarkup.js';
 import { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
@@ -51,6 +50,7 @@ import { OnionSkinControlsController } from './OnionSkinControlsController.js';
 import { PoseLibraryController } from './PoseLibraryController.js';
 import { RigTweakController } from './RigTweakController.js';
 import { TimelineController } from './TimelineController.js';
+import { workspaceGuideHost } from './workspaceGuideHost.js';
 import './style.css';
 
 const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
@@ -279,6 +279,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
       !!stateOwner?.hasPendingAnimationEdits ||
       rigTweak.hasUnsavedChanges ||
       artwork.hasPendingChanges,
+    { hostGuarded: !!projectContext },
   );
   const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
     app.querySelector<HTMLElement>('#animation-draft-status')!,

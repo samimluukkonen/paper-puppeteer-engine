@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Make `src/devtools/shared` depend only downward, enforced by a new lint override that forbids imports (type imports included) from the project, scene, rig and animation editors. Draft builders (`buildProjectDraft`, `buildCharacterDraft`, `sceneDraftSource`) move to `project/`. Each guide host moves next to its caller. `createNewCharacter`, `createCharacterDocuments` and `CharacterDraftStore` move to `animation-editor/characterDocuments.ts`, with identity rules left in `shared/newCharacter.ts`. The recovery panel hands draft bytes to a restoring owner through the new `recoverDraft` instead of importing project packages, and `protectUnsavedChanges` takes a `hostGuarded` option instead of reading the project bridge. Draft output, recovery, navigation protection and guides are unchanged.
+
 - Move the local-autosave page lifecycle (start, change subscription, 500 ms poll, `pagehide` suspend, `pageshow` resume, hidden-tab flush and disposal) into one `attachLocalAutosave(autosave, { subscribe?, page? })` that returns a detach function. The Scene Editor, Project Workspace sessions and Animation Editor each attach with one call instead of hand-wiring timers and listeners. Autosave cadence, recovery and disposal are unchanged.
 
 - Fix selecting a Scene Editor camera key publishing two selection changes; it now notifies selection subscribers once.

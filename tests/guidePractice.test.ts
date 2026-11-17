@@ -1,7 +1,7 @@
 import { assert, test } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
+import { workspaceGuideHost } from '../src/devtools/animation-editor/workspaceGuideHost.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
-import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 
 function workspace() {
   const documents = createNewCharacter({ name: 'Practice', id: 'practice' });

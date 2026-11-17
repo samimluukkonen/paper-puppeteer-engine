@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, assert, beforeEach, expect, test, vi } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
+import { buildCharacterDraft, sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharacterRegistry.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
-import { buildCharacterDraft, sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { LocalAutosave } from '../src/devtools/shared/autosave/LocalAutosave.js';
 import { LocalDraftStore, type DraftStorage } from '../src/devtools/shared/autosave/LocalDraftStore.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, type PackageFiles } from '../src/devtools/shared/package/characterPackage.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 

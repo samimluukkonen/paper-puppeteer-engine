@@ -85,6 +85,46 @@
           }
         ]
       }
+    },
+    {
+      "files": ["src/devtools/shared/**/*"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/engine/**",
+                  "!**/engine/core.js",
+                  "!**/engine/runtime.js",
+                  "!**/engine/data.js",
+                  "!**/engine/index.js",
+                  "!**/engine/serialization.js"
+                ],
+                "message": "Outside src/engine, import engine modules only through the core/runtime/data barrels or the published index/serialization entries."
+              },
+              {
+                "group": [
+                  "**/devtools/project/**",
+                  "**/devtools/scene-editor/**",
+                  "**/devtools/rig-editor/**",
+                  "**/devtools/animation-editor/**",
+                  "../project/**",
+                  "../../project/**",
+                  "../scene-editor/**",
+                  "../../scene-editor/**",
+                  "../rig-editor/**",
+                  "../../rig-editor/**",
+                  "../animation-editor/**",
+                  "../../animation-editor/**"
+                ],
+                "message": "src/devtools/shared sits below the editors (type imports included): move editor-aware code next to its owner and depend on interfaces here."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

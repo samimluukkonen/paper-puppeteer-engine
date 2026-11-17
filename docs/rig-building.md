@@ -39,7 +39,7 @@ Serialization matches original bones, slots and attachments by ID when comparing
 | Structural document commands | `RigEditorState.ts`: `createBone`, `renameBone`, `reparentBone`, `removeBone`, `boneDependencies`, `createSlot`, `removeSlot`; optional live `boneReferences` |
 | React controls               | `RigStructurePanel.tsx`, `editorMarkup.tsx`, `AttachmentController.ts`                                                                                        |
 | Hierarchy and preview        | `HierarchyController.ts`, `RigEditor.ts` (`onRebuild`, `actionError`), shared `boneHierarchy.ts` (`sameRigTopology`)                                          |
-| Shared workspace             | `newCharacter.ts`, `AnimationEditorScene.ts`, `AnimationEditorSelection.ts`, `SessionController.ts`                                                           |
+| Shared workspace             | `characterDocuments.ts`, `AnimationEditorScene.ts`, `AnimationEditorSelection.ts`, `SessionController.ts`                                                     |
 | Recovery                     | `rigDraftRecovery.ts`, `RigEditorState.createRecoveryDraft`                                                                                                   |
 | Serialization                | `rigSerialization.ts`: `serializeRigData` retains original numeric baselines by stable ID                                                                     |
 | Regression coverage          | `rigBuilding.test.ts`, `animationEditorRigTweak.test.ts`, local-only `browser/rigBuilding.spec.ts` and `browser/newCharacter.spec.ts`                         |

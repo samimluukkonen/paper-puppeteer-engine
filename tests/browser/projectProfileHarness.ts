@@ -1,3 +1,4 @@
+import { buildProjectDraft } from '../../src/devtools/project/projectDrafts.js';
 import {
   buildProjectPackage,
   importProjectPackage,
@@ -5,7 +6,6 @@ import {
 } from '../../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../../src/devtools/project/ProjectWorkspace.js';
 import { LocalDraftStore } from '../../src/devtools/shared/autosave/LocalDraftStore.js';
-import { buildProjectDraft } from '../../src/devtools/shared/autosave/projectDrafts.js';
 import { packageJson } from '../../src/devtools/shared/package/characterPackage.js';
 import type { AudioAssetDefinition } from '../../src/engine/AudioAsset.js';
 import { canonicalJson } from '../../src/engine/authoredSerialization.js';

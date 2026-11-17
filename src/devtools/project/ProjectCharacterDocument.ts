@@ -1,8 +1,8 @@
 import { Rig } from '../../engine/core.js';
 import type { CharacterDefinition } from '../../engine/data.js';
 import { getCharacterPreviewSettings } from '../../shared/characterPreviewSettings.js';
+import { createCharacterDocuments } from '../animation-editor/characterDocuments.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
-import { createCharacterDocuments } from '../shared/newCharacter.js';
 import type { PackageSnapshot } from '../shared/package/characterPackage.js';
 
 /** Authored state lives in the project realm and never owns a renderer or runtime lease. */

@@ -22,3 +22,13 @@ test('navigation protection follows the current session and releases its listene
   dirty = true;
   assert.isFalse(navigate());
 });
+
+test('navigation protection defers to a host that guards the documents itself', () => {
+  const target = new EventTarget();
+  vi.stubGlobal('window', target);
+  const release = protectUnsavedChanges(() => true, { hostGuarded: true });
+  const event = new Event('beforeunload', { cancelable: true });
+  target.dispatchEvent(event);
+  assert.isFalse(event.defaultPrevented);
+  release();
+});

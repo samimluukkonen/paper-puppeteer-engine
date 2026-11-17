@@ -16,24 +16,27 @@ import {
   updateIKConstraint,
   removeIKConstraint,
   ikConstraintDependencies,
-} from 'paper-puppeteer-engine/core';
+} from "paper-puppeteer-engine/core";
 
 const created = createIKConstraint(rig, {
-  name: 'tailIK',
-  rootBone: 'tailBase',
-  middleBone: 'tailMiddle',
-  endBone: 'tailTip',
+  name: "tailIK",
+  rootBone: "tailBase",
+  middleBone: "tailMiddle",
+  endBone: "tailTip",
 });
-const edited = updateIKConstraint(created, 'tailIK', {
+const edited = updateIKConstraint(created, "tailIK", {
   target: { x: 30, y: 80 },
   mix: 0.7,
   bendDirection: -1,
   enabled: true,
   priority: 2,
 });
-const dependencies = { animations: allWorkingClips, references: hostReferencesForIK };
-const references = ikConstraintDependencies(edited, 'tailIK', dependencies);
-const removed = removeIKConstraint(edited, 'tailIK', dependencies);
+const dependencies = {
+  animations: allWorkingClips,
+  references: hostReferencesForIK,
+};
+const references = ikConstraintDependencies(edited, "tailIK", dependencies);
+const removed = removeIKConstraint(edited, "tailIK", dependencies);
 ```
 
 `CreateIKConstraintOptions` uses the existing definition. `IKConstraintPatch` excludes `name`; runtime validation also rejects identity changes and unknown settings. `getIKConstraint(rig, id)` resolves a stable name. Standalone callers must supply all relevant animations and host references when changing chains or removing constraints.
@@ -64,11 +67,11 @@ Rig JSON stays at version 1: `target` is an additive optional field in the exist
 
 ## Files changed
 
-| Area                                      | Files                                                                                                                                                                                                                   |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Authoring APIs and exports                | `src/engine/ik/ikAuthoring.ts`, `src/engine/core.ts`, `src/engine/data.ts`                                                                                                                                              |
-| Existing IK model, schema and evaluation  | `src/engine/ik/types.ts`, `src/engine/schemas.ts`, `schemas/rig.schema.json`, `src/engine/ik/TwoBoneIKConstraint.ts`, `src/engine/ik/IsolatedIKSampler.ts`                                                              |
-| Rig document and controller               | `src/devtools/rig-editor/RigEditorState.ts`, `src/devtools/rig-editor/RigEditor.ts`, `src/devtools/rig-editor/rigDraftRecovery.ts`, `src/devtools/rig-editor/rigSerialization.ts`                                       |
-| Shared workspace and animation references | `src/devtools/shared/newCharacter.ts`, `src/devtools/animation-editor/AnimationEditorScene.ts`, `src/devtools/animation-editor/AnimationEditorDocument.ts`, `src/devtools/animation-editor/AnimationEditorSelection.ts` |
-| Regression tests                          | `tests/ikAuthoring.test.ts`, `tests/rigEditorActivation.test.ts`, `tests/ikAnimationRuntime.test.ts`, `tests/animationEditorScene.test.ts`                                                                              |
-| Documentation                             | `README.md`, `docs/ik-constraint-authoring.md`, `docs/ik-animation-runtime.md`, `docs/rig-editor.md`, `docs/schema-compatibility.md`                                                                                    |
+| Area                                      | Files                                                                                                                                                                                                                                   |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authoring APIs and exports                | `src/engine/ik/ikAuthoring.ts`, `src/engine/core.ts`, `src/engine/data.ts`                                                                                                                                                              |
+| Existing IK model, schema and evaluation  | `src/engine/ik/types.ts`, `src/engine/schemas.ts`, `schemas/rig.schema.json`, `src/engine/ik/TwoBoneIKConstraint.ts`, `src/engine/ik/IsolatedIKSampler.ts`                                                                              |
+| Rig document and controller               | `src/devtools/rig-editor/RigEditorState.ts`, `src/devtools/rig-editor/RigEditor.ts`, `src/devtools/rig-editor/rigDraftRecovery.ts`, `src/devtools/rig-editor/rigSerialization.ts`                                                       |
+| Shared workspace and animation references | `src/devtools/animation-editor/characterDocuments.ts`, `src/devtools/animation-editor/AnimationEditorScene.ts`, `src/devtools/animation-editor/AnimationEditorDocument.ts`, `src/devtools/animation-editor/AnimationEditorSelection.ts` |
+| Regression tests                          | `tests/ikAuthoring.test.ts`, `tests/rigEditorActivation.test.ts`, `tests/ikAnimationRuntime.test.ts`, `tests/animationEditorScene.test.ts`                                                                                              |
+| Documentation                             | `README.md`, `docs/ik-constraint-authoring.md`, `docs/ik-animation-runtime.md`, `docs/rig-editor.md`, `docs/schema-compatibility.md`                                                                                                    |

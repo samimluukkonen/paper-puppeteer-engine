@@ -1,4 +1,5 @@
 import { afterEach, assert, expect, test, vi } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import {
   ProjectEditorHosts,
   type ProjectEditorHost,
@@ -6,7 +7,6 @@ import {
 } from '../src/devtools/project/ProjectEditorHosts.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { LocalAutosave } from '../src/devtools/shared/autosave/LocalAutosave.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import * as packages from '../src/devtools/shared/package/characterPackage.js';
 import { rigCompatibilityRevision } from '../src/engine/rigBoneMapping.js';
 

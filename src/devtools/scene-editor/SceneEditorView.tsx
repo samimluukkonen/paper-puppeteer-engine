@@ -22,8 +22,8 @@ import { bindExportShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorContext } from '../../ui/EditorContext.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
+import { sceneDraftSource } from '../project/editorDrafts.js';
 import { projectEditorContext } from '../project/projectBridge.js';
-import { sceneDraftSource } from '../shared/autosave/editorDrafts.js';
 import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -95,7 +95,8 @@ export function SceneEditorView({
   const [transferStatus, setTransferStatus] = useState('');
   const transfer = useRef<AbortController | null>(null);
   const [loading, setLoading] = useState(false);
-  useEffect(() => protectUnsavedChanges(() => document.hasUnsavedChanges), [document]);
+  const hostGuarded = !!project;
+  useEffect(() => protectUnsavedChanges(() => document.hasUnsavedChanges, { hostGuarded }), [document, hostGuarded]);
   useEffect(
     () => () => {
       transfer.current?.abort();

@@ -1,4 +1,4 @@
-import type { GuideLaunchHost } from './GuideLauncher.js';
+import type { GuideLaunchHost } from '../shared/guides/GuideLauncher.js';
 
 /** Project presence is a live capability; tours never receive asset commands or playback owners. */
 export function projectGuideHost(hasProject: () => boolean): GuideLaunchHost {

@@ -1,12 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
 import { AnimationRetargetSession } from '../src/devtools/project/AnimationRetargetSession.js';
+import { buildProjectDraft } from '../src/devtools/project/projectDrafts.js';
 import {
   buildProjectPackage,
   buildProjectScenePackage,
   importProjectPackage,
 } from '../src/devtools/project/projectPackage.js';
-import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
 import {
   captureChoreography,
   captureSceneTemplate,

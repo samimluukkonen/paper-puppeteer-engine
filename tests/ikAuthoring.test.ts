@@ -1,7 +1,7 @@
 import { assert, test } from 'vitest';
 import { AnimationEditorDocument } from '../src/devtools/animation-editor/AnimationEditorDocument.js';
+import { createCharacterDocuments, createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
-import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import type { AnimationClip } from '../src/engine/AnimationClip.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { parseRigDefinition, validateRigDefinition } from '../src/engine/externalData.js';

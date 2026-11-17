@@ -1,6 +1,6 @@
-import type { SceneEditorDocument } from '../../scene-editor/SceneEditorDocument.js';
-import type { GuideLaunchHost } from './GuideLauncher.js';
-import type { GuideCapability } from './types.js';
+import type { GuideLaunchHost } from '../shared/guides/GuideLauncher.js';
+import type { GuideCapability } from '../shared/guides/types.js';
+import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 /** Read authored selection facts only; guides never execute scene commands or playback. */
 export function sceneGuideHost(document: SceneEditorDocument): GuideLaunchHost {

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
+import { sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import {
   buildProjectPackage,
   buildProjectScenePackage,
@@ -14,7 +15,6 @@ import {
   layoutAudioClips,
   snapSceneTime,
 } from '../src/devtools/scene-editor/timelineActions.js';
-import { sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { AUDIO_CATEGORIES, type AudioAssetDefinition } from '../src/engine/AudioAsset.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
 import { trimSceneAudioClip, type SceneAudioClip } from '../src/engine/sceneAudio.js';

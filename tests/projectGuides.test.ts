@@ -2,10 +2,10 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { assert, test } from 'vitest';
+import { projectGuideHost } from '../src/devtools/project/projectGuideHost.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
-import { projectGuideHost } from '../src/devtools/shared/guides/projectGuideHost.js';
 import { guideRegistry } from '../src/devtools/shared/guides/registry.js';
 import { FeatureGuideCatalog } from '../src/ui/FeatureGuideCatalog.js';
 

@@ -1,11 +1,11 @@
 import { EventEmitter } from 'node:events';
 import { assert, test, vi } from 'vitest';
+import { sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import { importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharacterRegistry.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { snapSceneTime } from '../src/devtools/scene-editor/timelineActions.js';
-import { sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { Actor } from '../src/engine/Actor.js';
 import { evaluateCameraAtTime } from '../src/engine/cameraAnimation.js';
 import { cinematicFrame } from '../src/engine/cinematicCamera.js';

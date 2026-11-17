@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage } from '../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
 import { createRigBoneMapping } from '../src/engine/rigBoneMapping.js';

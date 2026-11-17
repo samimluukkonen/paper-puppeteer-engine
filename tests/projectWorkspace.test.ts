@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { assert, expect, test, vi } from 'vitest';
+import { createCharacterDocuments, createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import {
   buildProjectPackage,
@@ -9,7 +10,6 @@ import {
   packageHostedCharacter,
 } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
-import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import {
   buildCharacterPackage,
   openPackageRuntime,

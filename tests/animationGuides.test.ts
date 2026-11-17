@@ -1,11 +1,11 @@
 import { assert, test, vi } from 'vitest';
+import { createCharacterDocuments, createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { EnvironmentPreviewController } from '../src/devtools/animation-editor/EnvironmentPreviewController.js';
 import { MotionPreviewController } from '../src/devtools/animation-editor/MotionPreviewController.js';
+import { workspaceGuideHost } from '../src/devtools/animation-editor/workspaceGuideHost.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { getGuidesForEditor } from '../src/devtools/shared/guides/registry.js';
-import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
-import { createCharacterDocuments, createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { Rig } from '../src/engine/Rig.js';
 import { demoCharacter } from './helpers/demoCharacter.js';
 

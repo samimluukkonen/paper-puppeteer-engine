@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test, vi } from 'vitest';
 import { AnimationEditorDocument } from '../src/devtools/animation-editor/AnimationEditorDocument.js';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import {
   assetDependents,
   ProjectInspector,
@@ -17,7 +18,6 @@ import {
 import { ProjectValidationPanel } from '../src/devtools/project/ProjectValidationPanel.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, type PackageSnapshot } from '../src/devtools/shared/package/characterPackage.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';

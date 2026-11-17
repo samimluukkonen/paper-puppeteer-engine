@@ -1,4 +1,4 @@
-import { browserCharacterDrafts } from '../devtools/shared/newCharacter.js';
+import { browserCharacterDrafts } from '../devtools/animation-editor/characterDocuments.js';
 import { characterCatalog, defaultCharacterId } from '../shared/characterCatalog.js';
 
 export const characterChoices = characterCatalog;

@@ -20,18 +20,19 @@ import { downloadBlob } from '../../shared/downloadJson.js';
 import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { ViewHeader } from '../../ui/viewShell.js';
+import { createNewCharacter } from '../animation-editor/characterDocuments.js';
 import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
-import { buildProjectDraft } from '../shared/autosave/projectDrafts.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
-import { createNewCharacter, suggestCharacterId } from '../shared/newCharacter.js';
-import { buildCharacterPackage } from '../shared/package/characterPackage.js';
+import { suggestCharacterId } from '../shared/newCharacter.js';
+import { buildCharacterPackage, type PackageFiles } from '../shared/package/characterPackage.js';
 import { packageZipWorker } from '../shared/package/packageZipWorkerClient.js';
 import { CharacterVariantDialog, type CharacterCreationKind } from './CharacterVariantDialog.js';
 import { ProjectAnimationLibrary } from './ProjectAnimationLibrary.js';
 import { ProjectAssetLibrary } from './ProjectAssetLibrary.js';
 import { ProjectAudioLibrary } from './ProjectAudioLibrary.js';
+import { buildProjectDraft } from './projectDrafts.js';
 import { ProjectEditorHosts, type ProjectEditorHost, type ProjectSession } from './ProjectEditorHosts.js';
 import { ProjectFeatureGuide } from './ProjectFeatureGuide.js';
 import { ProjectValidationError, type ProjectInspection, type ValidationContext } from './projectInspection.js';
@@ -187,6 +188,15 @@ export function ProjectView() {
     setSettingsName(workspace.definition.name);
     setStatus('Project open in this tab. Export a project ZIP to keep your work.');
   }, []);
+  /** Recovered drafts are portable project packages; the restored owner keeps the draft's recovery key. */
+  const recoverProject = useCallback(
+    async (files: PackageFiles, key: string): Promise<void> => {
+      const restored = await importProjectPackage(files);
+      restored.markRecovered(key);
+      addProject(restored);
+    },
+    [addProject],
+  );
   const openAsset = (
     kind: 'character' | 'scene',
     id: string,
@@ -374,7 +384,7 @@ export function ProjectView() {
               label: 'Local draft',
               icon: 'draft',
               content: (
-                <LocalDraftControls onRecover={addProject} {...(selected ? { autosave: selected.autosave } : {})} />
+                <LocalDraftControls onRecover={recoverProject} {...(selected ? { autosave: selected.autosave } : {})} />
               ),
             },
           ]}

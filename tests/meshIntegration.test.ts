@@ -1,13 +1,13 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationPoseOverlay } from '../src/devtools/animation-editor/AnimationEditorGhostLayer.js';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
+import { createCharacterDocuments } from '../src/devtools/animation-editor/characterDocuments.js';
 import { DEFAULT_ONION_SKIN_SETTINGS } from '../src/devtools/animation-editor/onionSkinSettings.js';
 import { assetDependents, ProjectInspector } from '../src/devtools/project/projectInspection.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneActorPreview } from '../src/devtools/scene-editor/SceneActorPreview.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
-import { createCharacterDocuments } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, validatePackage } from '../src/devtools/shared/package/characterPackage.js';
 import { Actor } from '../src/engine/Actor.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';

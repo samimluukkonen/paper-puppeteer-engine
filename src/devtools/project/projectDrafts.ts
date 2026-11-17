@@ -1,10 +1,10 @@
-import { canonicalJson, validatePackageFiles, serializeSceneDefinition } from '../../../engine/core.js';
-import { parseProjectDefinition, type ProjectDefinition } from '../../project/ProjectDefinition.js';
-import { characterFileFetcher } from '../../project/projectPackage.js';
-import type { ProjectCharacter, ProjectWorkspace } from '../../project/ProjectWorkspace.js';
-import type { SceneImageRegistry } from '../../scene-editor/SceneImageRegistry.js';
-import { CharacterDraftSerializer, type PackageFiles } from '../package/characterPackage.js';
-import { sceneFingerprint } from '../sceneFingerprint.js';
+import { canonicalJson, validatePackageFiles, serializeSceneDefinition } from '../../engine/core.js';
+import type { SceneImageRegistry } from '../scene-editor/SceneImageRegistry.js';
+import { CharacterDraftSerializer, type PackageFiles } from '../shared/package/characterPackage.js';
+import { sceneFingerprint } from '../shared/sceneFingerprint.js';
+import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
+import { characterFileFetcher } from './projectPackage.js';
+import type { ProjectCharacter, ProjectWorkspace } from './ProjectWorkspace.js';
 
 const encoder = new TextEncoder();
 const images = new WeakMap<SceneImageRegistry, { revision: number; files: PackageFiles }>();

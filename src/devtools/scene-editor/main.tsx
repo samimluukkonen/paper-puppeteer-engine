@@ -4,10 +4,10 @@ import { mountView } from '../../ui/mountView.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
 import { GuideTargets } from '../shared/guides/GuideTargets.js';
-import { sceneGuideHost } from '../shared/guides/sceneGuideHost.js';
 import { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneEditorDocument } from './SceneEditorDocument.js';
 import { SceneEditorView } from './SceneEditorView.js';
+import { sceneGuideHost } from './sceneGuideHost.js';
 
 const host = document.querySelector<HTMLElement>('#scene-editor-app');
 if (!host) throw new Error('Missing scene editor host.');

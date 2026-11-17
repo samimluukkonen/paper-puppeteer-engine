@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import { buildProjectPackage, packageHostedCharacter } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage } from '../src/devtools/shared/package/characterPackage.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';

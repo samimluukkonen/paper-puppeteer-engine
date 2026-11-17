@@ -3,11 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
 import { RigTweakController } from '../src/devtools/animation-editor/RigTweakController.js';
+import { workspaceGuideHost } from '../src/devtools/animation-editor/workspaceGuideHost.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { GuideRegistry, guideRegistry } from '../src/devtools/shared/guides/registry.js';
 import type { GuideContext } from '../src/devtools/shared/guides/types.js';
-import { workspaceGuideHost } from '../src/devtools/shared/guides/workspaceGuideHost.js';
 import { Rig } from '../src/engine/Rig.js';
 import { FeatureGuide, FeatureGuideButton } from '../src/ui/FeatureGuide.js';
 

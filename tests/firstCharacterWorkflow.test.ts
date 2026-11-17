@@ -1,6 +1,6 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import {
   buildCharacterPackage,
   loadPackageDefinition,

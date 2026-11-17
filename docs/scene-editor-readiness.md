@@ -67,7 +67,7 @@ After the change, the five tested seeks took 3.9–6.3 ms for two Actors, 6.5–
 - `SceneActorPreview.ts`, `SceneEditorPlayback.ts`, `SceneStage.tsx`: silent initial pose sampling and complete cleanup under failure.
 - `ScenePlaybackControls.tsx`, `SceneTimeline.tsx`, `ScenePlaybackInspector.tsx`: isolated frame subscriptions and lazy runtime observations.
 - Scene view/Actor/action panels and `main.tsx`: stable guide anchors, the existing guide host and collapsed disclosures after a fresh same-ID import.
-- `shared/guides/sceneGuides.ts`, `sceneGuideHost.ts`, registry/anchor/types; `FeatureGuide.tsx`; guarded character-workspace host/navigation: eight scene tours without cross-workspace data loss.
+- `shared/guides/sceneGuides.ts`, `scene-editor/sceneGuideHost.ts`, registry/anchor/types; `FeatureGuide.tsx`; guarded character-workspace host/navigation: eight scene tours without cross-workspace data loss.
 - Scene unit/browser regressions; `firstScene.spec.ts`; optional standalone exact-ZIP handoff; `sceneProfileHarness.tsx`, profiling scripts and `profile:scene` command.
 - First-scene guide, reference/development/profiling/Feature Guide docs, README/changelog and v0.9.6 package/consumer metadata.
 

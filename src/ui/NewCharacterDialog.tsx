@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { browserCharacterDrafts, suggestCharacterId } from '../devtools/shared/newCharacter.js';
+import { browserCharacterDrafts } from '../devtools/animation-editor/characterDocuments.js';
+import { suggestCharacterId } from '../devtools/shared/newCharacter.js';
 import { characterCatalog } from '../shared/characterCatalog.js';
 
 /** Available before the renderer or any character documents are ready. */

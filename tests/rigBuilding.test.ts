@@ -1,10 +1,10 @@
 import { EventEmitter } from 'eventemitter3';
 import { afterEach, assert, test, vi } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { AttachmentController } from '../src/devtools/rig-editor/AttachmentController.js';
 import { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { sameRigTopology } from '../src/devtools/shared/boneHierarchy.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { parseRigDefinition } from '../src/engine/externalData.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';

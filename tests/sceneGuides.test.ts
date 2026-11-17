@@ -8,13 +8,13 @@ import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharac
 import { SceneDialogueInspector } from '../src/devtools/scene-editor/SceneDialogueInspector.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
+import { sceneGuideHost } from '../src/devtools/scene-editor/sceneGuideHost.js';
 import { SceneLayersPanel } from '../src/devtools/scene-editor/SceneLayersPanel.js';
 import { SceneTimeline } from '../src/devtools/scene-editor/SceneTimeline.js';
 import { SceneTransitionPanel } from '../src/devtools/scene-editor/SceneTransitionPanel.js';
 import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { guideRegistry } from '../src/devtools/shared/guides/registry.js';
-import { sceneGuideHost } from '../src/devtools/shared/guides/sceneGuideHost.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
 
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {

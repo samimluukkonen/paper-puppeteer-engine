@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
+import { sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import { ProjectInspector } from '../src/devtools/project/projectInspection.js';
 import {
   buildProjectPackage,
@@ -15,7 +16,6 @@ import { SceneDialogueTrack } from '../src/devtools/scene-editor/SceneDialogueTi
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { snapSceneTime } from '../src/devtools/scene-editor/timelineActions.js';
-import { sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { sceneFingerprint } from '../src/devtools/shared/sceneFingerprint.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
 import {

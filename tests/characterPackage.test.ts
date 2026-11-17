@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { evaluatedFootContacts } from '../src/devtools/shared/footContactGround.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import {
   buildCharacterPackage,
   capturePackage,

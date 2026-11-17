@@ -10,10 +10,9 @@ import X from 'lucide-react/icons/x';
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { z } from 'zod';
-import { importProjectPackage } from '../../project/projectPackage.js';
-import type { ProjectWorkspace } from '../../project/ProjectWorkspace.js';
 import type { LocalAutosave } from './LocalAutosave.js';
 import { type DraftInfo, LocalDraftStore, storageError } from './LocalDraftStore.js';
+import { recoverDraft, type RestoreDraft } from './recoverDraft.js';
 
 export const localDrafts = new LocalDraftStore();
 // Rig/Animation view changes remount the control slot, but are not a new startup.
@@ -21,13 +20,7 @@ let offeredRecovery = false;
 const RECOVERY_INTENT = 'paper-puppeteer:recovery-intent';
 const recoveryIntentSchema = z.strictObject({ id: z.string(), key: z.string() });
 
-export function LocalDraftControls({
-  autosave,
-  onRecover,
-}: {
-  autosave?: LocalAutosave;
-  onRecover?: (workspace: ProjectWorkspace) => void;
-}) {
+export function LocalDraftControls({ autosave, onRecover }: { autosave?: LocalAutosave; onRecover?: RestoreDraft }) {
   return <RecoveryPanel {...(onRecover ? { onRecover } : {})} {...(autosave ? { autosave } : {})} />;
 }
 
@@ -125,14 +118,8 @@ export function AutosaveStatus({
   );
 }
 
-/** All routes discover the same complete drafts. Restoration always installs a detached project owner. */
-export function RecoveryPanel({
-  onRecover,
-  autosave,
-}: {
-  onRecover?: (workspace: ProjectWorkspace) => void;
-  autosave?: LocalAutosave;
-}) {
+/** All routes discover the same complete drafts. Without a restoring owner, recovery navigates to the project view. */
+export function RecoveryPanel({ onRecover, autosave }: { onRecover?: RestoreDraft; autosave?: LocalAutosave }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const descriptionId = useId();
   const [drafts, setDrafts] = useState<DraftInfo[]>([]);
@@ -157,17 +144,9 @@ export function RecoveryPanel({
       }
       setBusy(true);
       try {
-        // No lease is held while the user inspects the dialog. Claim only on explicit recovery.
-        await localDrafts.claim(candidate.key, owner.current);
-        try {
-          const restored = await importProjectPackage(await localDrafts.read(candidate.id));
-          restored.markRecovered(candidate.key);
-          onRecover(restored);
-          dialog.current?.close();
-          setStatus('Draft recovered as a working copy. Export a project ZIP for a disk copy.');
-        } finally {
-          await localDrafts.release(candidate.key, owner.current);
-        }
+        await recoverDraft(localDrafts, owner.current, candidate, onRecover);
+        dialog.current?.close();
+        setStatus('Draft recovered as a working copy. Export a project ZIP for a disk copy.');
         return true;
       } catch (error) {
         setStatus(storageError(error, 'Recovery'));

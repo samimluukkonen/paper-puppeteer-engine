@@ -2,7 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import { afterEach, assert, test, vi } from 'vitest';
 import { AnimationEditorScene } from '../src/devtools/animation-editor/AnimationEditorScene.js';
 import type { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { buildCharacterPackage, loadPackageDefinition } from '../src/devtools/shared/package/characterPackage.js';
 import { decodePackageZip, encodePackageZip } from '../src/devtools/shared/package/packageZip.js';
 import { localToWorld } from '../src/engine/affineMath.js';

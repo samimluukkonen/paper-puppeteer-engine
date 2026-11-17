@@ -1,6 +1,6 @@
 import { assert, test } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, packageJson } from '../src/devtools/shared/package/characterPackage.js';
 import type { RigJsonDefinition } from '../src/engine/externalData.js';
 import { Rig } from '../src/engine/Rig.js';

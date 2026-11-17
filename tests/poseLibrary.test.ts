@@ -1,13 +1,13 @@
 import { assert, test, vi } from 'vitest';
 import { AnimationEditorPreview } from '../src/devtools/animation-editor/AnimationEditorPreview.js';
 import { AnimationEditorState } from '../src/devtools/animation-editor/AnimationEditorState.js';
+import { createCharacterDocuments } from '../src/devtools/animation-editor/characterDocuments.js';
 import { poseRigSignature } from '../src/devtools/animation-editor/PoseLibrary.js';
 import { PoseLibraryController } from '../src/devtools/animation-editor/PoseLibraryController.js';
+import { buildCharacterDraft } from '../src/devtools/project/editorDrafts.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
-import { buildCharacterDraft } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { createBoneSymmetryMapping } from '../src/devtools/shared/boneSymmetry.js';
-import { createCharacterDocuments } from '../src/devtools/shared/newCharacter.js';
 import {
   buildCharacterPackage,
   capturePackage,

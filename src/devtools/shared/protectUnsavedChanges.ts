@@ -1,9 +1,12 @@
-import { projectEditorContext } from '../project/projectBridge.js';
-
-/** Let the browser confirm document navigation, refresh, or closing while edits are unsaved. */
-export function protectUnsavedChanges(hasUnsavedChanges: () => boolean): () => void {
-  // The project host retains document owners and guards the entire project collection.
-  if (projectEditorContext()) return () => {};
+/**
+ * Let the browser confirm document navigation, refresh, or closing while edits are unsaved.
+ * A host that retains the document owners (the project workspace) guards the whole collection itself.
+ */
+export function protectUnsavedChanges(
+  hasUnsavedChanges: () => boolean,
+  options: { hostGuarded?: boolean } = {},
+): () => void {
+  if (options.hostGuarded) return () => {};
   const onBeforeUnload = (event: BeforeUnloadEvent): void => {
     if (!hasUnsavedChanges()) return;
     event.preventDefault();

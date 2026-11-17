@@ -1,7 +1,7 @@
-import type { AnimationEditorState, ReadonlyAnimation } from '../../animation-editor/AnimationEditorState.js';
-import type { RigEditorState } from '../../rig-editor/RigEditorState.js';
-import type { GuideLaunchHost } from './GuideLauncher.js';
-import type { GuideCapability, GuideEditor } from './types.js';
+import type { RigEditorState } from '../rig-editor/RigEditorState.js';
+import type { GuideLaunchHost } from '../shared/guides/GuideLauncher.js';
+import type { GuideCapability, GuideEditor } from '../shared/guides/types.js';
+import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 
 /** Only this workspace adapter reads documents; the guide controller receives capability facts. */
 export function workspaceGuideHost(options: {

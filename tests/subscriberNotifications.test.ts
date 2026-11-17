@@ -1,4 +1,5 @@
 import { afterEach, assert, test, vi } from 'vitest';
+import { createNewCharacter } from '../src/devtools/animation-editor/characterDocuments.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { AttachmentController } from '../src/devtools/rig-editor/AttachmentController.js';
 import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharacterRegistry.js';
@@ -6,7 +7,6 @@ import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDoc
 import { SceneEditorPlayback } from '../src/devtools/scene-editor/SceneEditorPlayback.js';
 import { SceneImageRegistry } from '../src/devtools/scene-editor/SceneImageRegistry.js';
 import { ArtworkController } from '../src/devtools/shared/artwork/ArtworkController.js';
-import { createNewCharacter } from '../src/devtools/shared/newCharacter.js';
 import { notifySubscribers } from '../src/devtools/shared/subscriberNotifications.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';

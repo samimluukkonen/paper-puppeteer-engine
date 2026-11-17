@@ -3,8 +3,8 @@ import {
   CharacterDraftStore,
   createCharacterDocuments,
   createNewCharacter,
-  suggestCharacterId,
-} from '../src/devtools/shared/newCharacter.js';
+} from '../src/devtools/animation-editor/characterDocuments.js';
+import { suggestCharacterId } from '../src/devtools/shared/newCharacter.js';
 import { buildCharacterPackage, loadPackageDefinition } from '../src/devtools/shared/package/characterPackage.js';
 import { PackageController } from '../src/devtools/shared/package/PackageController.js';
 import { CharacterDefinition, validateCharacterDefinition } from '../src/engine/CharacterDefinition.js';

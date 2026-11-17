@@ -4,7 +4,7 @@
 
 Choose **+ New Character** from the shared character header. The React dialog is available while character loading is pending or has failed. Names are trimmed, must contain 1–100 characters and cannot contain control characters. IDs contain at most 64 lowercase ASCII letters/numbers with single hyphens between words. Suggestions normalize the name and add a numeric suffix on collision; artists can edit them. Creation rejects IDs already used by either shipped character or another draft in this browser tab. The existing version-1 manifest has no description field, so the dialog does not offer one.
 
-`createNewCharacter(options, existingIds)` is the centralized, renderer-independent editor factory in `src/devtools/shared/newCharacter.ts`. It builds a new immutable `CharacterDefinition`, one `RigEditorState` and one `AnimationEditorState`. It never takes an existing character as input. `createCharacterDocuments()` supplies those same document owners for characters loaded through the existing scene loader. Both editor views continue sharing one scene and one working owner per document domain.
+`createNewCharacter(options, existingIds)` is the centralized, renderer-independent editor factory in `src/devtools/animation-editor/characterDocuments.ts`; identity rules (`newCharacterSchema`, `suggestCharacterId`) stay in `src/devtools/shared/newCharacter.ts`. It builds a new immutable `CharacterDefinition`, one `RigEditorState` and one `AnimationEditorState`. It never takes an existing character as input. `createCharacterDocuments()` supplies those same document owners for characters loaded through the existing scene loader. Both editor views continue sharing one scene and one working owner per document domain.
 
 Every new definition has its own `character.json` manifest, a named `rig.json` with only `{ id: 'root' }`, and `skins/default.json` with an empty slot map. Textures, animations, poses, slots and attachments start empty. No sample artwork, tracks, IK chains or additional bones are generated. The name lives in the supported rig name field; the manifest retains the unique character ID.
 
@@ -22,14 +22,14 @@ The [v0.6.6.2 rig-building workflow](rig-building.md) adds bone/slot creation an
 
 ## Changed files and APIs
 
-| Area                       | Files and APIs                                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Creation and draft catalog | `newCharacter.ts`: `createNewCharacter`, `createCharacterDocuments`, `suggestCharacterId`, `CharacterWorkspace`, `CharacterDraftStore`                 |
-| React creation UI          | `NewCharacterDialog.tsx`, `viewShell.tsx`, `characterSelection.ts`, `workspace.css`                                                                    |
-| Scene and lifecycle        | `AnimationEditorScene.ts`: optional prevalidated `definition`; `main.tsx`: draft startup, character status and unsaved guard                           |
-| First artwork import       | `ArtworkController.ts`: `importAsset`, `ArtworkExport.newAsset`, `ArtworkSnapshot.ready`; `ArtworkPanel.tsx`                                           |
-| Complete export            | `characterPackage.ts`: new library image paths/bytes; `PackageFingerprints.ts`: new asset identity; `PackageController.ts`: character-level checkpoint |
-| Regression coverage        | `newCharacter.test.ts`, `artworkReplacement.test.ts`, `characterPackage.test.ts`, local `browser/newCharacter.spec.ts`                                 |
+| Area                       | Files and APIs                                                                                                                                                  |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creation and draft catalog | `characterDocuments.ts`: `createNewCharacter`, `createCharacterDocuments`, `CharacterWorkspace`, `CharacterDraftStore`; `newCharacter.ts`: `suggestCharacterId` |
+| React creation UI          | `NewCharacterDialog.tsx`, `viewShell.tsx`, `characterSelection.ts`, `workspace.css`                                                                             |
+| Scene and lifecycle        | `AnimationEditorScene.ts`: optional prevalidated `definition`; `main.tsx`: draft startup, character status and unsaved guard                                    |
+| First artwork import       | `ArtworkController.ts`: `importAsset`, `ArtworkExport.newAsset`, `ArtworkSnapshot.ready`; `ArtworkPanel.tsx`                                                    |
+| Complete export            | `characterPackage.ts`: new library image paths/bytes; `PackageFingerprints.ts`: new asset identity; `PackageController.ts`: character-level checkpoint          |
+| Regression coverage        | `newCharacter.test.ts`, `artworkReplacement.test.ts`, `characterPackage.test.ts`, local `browser/newCharacter.spec.ts`                                          |
 
 No runtime schema, shipped example character, dependency, version, or CI workflow was changed.
 

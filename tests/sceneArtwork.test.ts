@@ -1,4 +1,5 @@
 import { assert, expect, test } from 'vitest';
+import { sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import { parseProjectDefinition } from '../src/devtools/project/ProjectDefinition.js';
 import {
   buildProjectPackage,
@@ -11,7 +12,6 @@ import { SceneCharacterRegistry } from '../src/devtools/scene-editor/SceneCharac
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
 import { SceneImageRegistry } from '../src/devtools/scene-editor/SceneImageRegistry.js';
 import { importSceneJson } from '../src/devtools/scene-editor/SceneTransfer.js';
-import { sceneDraftSource } from '../src/devtools/shared/autosave/editorDrafts.js';
 import { CharacterLoader } from '../src/engine/CharacterLoader.js';
 import { encodePackageZip, decodePackageZip } from '../src/engine/packageZip.js';
 import {

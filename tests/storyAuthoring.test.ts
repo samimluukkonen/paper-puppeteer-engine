@@ -1,12 +1,12 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
+import { buildProjectDraft } from '../src/devtools/project/projectDrafts.js';
 import { ProjectInspector } from '../src/devtools/project/projectInspection.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { storyDiagnostics } from '../src/devtools/project/storyDiagnostics.js';
 import { StorySequencePanel } from '../src/devtools/project/StorySequencePanel.js';
-import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
 import { captureChoreography, captureSceneTemplate } from '../src/devtools/shared/sceneReuse.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import { retargetFixture } from './helpers/retargetFixture.js';

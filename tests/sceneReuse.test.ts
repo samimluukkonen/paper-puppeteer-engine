@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
+import { buildProjectDraft } from '../src/devtools/project/projectDrafts.js';
 import { buildProjectPackage, importProjectPackage } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
 import { SceneEditorDocument } from '../src/devtools/scene-editor/SceneEditorDocument.js';
-import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
 import {
   captureChoreography,
   captureSceneTemplate,

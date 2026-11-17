@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { buildProjectDraft } from '../src/devtools/project/projectDrafts.js';
 import { assetDependents, ProjectInspector } from '../src/devtools/project/projectInspection.js';
 import {
   buildProjectPackage,
@@ -6,7 +7,6 @@ import {
   importProjectPackage,
 } from '../src/devtools/project/projectPackage.js';
 import { ProjectWorkspace } from '../src/devtools/project/ProjectWorkspace.js';
-import { buildProjectDraft } from '../src/devtools/shared/autosave/projectDrafts.js';
 import { decodePackageZip, encodePackageZip } from '../src/engine/packageZip.js';
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import type { StoryDefinition } from '../src/engine/StoryDefinition.js';

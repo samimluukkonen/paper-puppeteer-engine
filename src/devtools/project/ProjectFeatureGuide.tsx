@@ -3,9 +3,9 @@ import { FeatureGuideButton } from '../../ui/FeatureGuide.js';
 import { FeatureGuideCatalog } from '../../ui/FeatureGuideCatalog.js';
 import { GuideSpotlight } from '../../ui/GuideSpotlight.js';
 import { GuideLauncher } from '../shared/guides/GuideLauncher.js';
-import { projectGuideHost } from '../shared/guides/projectGuideHost.js';
 import { guideRegistry } from '../shared/guides/registry.js';
 import type { GuideEditor, GuideTargetResolver } from '../shared/guides/types.js';
+import { projectGuideHost } from './projectGuideHost.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';
 
 /** Project tours run here; character/scene tours verify live prerequisites in their retained editor. */
