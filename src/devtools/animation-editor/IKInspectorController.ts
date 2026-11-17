@@ -1,4 +1,5 @@
 import { ikAnimationProperties, type IKAnimationProperty } from '../../engine/core.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
 export interface IKInspectorField {
@@ -20,7 +21,7 @@ export interface IKInspectorSnapshot {
 export class IKInspectorController {
   private state: AnimationEditorState | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'IK inspector subscribers failed.' });
   private readonly text = new Map<IKAnimationProperty, string>();
   private editing = false;
   private previousDraft: Readonly<Partial<Record<IKAnimationProperty, number>>> = {};
@@ -33,10 +34,7 @@ export class IKInspectorController {
     fields: Object.freeze([]),
   });
 
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  subscribe = this.subscribers.subscribe;
   getSnapshot = (): IKInspectorSnapshot => this.snapshot;
 
   bind(state: AnimationEditorState): void {
@@ -158,10 +156,10 @@ export class IKInspectorController {
     )
       return;
     this.snapshot = snapshot;
-    for (const listener of this.listeners) listener();
+    this.subscribers.notify();
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

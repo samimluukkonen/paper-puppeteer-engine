@@ -1,5 +1,5 @@
 import { downloadBlob } from '../../../shared/downloadJson.js';
-import { notifySubscribers } from '../subscriberNotifications.js';
+import { Subscribers } from '../subscriberNotifications.js';
 import {
   buildCharacterPackage,
   capturePackage,
@@ -26,7 +26,7 @@ export class PackageController {
   private baseline: PackageDomains = clean;
   private assessed: PackageDomains | undefined;
   private readonly fingerprints = new PackageFingerprints();
-  private listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Package subscribers failed.' });
   private request: AbortController | undefined;
   private lastFiles: PackageFiles | null = null;
   private snapshot = {
@@ -38,10 +38,7 @@ export class PackageController {
     draftWarnings: [] as string[],
     preview: null as PackageFiles | null,
   };
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  subscribe = this.subscribers.subscribe;
   getSnapshot = () => this.snapshot;
   get hasUnsavedChanges(): boolean {
     return this.snapshot.unsavedCharacter || this.snapshot.modified.length > 0;
@@ -52,7 +49,7 @@ export class PackageController {
 
   private publish(update: Partial<typeof this.snapshot> = {}): void {
     this.snapshot = { ...this.snapshot, ...update };
-    notifySubscribers(this.listeners, 'Package subscribers failed.');
+    this.subscribers.notify();
   }
   bind(source: () => PackageSnapshot, unsavedCharacter = false): void {
     this.request?.abort();
@@ -197,6 +194,6 @@ export class PackageController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

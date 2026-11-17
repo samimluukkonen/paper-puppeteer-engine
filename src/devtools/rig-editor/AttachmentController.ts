@@ -1,23 +1,20 @@
 import type { CreateIKConstraintOptions, IKConstraintPatch, FootContactMarker } from '../../engine/data.js';
 import { downloadJson } from '../../shared/downloadJson.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { RigEditor } from './RigEditor.js';
 import type { RigSelectionInspectorTab } from './RigEditorState.js';
 
 /** React adapter. Slot/attachment selection belongs exclusively to RigEditorState. */
 export class AttachmentController {
   private editor: RigEditor | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Attachment subscribers failed.' });
   private snapshot = { editor: undefined as RigEditor | undefined, revision: 0, message: '' };
   private readonly releaseArtwork: (() => void) | undefined;
   constructor(readonly artwork?: ArtworkController) {
     this.releaseArtwork = artwork?.subscribe(() => this.refresh());
   }
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  subscribe = this.subscribers.subscribe;
   getSnapshot = () => this.snapshot;
   bind(editor: RigEditor): void {
     if (this.editor !== editor) this.snapshot = { ...this.snapshot, message: '' };
@@ -27,7 +24,7 @@ export class AttachmentController {
   }
   refresh(): void {
     this.snapshot = { ...this.snapshot, editor: this.editor, revision: this.snapshot.revision + 1 };
-    notifySubscribers(this.listeners, 'Attachment subscribers failed.');
+    this.subscribers.notify();
   }
   private run(action: (editor: RigEditor) => void | false, message: string): void {
     const editor = this.editor;
@@ -332,6 +329,6 @@ export class AttachmentController {
   dispose(): void {
     this.releaseArtwork?.();
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

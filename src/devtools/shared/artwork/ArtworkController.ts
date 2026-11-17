@@ -10,7 +10,7 @@ import type { CharacterDefinition } from '../../../engine/data.js';
 import type { Puppet } from '../../../engine/runtime.js';
 import { assetFilename } from '../assetFilename.js';
 import { SnapshotHistory } from '../SnapshotHistory.js';
-import { notifySubscribers } from '../subscriberNotifications.js';
+import { Subscribers } from '../subscriberNotifications.js';
 import { importSprite, type ImportedSprite, type SpriteMetadata } from './spriteImport.js';
 
 export interface ArtworkTarget {
@@ -78,7 +78,7 @@ export class ArtworkController {
   private textures: Phaser.Textures.TextureManager | undefined;
   private definition: CharacterDefinition | undefined;
   private refreshAppearance: () => void = () => {};
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Artwork subscribers failed.' });
   private readonly importedAssets = new Map<string, ImportedSprite>();
   private applied = new Map<string, SpriteResource>();
   private rendered = new Map<string, SpriteResource>();
@@ -122,10 +122,7 @@ export class ArtworkController {
     );
   }
 
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  subscribe = this.subscribers.subscribe;
   getSnapshot = (): ArtworkSnapshot => this.snapshot;
   get hasUnsavedChanges(): boolean {
     return this.applied.size > 0 || this.importedAssets.size > 0;
@@ -199,7 +196,7 @@ export class ArtworkController {
       canUndo: this.history.canUndo,
       canRedo: this.history.canRedo,
     };
-    notifySubscribers(this.listeners, 'Artwork subscribers failed.');
+    this.subscribers.notify();
   }
 
   /** Catalog edits can introduce new logical references without replacing the preview puppet. */
@@ -758,6 +755,6 @@ export class ArtworkController {
 
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

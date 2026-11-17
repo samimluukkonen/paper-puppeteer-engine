@@ -1,4 +1,3 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';
@@ -9,6 +8,7 @@ import { createSessionController } from '../rig-editor/SessionController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
 import { rigDraftKey } from '../shared/rigDraftSession.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { AnimationEditorState, EditorMode } from './AnimationEditorState.js';
 
@@ -32,16 +32,13 @@ export class RigTweakController {
   private state: AnimationEditorState | undefined;
   private editor: RigEditor | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Rig Tweak subscribers failed.' });
   private snapshot = emptySnapshot;
   private releaseUI: (() => void) | undefined;
   private renderUI: (() => void) | undefined;
   private bindDraft: (() => void) | undefined;
   private clearDraft: (() => void) | undefined;
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): typeof emptySnapshot => this.snapshot;
 
   constructor(private readonly attachments?: AttachmentController) {}
@@ -195,10 +192,7 @@ export class RigTweakController {
     if (Object.keys(next).every((key) => next[key as keyof typeof next] === this.snapshot[key as keyof typeof next]))
       return;
     this.snapshot = Object.freeze(next);
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Rig Tweak subscribers failed.',
-    );
+    this.subscribers.notify();
   }
   unbind(): void {
     this.unsubscribe?.();
@@ -216,6 +210,6 @@ export class RigTweakController {
     this.renderUI = undefined;
     this.bindDraft = undefined;
     this.clearDraft = undefined;
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

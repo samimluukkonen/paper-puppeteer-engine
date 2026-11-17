@@ -1,22 +1,19 @@
 import type { AnimationLibraryMetadata } from '../../engine/data.js';
 import { independentAnimationName, type AnimationLibraryEntry } from '../shared/animationLibraryData.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
 /** Bridges the browser to the existing document, history and Environment Preview canvas. */
 export class AnimationLibraryController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
-  private listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Animation library listeners failed.' });
   private snapshot = {
     entries: [] as readonly AnimationLibraryEntry[],
     source: null as AnimationEditorState['workingAnimation'],
     reason: 'Load a character first.',
   };
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = () => this.snapshot;
   bind(state: AnimationEditorState, character: string): void {
     this.unbind();
@@ -53,7 +50,7 @@ export class AnimationLibraryController {
           clip,
         })),
       };
-      notifySubscribers(this.listeners, 'Animation library listeners failed.');
+      this.subscribers.notify();
     };
     this.release = state.subscribe(refresh);
     refresh();
@@ -83,10 +80,10 @@ export class AnimationLibraryController {
     this.release = undefined;
     this.state = undefined;
     this.snapshot = { source: null, entries: [], reason: 'Load a character first.' };
-    notifySubscribers(this.listeners, 'Animation library listeners failed.');
+    this.subscribers.notify();
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { throwNotificationErrors } from '../../engine/core.js';
 import {
   defaultGroundGuide,
   groundGuideSchema,
@@ -7,6 +6,7 @@ import {
   type GroundGuide,
   type GroundGuideSpace,
 } from './groundGuide.js';
+import { Subscribers } from './subscriberNotifications.js';
 
 const storedGuideSchema = z.strictObject({ version: z.literal(1), guide: groundGuideSchema });
 type GuideStorage = Pick<Storage, 'getItem' | 'setItem'>;
@@ -25,7 +25,7 @@ export interface GroundGuideSnapshot {
  */
 export class GroundGuideWorkspace {
   private readonly entries = new Map<string, GroundGuideSnapshot>();
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Ground guide notification failed.' });
   private snapshot: GroundGuideSnapshot;
   private readonly histories = new Map<string, { undo: GroundGuide[]; redo: GroundGuide[] }>();
   private dragStart: GroundGuide | undefined;
@@ -45,10 +45,7 @@ export class GroundGuideWorkspace {
     });
   }
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): GroundGuideSnapshot => this.snapshot;
 
   private key(id: string): string {
@@ -68,16 +65,7 @@ export class GroundGuideWorkspace {
   }
 
   private notify(): void {
-    const errors: unknown[] = [];
-    // oxlint-disable-next-line unicorn/no-useless-spread -- Changes during notification apply to the next delivery.
-    for (const listener of [...this.listeners]) {
-      try {
-        listener();
-      } catch (error) {
-        errors.push(error);
-      }
-    }
-    throwNotificationErrors(errors, 'Ground guide notification failed.');
+    this.subscribers.notify();
   }
 
   /** Rebinding never writes preferences, resets camera placement or changes authored data. */

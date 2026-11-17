@@ -3,8 +3,6 @@ import {
   ANIMATION_FORMAT_VERSION,
   getIKBakeRuntimeIssues,
   IsolatedIKSampler,
-  dispatchListeners,
-  throwNotificationErrors,
   freezeData,
   type AnimationClip,
   type CompiledClip,
@@ -13,6 +11,7 @@ import {
   type DeepReadonly,
 } from '../../engine/core.js';
 import type { AnimationPose, IKBakeMotionFidelity, TwoBoneIKConstraint } from '../../engine/data.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { bakeRigSnapshot } from './ikBakePlanning.js';
 import { startIKBakePlanning, type IKBakePlanningTask, type StartIKBakePlanning } from './ikBakeWorkerClient.js';
@@ -33,7 +32,7 @@ export interface IKBakeSnapshot {
 export class IKBakeController {
   private state: AnimationEditorState | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'IK bake listeners failed.' });
   private selectedIds: readonly string[] = Object.freeze([]);
   private fps = '10';
   private preview = false;
@@ -62,10 +61,7 @@ export class IKBakeController {
     private readonly startPlanning: StartIKBakePlanning = startIKBakePlanning,
   ) {}
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): IKBakeSnapshot => this.snapshot;
 
   bind(state: AnimationEditorState): void {
@@ -324,10 +320,7 @@ export class IKBakeController {
     const next = this.buildSnapshot();
     if ((Object.keys(next) as (keyof IKBakeSnapshot)[]).every((key) => next[key] === this.snapshot[key])) return;
     this.snapshot = next;
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'IK bake listeners failed.',
-    );
+    this.subscribers.notify();
   }
 
   unbind(): void {
@@ -351,7 +344,7 @@ export class IKBakeController {
   }
 
   dispose(): void {
-    this.listeners.clear();
+    this.subscribers.clear();
     this.unbind();
   }
 }

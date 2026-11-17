@@ -1,5 +1,5 @@
 import type { IKAnimationProperty, TransformProperty } from '../../engine/data.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import {
   DEFAULT_MOTION_OPTIONS,
@@ -15,7 +15,7 @@ import {
 export class MotionDiagnosticsController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Motion diagnostics listeners failed.' });
   private dependencies: readonly unknown[] = [];
   private options = { ...DEFAULT_MOTION_OPTIONS };
   private report: MotionReport | null = null;
@@ -25,10 +25,7 @@ export class MotionDiagnosticsController {
   private timeMs = 0;
   private after = false;
   private snapshot = this.buildSnapshot();
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = () => this.snapshot;
   bind(state: AnimationEditorState): void {
     this.unbind();
@@ -45,7 +42,7 @@ export class MotionDiagnosticsController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
   private get reason(): string {
     if (!this.state?.rig || !this.state.workingAnimation) return 'Select an animation first.';
@@ -69,7 +66,7 @@ export class MotionDiagnosticsController {
   }
   private publish(): void {
     this.snapshot = this.buildSnapshot();
-    notifySubscribers(this.listeners, 'Motion diagnostics listeners failed.');
+    this.subscribers.notify();
   }
   private refresh(): void {
     const dependencies = [this.state?.workingAnimation, this.state?.rig, this.state?.sessionRevision, this.reason];

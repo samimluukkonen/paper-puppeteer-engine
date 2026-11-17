@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import { retimeSelectionReason } from './commandAvailability.js';
 import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
@@ -16,7 +16,7 @@ export interface KeyframeRetimingSnapshot {
 export class KeyframeRetimingController {
   private state: AnimationEditorState | undefined;
   private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Retiming panel listeners failed.' });
   private scale = '0.75';
   private anchor: RetimeOptions['anchor'] = 'earliest';
   private preview: RetimeResult<ReadonlyAnimation> | null = null;
@@ -24,10 +24,7 @@ export class KeyframeRetimingController {
   private dependencies: readonly unknown[] = [];
   private snapshot: KeyframeRetimingSnapshot = this.buildSnapshot();
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): KeyframeRetimingSnapshot => this.snapshot;
 
   bind(state: AnimationEditorState): void {
@@ -48,7 +45,7 @@ export class KeyframeRetimingController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
   setScale(scale: string): void {
     this.scale = scale;
@@ -126,7 +123,6 @@ export class KeyframeRetimingController {
     if ((Object.keys(next) as (keyof KeyframeRetimingSnapshot)[]).every((key) => next[key] === this.snapshot[key]))
       return;
     this.snapshot = Object.freeze(next);
-    const errors = dispatchListeners(this.listeners, (listener) => listener());
-    throwNotificationErrors(errors, 'Retiming panel listeners failed.');
+    this.subscribers.notify();
   }
 }

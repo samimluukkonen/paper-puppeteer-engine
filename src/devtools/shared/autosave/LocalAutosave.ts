@@ -1,5 +1,5 @@
 import type { PackageFiles } from '../package/characterPackage.js';
-import { notifySubscribers } from '../subscriberNotifications.js';
+import { Subscribers } from '../subscriberNotifications.js';
 import { type DraftStorage, storageError } from './LocalDraftStore.js';
 
 export interface AutosaveSource {
@@ -24,11 +24,8 @@ export class LocalAutosave {
   private disabled = false;
   private suspended = false;
   private message = 'Unsaved changes';
-  private readonly listeners = new Set<() => void>();
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  private readonly subscribers = new Subscribers({ label: 'Autosave subscribers failed.' });
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): string => this.message;
   constructor(
     readonly key: string,
@@ -39,7 +36,7 @@ export class LocalAutosave {
   private publish(message: string): void {
     if (message === this.message || this.stopped) return;
     this.message = message;
-    notifySubscribers(this.listeners, 'Autosave subscribers failed.');
+    this.subscribers.notify();
   }
   private savedMessage(revision: string): string {
     return `Local draft saved · export a ZIP for a disk copy${this.exportedRevision === revision ? ' · Explicitly exported' : ''}`;
@@ -176,7 +173,7 @@ export class LocalAutosave {
     this.buildRequest?.abort(new DOMException('Local saving disposed.', 'AbortError'));
     clearTimeout(this.timer);
     clearInterval(this.heartbeat);
-    this.listeners.clear();
+    this.subscribers.clear();
     // Release promptly; flush's finally also releases if artwork hashing is still pending.
     void this.storage.release(this.key, this.owner).catch(() => {});
   }

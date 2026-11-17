@@ -1,5 +1,6 @@
-import { dispatchListeners, throwNotificationErrors } from '../../../engine/core.js';
+import { throwNotificationErrors } from '../../../engine/core.js';
 import { freezeData } from '../editorData.js';
+import { Subscribers } from '../subscriberNotifications.js';
 import { getGuideAvailability, type GuideRegistry, guideRegistry } from './registry.js';
 import type {
   GuideAvailability,
@@ -41,7 +42,7 @@ const inactive = (status: 'idle' | 'exited' | 'finished', context: GuideContext)
 
 /** Session-only UI store. Compatible with useSyncExternalStore; no document or scene dependency. */
 export class GuideController {
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Guide UI listeners failed.', onError: 'collect' });
   private context: GuideContext;
   private snapshot: GuideSnapshot;
 
@@ -53,12 +54,7 @@ export class GuideController {
     this.snapshot = inactive('idle', this.context);
   }
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => {
-      this.listeners.delete(listener);
-    };
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): GuideSnapshot => this.snapshot;
 
   getAvailability(id: string): GuideAvailability {
@@ -169,9 +165,7 @@ export class GuideController {
 
   private publish(snapshot: GuideSnapshot): void {
     this.snapshot = snapshot;
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Guide UI listeners failed.',
-    );
+    // Collected, not reported: guide commands such as exit() surface listener failures to their caller.
+    throwNotificationErrors(this.subscribers.notify(), 'Guide UI listeners failed.');
   }
 }

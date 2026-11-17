@@ -1,4 +1,4 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { NewAnimationOptions } from './createEmptyAnimation.js';
 
@@ -6,12 +6,9 @@ import type { NewAnimationOptions } from './createEmptyAnimation.js';
 export class NewAnimationController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'New animation listeners failed.' });
   private reason = 'Load a valid character rig before creating an animation.';
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): string => this.reason;
 
   bind(state: AnimationEditorState): void {
@@ -28,10 +25,7 @@ export class NewAnimationController {
         : '';
     if (reason === this.reason) return;
     this.reason = reason;
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'New animation listeners failed.',
-    );
+    this.subscribers.notify();
   }
   create(options: NewAnimationOptions): string {
     if (this.reason || !this.state) return this.reason;
@@ -47,6 +41,6 @@ export class NewAnimationController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

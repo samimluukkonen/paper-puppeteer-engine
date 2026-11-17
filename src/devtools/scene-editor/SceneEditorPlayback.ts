@@ -1,6 +1,6 @@
 import { equalJsonData, sceneActorDepth, sceneLayer, SceneRunner } from '../../engine/core.js';
 import type { SceneAudioOptions, SceneRunnerOptions } from '../../engine/data.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { ReadonlyScene } from './SceneEditorDocument.js';
 
 /** View-only playback session. Phaser binds the isolated Actor factory and supplies deltas.
@@ -10,7 +10,6 @@ export class SceneEditorPlayback {
   private runner: SceneRunner | undefined;
   private source: ReadonlyScene | null = null;
   private factory: SceneRunnerOptions['createActor'] | undefined;
-  private revision = 0;
   private rate = 1;
   private message = '';
   private audioOptions: SceneAudioOptions | undefined;
@@ -18,15 +17,11 @@ export class SceneEditorPlayback {
   private seekFrame: number | undefined;
   private pendingSeek: number | undefined;
   private muted = false;
-  private readonly listeners = new Set<() => void>();
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  private readonly subscribers = new Subscribers({ label: 'Scene playback subscribers failed.' });
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   private notify(): void {
-    this.revision++;
-    notifySubscribers(this.listeners, 'Scene playback subscribers failed.');
+    this.subscribers.notify();
   }
   get time(): number {
     return this.runner?.time ?? 0;

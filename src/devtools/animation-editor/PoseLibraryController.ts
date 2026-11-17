@@ -1,20 +1,16 @@
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 
 /** Small React bridge; clock notifications do not reset forms or rerender a closed library. */
 export class PoseLibraryController {
   state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
-  private revision = 0;
   private facts = '';
   private poses: unknown;
   private rig: unknown;
-  private readonly listeners = new Set<() => void>();
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  private readonly subscribers = new Subscribers({ label: 'Pose library subscribers failed.' });
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   get selectedBoneIds(): string[] {
     const keys = this.state?.selectedKeys ?? [];
     return [
@@ -51,8 +47,7 @@ export class PoseLibraryController {
     this.facts = facts;
     this.poses = state?.poseLibrary.poses;
     this.rig = state?.rig;
-    ++this.revision;
-    notifySubscribers(this.listeners, 'Pose library subscribers failed.');
+    this.subscribers.notify();
   }
   unbind(): void {
     this.release?.();
@@ -63,6 +58,6 @@ export class PoseLibraryController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

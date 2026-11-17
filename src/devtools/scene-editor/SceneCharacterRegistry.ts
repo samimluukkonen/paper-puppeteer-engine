@@ -1,7 +1,7 @@
 import { CharacterLoader, sceneCharacterAssetPath, sceneCharacterReferenceSchema } from '../../engine/core.js';
 import type { CharacterDefinition } from '../../engine/data.js';
 import { characterCatalog } from '../../shared/characterCatalog.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 
 /** Permanent package references use the same catalog and manifest convention as the character editors. */
 export const sceneCharacterChoices = characterCatalog.map((entry) => ({
@@ -14,8 +14,7 @@ export class SceneCharacterRegistry {
   private readonly definitions = new Map<string, CharacterDefinition>();
   private readonly pending = new Map<string, Promise<CharacterDefinition>>();
   private readonly lifetime = new AbortController();
-  private readonly listeners = new Set<() => void>();
-  private revision = 0;
+  private readonly subscribers = new Subscribers({ label: 'Scene character subscribers failed.' });
   constructor(
     private readonly loadDefinition = (manifest: string, signal: AbortSignal) => {
       const url = new URL(manifest, globalThis.location?.href);
@@ -29,11 +28,8 @@ export class SceneCharacterRegistry {
     },
   ) {}
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   get(manifest: string): CharacterDefinition | undefined {
     return this.definitions.get(manifest);
   }
@@ -49,8 +45,7 @@ export class SceneCharacterRegistry {
         const definition = await this.loadDefinition(manifest, this.lifetime.signal);
         this.lifetime.signal.throwIfAborted();
         this.definitions.set(manifest, definition);
-        this.revision++;
-        notifySubscribers(this.listeners, 'Scene character subscribers failed.');
+        this.subscribers.notify();
         return definition;
       })
       .finally(() => this.pending.delete(manifest));
@@ -59,7 +54,7 @@ export class SceneCharacterRegistry {
   }
   dispose(): void {
     this.lifetime.abort();
-    this.listeners.clear();
+    this.subscribers.clear();
     this.definitions.clear();
     this.pending.clear();
   }

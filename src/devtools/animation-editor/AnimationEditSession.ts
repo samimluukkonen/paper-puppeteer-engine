@@ -1,6 +1,7 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import { throwNotificationErrors } from '../../engine/core.js';
 import type { Rig } from '../../engine/data.js';
 import { freezeData } from '../shared/editorData.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorDocument, ReadonlyAnimation } from './AnimationEditorDocument.js';
 import type { AnimationEventRef } from './animationEvents.js';
 import type { GraphChannel } from './graphEditor.js';
@@ -87,7 +88,7 @@ export interface AnimationEditSessionDeps {
  * Pure and DOM-free: every editor capability is an injected dependency.
  */
 export class AnimationEditSession implements AnimationEditActions {
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Animation editor listeners failed.', onError: 'collect' });
   private notificationDepth = 0;
   private notificationPending = false;
 
@@ -107,8 +108,7 @@ export class AnimationEditSession implements AnimationEditActions {
   }
 
   subscribe(listener: () => void): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return this.subscribers.subscribe(listener);
   }
 
   /** Nested commands publish the complete document, selection and clock together. */
@@ -131,10 +131,9 @@ export class AnimationEditSession implements AnimationEditActions {
       return;
     }
     this.deps.reconcilePreviews();
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Animation editor listeners failed.',
-    );
+    // Collected, not reported: editor commands rethrow listener failures so playback can merge them with
+    // animation-event failures into one AggregateError.
+    throwNotificationErrors(this.subscribers.notify(), 'Animation editor listeners failed.');
   }
 
   cancelActiveDrags(): boolean {

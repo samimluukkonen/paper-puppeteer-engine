@@ -7,6 +7,7 @@ import {
   evaluatedFootContacts,
 } from '../shared/footContactGround.js';
 import type { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { footContactConstraints, planFootContactAlignment, type FootContactAlignment } from './footContactAlignment.js';
 import { getCompiledPreviewClip } from './previewClip.js';
@@ -18,8 +19,7 @@ export class FootContactGroundController {
   private guide: GroundGuideWorkspace | undefined;
   private runtime: readonly TwoBoneIKConstraint[] = [];
   private releases: (() => void)[] = [];
-  private readonly listeners = new Set<() => void>();
-  private revision = 0;
+  private readonly subscribers = new Subscribers({ label: 'Foot contact subscribers failed.' });
   private context: readonly unknown[] = [];
   private presentation: readonly unknown[] = [];
   private lastContactNotification = -Infinity;
@@ -37,14 +37,10 @@ export class FootContactGroundController {
     return this.visible || !!this.plan;
   }
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   private notify(): void {
-    this.revision++;
-    for (const listener of this.listeners) listener();
+    this.subscribers.notify();
   }
   bind(state: AnimationEditorState, guide: GroundGuideWorkspace): void {
     this.unbind();

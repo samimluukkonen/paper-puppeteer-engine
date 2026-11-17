@@ -1,5 +1,6 @@
 import type { Affine, DeepReadonly } from '../../engine/data.js';
 import type { AnimationPreviewPreferences } from '../shared/animationPreviewPreferences.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import {
   DEFAULT_MOTION_PREVIEW,
@@ -21,7 +22,7 @@ export class MotionPreviewController {
   private placement: (() => Affine) | undefined;
   private copy: { placement: Affine; previousMode: AnimationEditorState['worldDisplacementMode'] } | undefined;
   private readonly clips = new Map<string, MotionPreviewSettings>();
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Motion preview subscribers failed.' });
   private snapshot: Readonly<{
     clipId: string | null;
     duration: number;
@@ -37,14 +38,11 @@ export class MotionPreviewController {
     message: '',
     copying: false,
   });
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = () => this.snapshot;
   private publish(patch: Partial<typeof this.snapshot>): void {
     this.snapshot = Object.freeze({ ...this.snapshot, ...patch });
-    for (const listener of Array.from(this.listeners)) listener();
+    this.subscribers.notify();
   }
   bind(state: AnimationEditorState): void {
     this.unbind();
@@ -279,6 +277,6 @@ export class MotionPreviewController {
   }
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

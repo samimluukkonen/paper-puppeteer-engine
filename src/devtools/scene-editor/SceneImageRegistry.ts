@@ -1,6 +1,6 @@
 import { inspectImageHeader, sceneImageReferenceSchema, createSceneTextureBudget } from '../../engine/core.js';
 import { importSprite } from '../shared/artwork/spriteImport.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 
 export interface SceneImageAsset {
   readonly reference: string;
@@ -12,16 +12,11 @@ export interface SceneImageAsset {
 /** Binary ownership shared by scenes and project packaging. No URL enters authored data. */
 export class SceneImageRegistry {
   private readonly assets = new Map<string, SceneImageAsset & { bytes: Uint8Array<ArrayBuffer> }>();
-  private readonly listeners = new Set<() => void>();
-  private revision = 0;
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  private readonly subscribers = new Subscribers({ label: 'Scene image subscribers failed.' });
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   private notify(): void {
-    this.revision++;
-    notifySubscribers(this.listeners, 'Scene image subscribers failed.');
+    this.subscribers.notify();
   }
   get entries(): readonly SceneImageAsset[] {
     return [...this.assets.values()].map(({ bytes: _bytes, ...asset }) => asset);

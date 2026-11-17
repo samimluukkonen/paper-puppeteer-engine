@@ -4,6 +4,7 @@ import {
   updateEnvironmentPreview,
   type EnvironmentPreviewSettings,
 } from '../shared/environmentPreview.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import { DEFAULT_PREVIEW_CAMERA, type PreviewCameraSettings, updatePreviewCamera } from './previewCamera.js';
 
 export interface EnvironmentProjectImage {
@@ -24,7 +25,7 @@ export class EnvironmentPreviewController {
     error: '',
     projectImages: [] as readonly EnvironmentProjectImage[],
   };
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Environment preview subscribers failed.' });
   private request: AbortController | undefined;
   private alive = true;
   private readonly releaseImages: () => void;
@@ -35,15 +36,12 @@ export class EnvironmentPreviewController {
     this.ownsImages = !images;
     this.releaseImages = this.images.subscribe(() => this.publish({}));
   }
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = () => this.snapshot;
   private publish(patch: Partial<typeof this.snapshot>): void {
     if (!this.alive) return;
     this.snapshot = Object.freeze({ ...this.snapshot, ...patch });
-    for (const listener of Array.from(this.listeners)) listener();
+    this.subscribers.notify();
   }
   update(patch: Partial<EnvironmentPreviewSettings>): void {
     if (!this.alive) return;
@@ -143,6 +141,6 @@ export class EnvironmentPreviewController {
     this.releaseImages();
     if (this.ownsImages) this.images.removeUnused(new Set());
     this.snapshot = { ...this.snapshot, projectImages: [] };
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }

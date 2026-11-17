@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { validatePackageFiles } from '../../../engine/core.js';
 import type { PackageFiles } from '../package/characterPackage.js';
-import { notifySubscribers } from '../subscriberNotifications.js';
+import { Subscribers } from '../subscriberNotifications.js';
 
 export const DRAFT_DATABASE = 'paper-puppeteer-recovery';
 export const DRAFT_RETENTION = 2;
@@ -94,7 +94,7 @@ export function storageError(error: unknown, operation = 'Autosave'): string {
 /** Revision metadata, shared binaries and their references commit/prune atomically. */
 export class LocalDraftStore implements DraftStorage {
   private database: Promise<IDBDatabase> | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Local draft subscribers failed.' });
   private readonly resources = new WeakMap<
     Uint8Array<ArrayBuffer>,
     {
@@ -116,12 +116,9 @@ export class LocalDraftStore implements DraftStorage {
     });
     return resource;
   }
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   private changed(): void {
-    notifySubscribers(this.listeners, 'Local draft subscribers failed.');
+    this.subscribers.notify();
   }
   private readonly locks = new Map<
     string,

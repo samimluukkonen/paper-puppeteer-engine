@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { AnimationValidationError, dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
+import { AnimationValidationError } from '../../engine/core.js';
 import type { AnimationPose, Rig } from '../../engine/data.js';
 import {
   type BoneSymmetryPair,
@@ -11,6 +11,7 @@ import {
 import { draftSource } from '../shared/draftSource.js';
 import { freezeData } from '../shared/editorData.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { sampleCurrentPoseMirror, sampleSelectedKeyframeMirror } from './keyframeMirroring.js';
 import { toMilliseconds } from './timeUnits.js';
@@ -54,7 +55,7 @@ export class MirrorToolsController {
   private installedMapping: BoneSymmetryMapping | null | undefined;
   private installing = false;
   private unsubscribe: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Mirror tools listeners failed.' });
   private direction: MirrorDirection = 'left-to-right';
   private pairs: readonly BoneSymmetryPair[] = [];
   private preview = false;
@@ -85,10 +86,7 @@ export class MirrorToolsController {
     this.snapshot = this.buildSnapshot();
   }
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = (): MirrorToolsSnapshot => this.snapshot;
 
   bind(state: AnimationEditorState, identity: string): void {
@@ -337,10 +335,7 @@ export class MirrorToolsController {
     // Clock notifications with unchanged readiness never cause React to render again.
     if (sameSnapshot(next, this.snapshot)) return;
     this.snapshot = next;
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Mirror tools listeners failed.',
-    );
+    this.subscribers.notify();
   }
 
   /** Release a failed or replaced session, including cached snapshots that retain its rig and clip. */
@@ -364,7 +359,7 @@ export class MirrorToolsController {
   }
 
   dispose(): void {
-    this.listeners.clear();
+    this.subscribers.clear();
     this.unbind();
   }
 }

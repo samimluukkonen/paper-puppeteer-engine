@@ -1,4 +1,4 @@
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 
 export type SceneRevision = 'authored' | 'selection' | 'presentation';
 interface SceneRevisionSource {
@@ -7,16 +7,12 @@ interface SceneRevisionSource {
 
 /** Own revision snapshots and subscriptions; callers publish only after updating their owned state. */
 export class SceneEditorNotifications {
-  private revision = 0;
   private readonly revisions: Record<SceneRevision, number> = { authored: 0, selection: 0, presentation: 0 };
   private scene: SceneRevisionSource | null = null;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Scene document subscribers failed.' });
 
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   readonly getAuthoredSnapshot = (): number => this.revisions.authored;
   readonly getSelectionSnapshot = (): number => this.revisions.selection;
   readonly getPresentationSnapshot = (): number => this.revisions.presentation;
@@ -40,7 +36,6 @@ export class SceneEditorNotifications {
     }
     if (kind === 'selection') this.revisions.selection++;
     else if (kind === 'presentation' || !authoredChanged) this.revisions.presentation++;
-    this.revision++;
-    notifySubscribers(this.listeners, 'Scene document subscribers failed.');
+    this.subscribers.notify();
   }
 }

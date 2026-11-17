@@ -44,7 +44,7 @@ import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
 import { sceneFingerprint } from '../shared/sceneFingerprint.js';
 import { emptySceneReuseLibrary, parseSceneReuseLibrary, type SceneReuseLibrary } from '../shared/sceneReuse.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';
-import { notifySubscribers } from '../shared/subscriberNotifications.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import { ProjectCharacterDocument } from './ProjectCharacterDocument.js';
 import { parseProjectDefinition, type ProjectDefinition } from './ProjectDefinition.js';
 import {
@@ -119,9 +119,8 @@ export class ProjectWorkspace {
     ],
     (id) => this.audioFiles.get(id),
   );
-  private revision = 0;
   recoveryKey: string | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Project subscribers failed.' });
   private readonly inspector = new ProjectInspector();
   history: SnapshotHistory<DeepReadonly<ProjectDefinition>>;
 
@@ -137,14 +136,10 @@ export class ProjectWorkspace {
     });
     this.scenes.images.subscribe(this.refresh);
   }
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
-  readonly getSnapshot = (): number => this.revision;
+  readonly subscribe = this.subscribers.subscribe;
+  readonly getSnapshot = this.subscribers.getSnapshot;
   readonly refresh = (): void => {
-    this.revision++;
-    notifySubscribers(this.listeners, 'Project subscribers failed.');
+    this.subscribers.notify();
   };
   get definition(): DeepReadonly<ProjectDefinition> {
     const images = this.scenes.images.entries.map((asset) => ({

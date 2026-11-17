@@ -1,5 +1,5 @@
-import { dispatchListeners, throwNotificationErrors } from '../../engine/core.js';
 import type { Rig } from '../../engine/data.js';
+import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import type { AnimationVariationOptions } from './animationVariation.js';
 
@@ -9,7 +9,7 @@ const unavailable = 'Select a valid source animation first.';
 export class AnimationVariationController {
   private state: AnimationEditorState | undefined;
   private release: (() => void) | undefined;
-  private readonly listeners = new Set<() => void>();
+  private readonly subscribers = new Subscribers({ label: 'Variation listeners failed.' });
   private draft: { source: ReadonlyAnimation; revision: number; rig: Rig | undefined } | undefined;
   private snapshot = {
     reason: unavailable,
@@ -17,10 +17,7 @@ export class AnimationVariationController {
     revision: 0,
     rig: undefined as Rig | undefined,
   };
-  readonly subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  readonly subscribe = this.subscribers.subscribe;
   readonly getSnapshot = () => this.snapshot;
 
   bind(state: AnimationEditorState): void {
@@ -56,10 +53,7 @@ export class AnimationVariationController {
       (source !== this.draft.source || revision !== this.draft.revision || rig !== this.draft.rig || reason)
     )
       this.cancel();
-    throwNotificationErrors(
-      dispatchListeners(this.listeners, (listener) => listener()),
-      'Variation listeners failed.',
-    );
+    this.subscribers.notify();
   }
 
   begin(): string {
@@ -114,6 +108,6 @@ export class AnimationVariationController {
 
   dispose(): void {
     this.unbind();
-    this.listeners.clear();
+    this.subscribers.clear();
   }
 }
