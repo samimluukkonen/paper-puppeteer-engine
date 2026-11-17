@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Store the Rig Editor selection as one value covering bones, slots, IK constraints and foot-contact markers. `selectedIKConstraintId` and `selectedFootContactMarkerId` are now read-only views of it, and assigning `selection` replaces an IK or marker selection, so the input controller and `select*` methods no longer reset the other fields by hand. Editor behavior is unchanged.
+
 - Store each Scene Editor scene's selection as one `SceneSelection` union (Actor, actions, camera with optional key, image, dialogue line, audio clip or transition) written through a single setter, replacing nine hand-reset fields. Selection rules for actions live in the pure `SceneSelection` module. Editor APIs and behavior are unchanged.
 
 - Make the Scene Editor camera and Actors mutually exclusive selections. Selecting the camera now deselects the Actor, so Escape on a selected camera no longer reveals a hidden Actor in the inspector. **Frame Selected Actor** becomes **Frame Actor** with an **Actor to frame** list that starts at the selected Actor or the first Actor; `SceneEditorDocument.frameSelectedActor()` is replaced by `frameActor(id)`.

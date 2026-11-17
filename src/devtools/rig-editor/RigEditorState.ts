@@ -52,6 +52,12 @@ import { RigStructureCommands } from './RigStructureCommands.js';
 
 export type RigSelectionInspectorTab = 'mesh' | 'attachments';
 export type RigEditorSelection = { type: 'bone'; id: string } | { type: 'slot'; id: string } | null;
+/** Everything the rig editor can select; exactly one item at a time. */
+type RigSelection =
+  | NonNullable<RigEditorSelection>
+  | { type: 'ik'; id: string }
+  | { type: 'footContact'; id: string }
+  | null;
 export type VisibilityKey =
   | 'artwork'
   | 'bones'
@@ -123,14 +129,26 @@ export class RigEditorState {
   get rig(): Rig {
     return this.topologyRig;
   }
-  selection: RigEditorSelection = null;
+  private current: RigSelection = null;
+  /** The selected bone or slot. Assigning replaces any IK constraint or foot-contact marker selection. */
+  get selection(): RigEditorSelection {
+    const current = this.current;
+    return current?.type === 'bone' || current?.type === 'slot' ? current : null;
+  }
+  set selection(selection: RigEditorSelection) {
+    this.current = selection;
+  }
   private inspectorSelection: { selection: NonNullable<RigEditorSelection>; tab: RigSelectionInspectorTab } | undefined;
   /** A control can request its own inspector for this exact selection, independently of browser focus. */
   get selectionInspectorTab(): RigSelectionInspectorTab | undefined {
     return this.inspectorSelection?.selection === this.selection ? this.inspectorSelection.tab : undefined;
   }
-  selectedIKConstraintId: string | null = null;
-  selectedFootContactMarkerId: string | null = null;
+  get selectedIKConstraintId(): string | null {
+    return this.current?.type === 'ik' ? this.current.id : null;
+  }
+  get selectedFootContactMarkerId(): string | null {
+    return this.current?.type === 'footContact' ? this.current.id : null;
+  }
   private targetDragId: string | undefined;
   get ikTargetDragId(): string | undefined {
     return this.targetDragId;
@@ -515,18 +533,17 @@ export class RigEditorState {
   }
 
   private reconcileSelection(): void {
-    if (
-      this.selectedFootContactMarkerId &&
-      !this.data.footContactMarkers?.some((entry) => entry.id === this.selectedFootContactMarkerId)
-    )
-      this.selectedFootContactMarkerId = null;
-    if (this.selectedIKConstraintId && !this.data.ik?.some((entry) => entry.name === this.selectedIKConstraintId))
-      this.selectedIKConstraintId = null;
-    if (
-      this.selection &&
-      !(this.selection.type === 'bone' ? this.boneIndices : this.slotIndices).has(this.selection.id)
-    )
-      this.selection = null;
+    const current = this.current;
+    if (!current) return;
+    const exists =
+      current.type === 'bone'
+        ? this.boneIndices.has(current.id)
+        : current.type === 'slot'
+          ? this.slotIndices.has(current.id)
+          : current.type === 'ik'
+            ? !!this.data.ik?.some((entry) => entry.name === current.id)
+            : !!this.data.footContactMarkers?.some((entry) => entry.id === current.id);
+    if (!exists) this.current = null;
   }
 
   private assertMeshReferences(
@@ -1024,9 +1041,7 @@ export class RigEditorState {
 
   selectIKConstraint(id: string): void {
     this.getIKConstraint(id);
-    this.selectedFootContactMarkerId = null;
-    this.selection = null;
-    this.selectedIKConstraintId = id;
+    this.current = { type: 'ik', id };
   }
 
   ikConstraintDependencies(id: string): readonly string[] {
@@ -1089,8 +1104,7 @@ export class RigEditorState {
 
   selectFootContactMarker(id: string): void {
     this.getFootContactMarker(id);
-    this.clearSelection();
-    this.selectedFootContactMarkerId = id;
+    this.current = { type: 'footContact', id };
   }
 
   footContactMarkerDependencies(id: string): readonly string[] {
@@ -1260,23 +1274,17 @@ export class RigEditorState {
 
   selectBone(id: string): void {
     this.getBone(id);
-    this.selectedFootContactMarkerId = null;
-    this.selectedIKConstraintId = null;
-    this.selection = { type: 'bone', id };
+    this.current = { type: 'bone', id };
   }
 
   selectSlot(id: string, inspectorTab?: RigSelectionInspectorTab): void {
     this.getSlot(id);
-    this.selectedFootContactMarkerId = null;
-    this.selectedIKConstraintId = null;
     this.selection = { type: 'slot', id };
     this.inspectorSelection = inspectorTab ? { selection: this.selection, tab: inspectorTab } : undefined;
   }
 
   clearSelection(): void {
-    this.selectedFootContactMarkerId = null;
-    this.selectedIKConstraintId = null;
-    this.selection = null;
+    this.current = null;
   }
 
   childrenOf(id: string): readonly string[] {

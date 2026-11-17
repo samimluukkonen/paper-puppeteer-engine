@@ -227,9 +227,7 @@ export class RigEditorInputController {
       return;
     }
     if (event.key === 'Escape') {
-      this.state.selection = null;
-      this.state.selectedIKConstraintId = null;
-      this.state.selectedFootContactMarkerId = null;
+      this.state.clearSelection();
       this.editor.refresh();
       event.preventDefault();
       return;
@@ -392,8 +390,6 @@ export class RigEditorInputController {
       if (start) this.characterDrag = { start, value: { x: this.puppet.container.x, y: this.puppet.container.y } };
       return;
     }
-    this.state.selectedIKConstraintId = null;
-    this.state.selectedFootContactMarkerId = null;
     this.state.selection = target;
     if (aligning) {
       const attachment = target.type === 'slot';
@@ -563,8 +559,6 @@ export class RigEditorInputController {
       !this.ikHit &&
       !this.markerHit
     ) {
-      this.state.selectedIKConstraintId = null;
-      this.state.selectedFootContactMarkerId = null;
       this.state.selection = this.overlay.pick(pointer.x, pointer.y, pointer.event?.altKey ?? false) ?? null;
       this.onChange();
       this.redraw();
