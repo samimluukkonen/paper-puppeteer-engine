@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Move the local-autosave page lifecycle (start, change subscription, 500 ms poll, `pagehide` suspend, `pageshow` resume, hidden-tab flush and disposal) into one `attachLocalAutosave(autosave, { subscribe?, page? })` that returns a detach function. The Scene Editor, Project Workspace sessions and Animation Editor each attach with one call instead of hand-wiring timers and listeners. Autosave cadence, recovery and disposal are unchanged.
+
 - Fix selecting a Scene Editor camera key publishing two selection changes; it now notifies selection subscribers once.
 
 - Store the Rig Editor selection as one value covering bones, slots, IK constraints and foot-contact markers. `selectedIKConstraintId` and `selectedFootContactMarkerId` are now read-only views of it, and assigning `selection` replaces an IK or marker selection, so the input controller and `select*` methods no longer reset the other fields by hand. Editor behavior is unchanged.

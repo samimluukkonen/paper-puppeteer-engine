@@ -182,3 +182,47 @@ export class LocalAutosave {
   }
 }
 import { abortable } from '../../../engine/core.js';
+
+export const AUTOSAVE_POLL_MS = 500;
+
+export interface PageLifecycleEvents {
+  window: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
+  document: Pick<EventTarget, 'addEventListener' | 'removeEventListener'> & {
+    readonly visibilityState: DocumentVisibilityState;
+  };
+}
+
+/** Runs an autosave until the returned detach is called. Detach takes ownership: it disposes the autosave. */
+export function attachLocalAutosave(
+  autosave: LocalAutosave,
+  options: {
+    /** Change notifications from the authored document. Omit when the caller pushes update() itself. */
+    subscribe?: (listener: () => void) => () => void;
+    /** Defaults to the browser globals; tests inject fakes. */
+    page?: PageLifecycleEvents;
+  } = {},
+): () => void {
+  const page = options.page ?? { window: globalThis.window, document: globalThis.document };
+  const leave = (): void => autosave.suspend();
+  const resume = (): void => autosave.start();
+  const hidden = (): void => {
+    if (page.document.visibilityState === 'hidden') void autosave.flush();
+  };
+  autosave.start();
+  const unsubscribe = options.subscribe?.(autosave.update);
+  const poll = setInterval(autosave.update, AUTOSAVE_POLL_MS);
+  page.window.addEventListener('pagehide', leave);
+  page.window.addEventListener('pageshow', resume);
+  page.document.addEventListener('visibilitychange', hidden);
+  let attached = true;
+  return () => {
+    if (!attached) return;
+    attached = false;
+    clearInterval(poll);
+    unsubscribe?.();
+    page.window.removeEventListener('pagehide', leave);
+    page.window.removeEventListener('pageshow', resume);
+    page.document.removeEventListener('visibilitychange', hidden);
+    autosave.dispose();
+  };
+}

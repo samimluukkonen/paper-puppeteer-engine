@@ -20,7 +20,7 @@ import { downloadBlob } from '../../shared/downloadJson.js';
 import { bindExportShortcut, blocksEditorShortcut, historyShortcut } from '../../shared/keyboardShortcuts.js';
 import { EditorTabs } from '../../ui/EditorTabs.js';
 import { ViewHeader } from '../../ui/viewShell.js';
-import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { buildProjectDraft } from '../shared/autosave/projectDrafts.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
@@ -125,35 +125,10 @@ export function ProjectView() {
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', guard);
-    const poll = setInterval(() => {
-      for (const session of current.current.sessions) session.autosave.update();
-    }, 500);
-    const flush = (): void => {
-      for (const session of current.current.sessions) void session.autosave.flush();
-    };
-    const leave = (): void => {
-      for (const session of current.current.sessions) session.autosave.suspend();
-    };
-    const resume = (): void => {
-      for (const session of current.current.sessions) session.autosave.start();
-    };
-    const hidden = (): void => {
-      if (document.visibilityState === 'hidden') flush();
-    };
-    window.addEventListener('pagehide', leave);
-    window.addEventListener('pageshow', resume);
-    document.addEventListener('visibilitychange', hidden);
     const transfers = transferLifetime.current;
     return () => {
       transfers.abort(new DOMException('Project Workspace closed.', 'AbortError'));
-      clearInterval(poll);
-      window.removeEventListener('pagehide', leave);
-      window.removeEventListener('pageshow', resume);
-      document.removeEventListener('visibilitychange', hidden);
-      for (const session of current.current.sessions) {
-        session.releaseAutosave();
-        session.autosave.dispose();
-      }
+      for (const session of current.current.sessions) session.detachAutosave();
       window.removeEventListener('beforeunload', guard);
       if (window.paperProjectEditor === resolve) delete window.paperProjectEditor;
       try {
@@ -204,9 +179,8 @@ export function ProjectView() {
       key: crypto.randomUUID(),
       workspace,
       autosave,
-      releaseAutosave: workspace.subscribe(autosave.update),
+      detachAutosave: attachLocalAutosave(autosave, { subscribe: workspace.subscribe }),
     };
-    autosave.start();
     setSessions((held) => [...held, session]);
     setSelected(session);
     setActive(undefined);

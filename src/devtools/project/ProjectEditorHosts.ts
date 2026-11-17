@@ -17,7 +17,8 @@ export interface ProjectSession {
   key: string;
   workspace: ProjectWorkspace;
   autosave: LocalAutosave;
-  releaseAutosave: () => void;
+  /** Stops the autosave lifecycle and disposes the autosave. */
+  detachAutosave: () => void;
 }
 export interface ProjectEditorHost {
   token: string;

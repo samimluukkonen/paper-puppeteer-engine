@@ -40,7 +40,7 @@ async function session(): Promise<ProjectSession> {
       },
       () => undefined,
     ),
-    releaseAutosave: () => {},
+    detachAutosave: () => {},
   };
 }
 

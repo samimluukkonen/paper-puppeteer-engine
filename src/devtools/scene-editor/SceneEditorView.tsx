@@ -24,7 +24,7 @@ import { EditorTabs } from '../../ui/EditorTabs.js';
 import { EditorDraftControls, ViewHeader } from '../../ui/viewShell.js';
 import { projectEditorContext } from '../project/projectBridge.js';
 import { sceneDraftSource } from '../shared/autosave/editorDrafts.js';
-import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { protectUnsavedChanges } from '../shared/protectUnsavedChanges.js';
@@ -72,31 +72,10 @@ export function SceneEditorView({
       ? undefined
       : new LocalAutosave(`scenes:${location.pathname}`, localDrafts, () => sceneDraftSource(document, registry, id));
   });
-  useEffect(() => {
-    if (!autosave) return;
-    autosave.start();
-    const unsubscribe = document.subscribe(autosave.update);
-    const poll = setInterval(autosave.update, 500);
-    const flush = (): void => {
-      void autosave.flush();
-    };
-    const leave = (): void => autosave.suspend();
-    const resume = (): void => autosave.start();
-    const hidden = (): void => {
-      if (globalThis.document.visibilityState === 'hidden') flush();
-    };
-    window.addEventListener('pagehide', leave);
-    window.addEventListener('pageshow', resume);
-    globalThis.document.addEventListener('visibilitychange', hidden);
-    return () => {
-      clearInterval(poll);
-      unsubscribe();
-      window.removeEventListener('pagehide', leave);
-      window.removeEventListener('pageshow', resume);
-      globalThis.document.removeEventListener('visibilitychange', hidden);
-      autosave.dispose();
-    };
-  }, [autosave, document]);
+  useEffect(
+    () => (autosave ? attachLocalAutosave(autosave, { subscribe: document.subscribe }) : undefined),
+    [autosave, document],
+  );
   const workspace = useRef<HTMLElement>(null);
   const source = document.sourceScene;
   useLayoutEffect(() => {

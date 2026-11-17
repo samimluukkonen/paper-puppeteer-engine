@@ -15,7 +15,7 @@ import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutCo
 import '../rig-editor/style.css';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { buildCharacterDraft } from '../shared/autosave/editorDrafts.js';
-import { LocalAutosave } from '../shared/autosave/LocalAutosave.js';
+import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
@@ -294,18 +294,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   let releaseAnimationPackage: (() => void) | undefined;
   let releaseWorkspaceSelection: (() => void) | undefined;
   let releaseProject: (() => void) | undefined;
-  let pollAutosave: ReturnType<typeof setInterval> | undefined;
-  const flushLocal = (): void => {
-    void autosave?.flush();
-  };
-  const leaveLocal = (): void => autosave?.suspend();
-  const resumeLocal = (): void => autosave?.start();
-  const hiddenLocal = (): void => {
-    if (document.visibilityState === 'hidden') flushLocal();
-  };
-  window.addEventListener('pagehide', leaveLocal);
-  window.addEventListener('pageshow', resumeLocal);
-  document.addEventListener('visibilitychange', hiddenLocal);
+  let detachAutosave: (() => void) | undefined;
   const editorScene = new AnimationEditorScene(
     (state, id) => {
       stateOwner = state;
@@ -313,8 +302,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
         projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
       );
       if (!projectContext?.characterDocuments) editorScene.rigEditor!.state.skinReferences = undefined;
-      autosave?.dispose();
-      clearInterval(pollAutosave);
+      detachAutosave?.();
+      detachAutosave = undefined;
       releaseProject?.();
       releaseProject = projectContext?.bindCharacter(
         () =>
@@ -454,8 +443,7 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
               ),
           };
         });
-        autosave.start();
-        pollAutosave = setInterval(() => autosave?.update(), 500);
+        detachAutosave = attachLocalAutosave(autosave);
         showAutosave?.(autosave);
       }
       releaseAnimationPackage?.();
@@ -624,11 +612,8 @@ const unmount = mountView(host, <CharacterWorkspace />, (root) => {
   return () => {
     releaseRenderer?.();
     previewPreferences?.dispose();
-    autosave?.dispose();
-    clearInterval(pollAutosave);
-    window.removeEventListener('pagehide', leaveLocal);
-    window.removeEventListener('pageshow', resumeLocal);
-    document.removeEventListener('visibilitychange', hiddenLocal);
+    detachAutosave?.();
+    detachAutosave = undefined;
     workspaceRoutes?.dispose();
     releaseRigExport();
     releaseAnimationExport();
