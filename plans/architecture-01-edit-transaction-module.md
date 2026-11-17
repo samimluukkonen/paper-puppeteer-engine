@@ -95,3 +95,5 @@ Step 2 needs its own plan, because it means migrating ~35 controllers and ~246 t
 - **Phases by domain** (keyframes, events, IK, deformation, root motion, preview), each moving its controllers onto a domain operation or a narrow sub-facade, and each shipped and tested on its own.
 - **Guards and batching moved into the session**, not kept as per-method wrappers in the facade.
 - **A test-construction helper**, so the ~246 test constructions change mechanically once instead of per file.
+
+As built: written as [architecture-11](architecture-11-animation-editor-facade-shrink.md). Measuring showed that the `AnimationEditorState` constructor does not need to change, so the 247 test constructions stay as they are. The real churn is about 4,960 `state.method(…)` call sites in tests, which plan 11 handles with a scripted rename per phase instead of a construction helper. Plan 11 also covers the five facade paths that still install through `session.install` instead of `commit`.
