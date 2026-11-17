@@ -43,7 +43,7 @@ export function SceneCameraPanel({
           disabled={document.hasActiveGesture}
           onClick={() => {
             playback.pause();
-            document.setCameraKey(playback.time);
+            document.camera.setCameraKey(playback.time);
             document.setCameraKeyEditing(true);
           }}
         >
@@ -170,7 +170,7 @@ function CameraKeyInspector({ document, playback }: { document: SceneEditorDocum
       mode === 'smooth' || mode === 'bezier'
         ? { mode: 'bezier', control1: { x: 0.42, y: 0 }, control2: { x: 0.58, y: 1 } }
         : { mode: mode === 'stepped' ? 'stepped' : 'linear' };
-    document.updateCameraKey(selected.property, selected.key.id, { curve: next });
+    document.camera.updateCameraKey(selected.property, selected.key.id, { curve: next });
   };
   return (
     <details className="scene-camera-key-inspector" data-guide-id={GUIDE_TARGETS.sceneCameraKeyProperties}>
@@ -187,7 +187,7 @@ function CameraKeyInspector({ document, playback }: { document: SceneEditorDocum
               event.preventDefault();
               playback.pause();
               const values = new FormData(event.currentTarget);
-              document.updateCameraKey(selected.property, key.id, {
+              document.camera.updateCameraKey(selected.property, key.id, {
                 time: Number(values.get('time')) * 1000,
                 value: Number(values.get('value')),
                 ...(curve?.mode === 'bezier'
@@ -266,7 +266,7 @@ function CameraKeyInspector({ document, playback }: { document: SceneEditorDocum
             onSubmit={(event) => {
               event.preventDefault();
               playback.pause();
-              document.duplicateCameraKey(
+              document.camera.duplicateCameraKey(
                 selected.property,
                 key.id,
                 Number(new FormData(event.currentTarget).get('duplicateTime')) * 1000,
@@ -295,7 +295,7 @@ function CameraKeyInspector({ document, playback }: { document: SceneEditorDocum
             disabled={document.hasActiveGesture}
             onClick={() => {
               playback.pause();
-              document.removeCameraKey(selected.property, key.id);
+              document.camera.removeCameraKey(selected.property, key.id);
             }}
           >
             Delete camera key

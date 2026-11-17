@@ -14,7 +14,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
         type="button"
         className="workspace-primary"
         disabled={layers.length >= 64}
-        onClick={() => document.addLayer()}
+        onClick={() => document.artwork.addLayer()}
       >
         + Add Layer
       </button>
@@ -35,7 +35,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                   const data = new FormData(event.currentTarget);
                   const name = data.get('name');
                   if (typeof name !== 'string') return;
-                  document.updateLayer(layer.id, {
+                  document.artwork.updateLayer(layer.id, {
                     name,
                     parallax: Number(data.get('parallax')),
                   });
@@ -69,7 +69,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                   type="button"
                   aria-label={`Move ${layer.name} forward`}
                   disabled={index === layers.length - 1}
-                  onClick={() => document.reorderLayer(layer.id, 1)}
+                  onClick={() => document.artwork.reorderLayer(layer.id, 1)}
                 >
                   Forward
                 </button>
@@ -77,7 +77,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                   type="button"
                   aria-label={`Move ${layer.name} backward`}
                   disabled={index === 0}
-                  onClick={() => document.reorderLayer(layer.id, -1)}
+                  onClick={() => document.artwork.reorderLayer(layer.id, -1)}
                 >
                   Backward
                 </button>
@@ -86,7 +86,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                     type="checkbox"
                     aria-label={`Show ${layer.name}`}
                     checked={layer.visible}
-                    onChange={(event) => document.updateLayer(layer.id, { visible: event.target.checked })}
+                    onChange={(event) => document.artwork.updateLayer(layer.id, { visible: event.target.checked })}
                   />{' '}
                   Visible
                 </label>
@@ -106,7 +106,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                     type="button"
                     className="workspace-danger"
                     disabled={locked || document.isLayerLocked('background')}
-                    onClick={() => document.removeLayer(layer.id)}
+                    onClick={() => document.artwork.removeLayer(layer.id)}
                   >
                     Remove layer
                   </button>
@@ -160,7 +160,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                           aria-label={`Layer for ${image.id}`}
                           value={image.layerId ?? 'background'}
                           disabled={locked}
-                          onChange={(event) => document.assignImageLayer(image.id, event.target.value)}
+                          onChange={(event) => document.artwork.assignImageLayer(image.id, event.target.value)}
                         >
                           {layers
                             .filter((entry) => entry.id !== 'actors')
@@ -174,7 +174,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                           type="button"
                           aria-label={`Move ${image.id} forward`}
                           disabled={locked || imageIndex === 0}
-                          onClick={() => document.reorderImage(image.id, 1)}
+                          onClick={() => document.artwork.reorderImage(image.id, 1)}
                         >
                           ↑
                         </button>
@@ -182,7 +182,7 @@ export function SceneLayersPanel({ document }: { document: SceneEditorDocument }
                           type="button"
                           aria-label={`Move ${image.id} backward`}
                           disabled={locked || imageIndex === images.length - 1}
-                          onClick={() => document.reorderImage(image.id, -1)}
+                          onClick={() => document.artwork.reorderImage(image.id, -1)}
                         >
                           ↓
                         </button>

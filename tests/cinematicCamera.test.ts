@@ -182,29 +182,29 @@ test('camera drag is one undo entry and cancellation, selection, preview and sce
   document.createScene({ id: 'camera' });
   document.addActor('hero.json');
   const before = document.workingScene;
-  document.beginCameraDrag();
-  for (let x = 1; x <= 20; x++) document.moveCameraDrag({ x, y: x });
-  document.endCameraDrag();
+  let cameraDrag = document.beginDrag({ kind: 'camera' })!;
+  for (let x = 1; x <= 20; x++) cameraDrag.change({ x, y: x });
+  cameraDrag.end();
   const after = document.workingScene;
   document.undo();
   assert.strictEqual(document.workingScene, before);
   document.redo();
   assert.strictEqual(document.workingScene, after);
   for (const cancel of [
-    () => document.cancelCameraDrag(),
+    () => document.cancelDrag(),
     () => document.selectActor('actor-1'),
     () => document.setCameraPreview(true),
   ]) {
     document.setCameraPreview(false);
-    document.beginCameraDrag();
-    document.moveCameraDrag({ x: 100, y: 200 });
+    cameraDrag = document.beginDrag({ kind: 'camera' })!;
+    cameraDrag.change({ x: 100, y: 200 });
     cancel();
     assert.strictEqual(document.workingScene, after);
     assert.isFalse(document.hasOpenOperation);
   }
   document.setCameraPreview(false);
-  document.beginCameraDrag();
-  document.moveCameraDrag({ x: 300, y: 400 });
+  cameraDrag = document.beginDrag({ kind: 'camera' })!;
+  cameraDrag.change({ x: 300, y: 400 });
   document.createScene({ id: 'other' });
   document.selectScene('camera');
   assert.strictEqual(document.workingScene, after);

@@ -84,8 +84,8 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
             const reference = await document.images.import(file, signal);
             signal.throwIfAborted();
             if (document.selectedSceneId !== sceneId) return;
-            if (imageId) document.updateImage(imageId, { image: reference });
-            else document.addImage(reference);
+            if (imageId) document.artwork.updateImage(imageId, { image: reference });
+            else document.artwork.addImage(reference);
             setMessage(`${file.name} imported. Download a project or scene package to save the image with the scene.`);
           });
         }}
@@ -104,8 +104,8 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
               run(async (signal) => {
                 const reference = choice ? await document.images.add(choice.bytes, choice.name, signal) : value;
                 signal.throwIfAborted();
-                if (replacement && selected) document.updateImage(selected.id, { image: reference });
-                else document.addImage(reference);
+                if (replacement && selected) document.artwork.updateImage(selected.id, { image: reference });
+                else document.artwork.addImage(reference);
                 setChoosing(false);
                 setProjectImages([]);
               });
@@ -150,8 +150,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
           onSubmit={(event) => {
             event.preventDefault();
             const values = new FormData(event.currentTarget);
-            document.endImageDrag();
-            document.updateImage(selected.id, {
+            document.artwork.updateImage(selected.id, {
               position: { x: Number(values.get('x')), y: Number(values.get('y')) },
               scale: { x: Number(values.get('scaleX')), y: Number(values.get('scaleY')) },
             });
@@ -186,7 +185,7 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
               <input
                 type="checkbox"
                 checked={selected.visible}
-                onChange={(event) => document.updateImage(selected.id, { visible: event.target.checked })}
+                onChange={(event) => document.artwork.updateImage(selected.id, { visible: event.target.checked })}
               />{' '}
               Visible
             </label>
@@ -194,7 +193,9 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
             <div className="scene-artwork-commands">
               <button
                 type="button"
-                onClick={() => document.updateImage(selected.id, { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 } })}
+                onClick={() =>
+                  document.artwork.updateImage(selected.id, { position: { x: 0, y: 0 }, scale: { x: 1, y: 1 } })
+                }
               >
                 Reset transforms
               </button>
@@ -218,7 +219,11 @@ export function SceneArtworkPanel({ document }: { document: SceneEditorDocument 
               >
                 Replace from project
               </button>
-              <button type="button" className="workspace-danger" onClick={() => document.removeImage(selected.id)}>
+              <button
+                type="button"
+                className="workspace-danger"
+                onClick={() => document.artwork.removeImage(selected.id)}
+              >
                 Remove Element
               </button>
             </div>

@@ -30,7 +30,7 @@ async function documentWithImage() {
   const document = new SceneEditorDocument();
   document.createScene({ id: 'forest' });
   const reference = await document.images.add(png(), 'forest.png');
-  assert.isTrue(document.addImage(reference));
+  assert.isTrue(document.artwork.addImage(reference));
   return { document, reference };
 }
 
@@ -39,19 +39,19 @@ test('background creation, project image selection, immutable Actors and one-ste
   document.addActor('../characters/hero/character.json', { x: 12, y: 45 });
   const actors = JSON.stringify(document.workingScene!.actors);
   const original = document.workingScene!.images![0]!;
-  assert.isTrue(document.addImage(reference));
+  assert.isTrue(document.artwork.addImage(reference));
   assert.lengthOf(document.images.entries, 1);
   assert.lengthOf(document.workingScene!.images!, 2);
   assert.equal(document.selectedImageId, 'image-2');
-  document.beginImageDrag('image-2');
-  for (let x = 10; x <= 50; x += 10) document.moveImageDrag({ position: { x, y: 20 }, scale: { x: 2, y: 3 } });
-  document.endImageDrag();
+  const imageDrag = document.beginDrag({ kind: 'image', id: 'image-2' })!;
+  for (let x = 10; x <= 50; x += 10) imageDrag.change({ position: { x, y: 20 }, scale: { x: 2, y: 3 } });
+  imageDrag.end();
   assert.isTrue(document.undo());
   assert.deepEqual(document.workingScene!.images![1]!.position, { x: 0, y: 0 });
   assert.deepEqual(document.workingScene!.images![1]!.scale, { x: 1, y: 1 });
   assert.isTrue(document.redo());
   assert.deepEqual(document.workingScene!.images![1]!.scale, { x: 2, y: 3 });
-  document.updateImage('image-2', { visible: false, opacity: 0.5 });
+  document.artwork.updateImage('image-2', { visible: false, opacity: 0.5 });
   assert.isFalse(document.workingScene!.images![1]!.visible);
   assert.equal(JSON.stringify(document.workingScene!.actors), actors);
   assert.deepEqual(document.workingScene!.images![0], original);
@@ -62,17 +62,17 @@ test('background creation, project image selection, immutable Actors and one-ste
 
 test('cancelled image gestures preserve redo and scene navigation rolls back the provisional transform', async () => {
   const { document } = await documentWithImage();
-  document.updateImage('image-1', { visible: false });
+  document.artwork.updateImage('image-1', { visible: false });
   document.undo();
   const before = document.workingScene;
-  document.beginImageDrag('image-1');
-  document.moveImageDrag({ position: { x: 100, y: 30 }, scale: { x: 4, y: 2 } });
+  let imageDrag = document.beginDrag({ kind: 'image', id: 'image-1' })!;
+  imageDrag.change({ position: { x: 100, y: 30 }, scale: { x: 4, y: 2 } });
   assert.isTrue(document.hasOpenOperation);
-  document.cancelImageDrag();
+  imageDrag.cancel();
   assert.strictEqual(document.workingScene, before);
   assert.isTrue(document.canRedo);
-  document.beginImageDrag('image-1');
-  document.moveImageDrag({ position: { x: 90, y: 40 }, scale: { x: 1, y: 1 } });
+  imageDrag = document.beginDrag({ kind: 'image', id: 'image-1' })!;
+  imageDrag.change({ position: { x: 90, y: 40 }, scale: { x: 1, y: 1 } });
   document.createScene({ id: 'other' });
   assert.strictEqual(document.scene('forest'), before);
 });
@@ -102,7 +102,7 @@ test('image asset ownership, deduplication, path collisions, header and format c
 test('cleanup protects working, source, saved, undo, redo and active gesture assets', async () => {
   const { document, reference } = await documentWithImage();
   document.images.register('../images/unused.png', png());
-  document.removeImage('image-1');
+  document.artwork.removeImage('image-1');
   assert.equal(document.cleanupImages(), 1);
   assert.isTrue(document.images.has(reference));
   document.undo();
@@ -129,10 +129,10 @@ test('missing image drafts stay editable and production validation prevents expo
     ],
   };
   assert.isTrue(document.importJson(JSON.stringify(draft)));
-  assert.isTrue(document.updateImage('background', { position: { x: 20, y: 5 } }));
+  assert.isTrue(document.artwork.updateImage('background', { position: { x: 20, y: 5 } }));
   assert.isFalse(document.validateScene());
   assert.match(document.validationIssues[0]!.message, /Missing image/);
-  assert.isTrue(document.removeImage('background'));
+  assert.isTrue(document.artwork.removeImage('background'));
   assert.isTrue(document.validateScene());
 });
 
@@ -170,8 +170,12 @@ test('project export/import and standalone scene ZIP preserve artwork and binary
   const workspace = new ProjectWorkspace('Film');
   workspace.createScene({ id: 'forest' });
   const reference = await workspace.scenes.images.add(png(), 'forest.png');
-  workspace.scenes.addImage(reference);
-  workspace.scenes.updateImage('image-1', { position: { x: -200, y: 80 }, scale: { x: 3, y: 2 }, visible: false });
+  workspace.scenes.artwork.addImage(reference);
+  workspace.scenes.artwork.updateImage('image-1', {
+    position: { x: -200, y: 80 },
+    scale: { x: 3, y: 2 },
+    visible: false,
+  });
   const before = workspace.autosaveRevision;
   const captured = await buildProjectPackage(workspace);
   const restored = await importProjectPackage(decodePackageZip(encodePackageZip(captured.files)));
@@ -186,7 +190,7 @@ test('project export/import and standalone scene ZIP preserve artwork and binary
   assert.equal(workspace.scenes.workingScene!.images![0]!.image, reference);
   workspace.markExported(captured.metadata, captured.characters, captured.scenes);
   assert.isFalse(workspace.hasUnsavedChanges);
-  workspace.scenes.updateImage('image-1', { visible: true });
+  workspace.scenes.artwork.updateImage('image-1', { visible: true });
   assert.isTrue(workspace.hasUnsavedChanges);
   assert.notEqual(workspace.autosaveRevision, before);
 });
@@ -203,7 +207,7 @@ test('scene artwork shares character image binaries in project ZIPs without chan
   workspace.createScene({ id: 'forest' });
   workspace.scenes.addActor(workspace.characterReference('hero'));
   const reference = await workspace.scenes.images.add(png(), 'existing paper');
-  workspace.scenes.addImage(reference);
+  workspace.scenes.artwork.addImage(reference);
   const { files } = await buildProjectPackage(workspace);
   assert.equal([...files.values()].filter((bytes) => bytes.length === png().length).length, 1);
   assert.equal(JSON.stringify(workspace.captureCharacter('hero').rig), rig);

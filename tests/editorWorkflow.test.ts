@@ -136,8 +136,8 @@ test('Escape cancels a scene clip gesture before deselecting; history and playba
   const { document, playback, release } = scene();
   try {
     const source = document.workingScene;
-    document.beginActionDrag('hold');
-    document.changeActionDrag({ ...document.workingScene!.actions[0]!, time: 2000 });
+    const actionDrag = document.beginDrag({ kind: 'action', id: 'hold' })!;
+    actionDrag.change({ ...document.workingScene!.actions[0]!, time: 2000 });
     key({ key: 'z', ctrlKey: true });
     key({ code: 'Space' });
     assert.isTrue(document.hasActiveGesture);

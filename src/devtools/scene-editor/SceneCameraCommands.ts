@@ -6,17 +6,28 @@ import {
 } from '../../engine/core.js';
 import type { CinematicCameraState } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import type { SceneGestureKind } from './SceneEditorGestures.js';
 
 type CommandState = Pick<
   SceneEditorDocument,
-  'replaceScene' | 'selectCameraKey' | 'setCameraKeyEditing' | 'workingScene'
+  'cinematicCamera' | 'replaceScene' | 'selectCameraKey' | 'setCameraKeyEditing' | 'workingScene'
 >;
+/** The camera-key edits a scene document exposes as `document.camera`. */
+export type SceneCameraEditing = Pick<SceneCameraCommands, keyof SceneCameraCommands>;
 
 /** Build camera-key and cut proposals; the document validates and commits each snapshot to its shared history. */
 export class SceneCameraCommands {
-  constructor(private readonly state: CommandState) {}
+  constructor(
+    private readonly state: CommandState,
+    /** Commit the active gesture, unless it is a drag of `unlessDragging`. */
+    private readonly finishGestures: (unlessDragging?: SceneGestureKind) => void,
+    /** The playback time camera keys default to. */
+    private readonly time: () => number,
+  ) {}
 
-  setCameraKey(time: number, values: Partial<CinematicCameraState>): boolean {
+  /** Explicit capture; channels at the same time are replaced without duplicating keys. */
+  setCameraKey(time = this.time(), values: Partial<CinematicCameraState> = this.state.cinematicCamera): boolean {
+    this.finishGestures('camera');
     const scene = this.state.workingScene;
     if (!scene) return false;
     const tracks = { ...scene.cameraTracks };
@@ -31,7 +42,12 @@ export class SceneCameraCommands {
     }
     return this.state.replaceScene({ ...scene, cameraTracks: tracks });
   }
-  setCameraCut(time: number, values: CinematicCameraState): boolean {
+  /** A cut uses the existing camera owner: each preceding channel key holds until
+   * this shot's key. A time-zero baseline prevents first-key pre-roll changing the old shot.
+   * All three channels and predecessor curves enter history in one validated snapshot.
+   */
+  setCameraCut(time = this.time(), values: CinematicCameraState = this.state.cinematicCamera): boolean {
+    this.finishGestures();
     const scene = this.state.workingScene;
     if (!scene) return false;
     const tracks = { ...scene.cameraTracks };
@@ -57,6 +73,7 @@ export class SceneCameraCommands {
     return true;
   }
   updateCameraKey(property: CameraProperty, id: string, patch: Partial<Omit<CameraKeyframe, 'id'>>): boolean {
+    this.finishGestures('cameraKey');
     const scene = this.state.workingScene;
     const keys = scene?.cameraTracks?.[property];
     if (!scene || !keys?.some((key) => key.id === id)) return false;
@@ -69,6 +86,7 @@ export class SceneCameraCommands {
     });
   }
   removeCameraKey(property: CameraProperty, id: string): boolean {
+    this.finishGestures();
     const scene = this.state.workingScene;
     if (!scene?.cameraTracks?.[property]?.some((key) => key.id === id)) return false;
     return this.state.replaceScene({
@@ -77,6 +95,7 @@ export class SceneCameraCommands {
     });
   }
   duplicateCameraKey(property: CameraProperty, id: string, time: number): boolean {
+    this.finishGestures();
     const scene = this.state.workingScene;
     const keys = scene?.cameraTracks?.[property];
     const key = keys?.find((key) => key.id === id);

@@ -27,7 +27,7 @@ test.each(['actor', 'image', 'action', 'audio', 'camera', 'cameraKey'] as const)
     const document = documentHistory();
     const notify = vi.fn(() => assert.isFalse(gestures.hasActiveGesture));
     const gestures = new SceneEditorGestures(notify);
-    const target = kind === 'camera' ? 0 : kind === 'cameraKey' ? true : 'selected';
+    const target = kind === 'camera' ? 0 : kind === 'cameraKey' ? { property: 'x' as const, id: 'key' } : 'selected';
     gestures.begin(kind, target, document.history);
     document.move(10);
     document.move(20);

@@ -92,9 +92,10 @@ test('Actor drags own only the changed placement and reuse action validation and
   document.importJson(JSON.stringify(fixture(2000)));
   const original = document.workingScene!;
   includes.mockClear();
-  assert.isTrue(document.beginActorDrag('hero'));
+  const actorDrag = document.beginDrag({ kind: 'actor', id: 'hero' });
+  assert.isNotNull(actorDrag);
   const position = { x: 10, y: 20 };
-  assert.isTrue(document.moveActorDrag(position));
+  assert.isTrue(actorDrag.change({ position: position }));
   const moved = document.workingScene!;
   position.x = 999;
   assert.equal(moved.actors[0]!.position.x, 10);
@@ -105,7 +106,7 @@ test('Actor drags own only the changed placement and reuse action validation and
   assert.strictEqual(moved.actions, original.actions);
   assert.isTrue(Object.isFrozen(moved.actors[0]!.position));
   assert.equal(includes.mock.calls.length, 0, 'placement cannot change action reference validity');
-  document.cancelActorDrag();
+  actorDrag.cancel();
   assert.strictEqual(document.workingScene, original);
   assert.isFalse(document.canUndo);
   includes.mockRestore();
@@ -118,9 +119,9 @@ test('action drags share unchanged entries and nested targets while keeping one 
   document.importJson(JSON.stringify(input));
   const original = document.workingScene!;
   const action = original.actions.at(-1)!;
-  document.beginActionDrag(action.id);
-  assert.isTrue(document.changeActionDrag({ ...action, time: 600 }));
-  assert.isTrue(document.changeActionDrag({ ...document.workingScene!.actions.at(-1)!, time: 700 }));
+  const actionDrag = document.beginDrag({ kind: 'action', id: action.id })!;
+  assert.isTrue(actionDrag.change({ ...action, time: 600 }));
+  assert.isTrue(actionDrag.change({ ...document.workingScene!.actions.at(-1)!, time: 700 }));
   const moved = document.workingScene!;
   assert.strictEqual(moved.actors, original.actors);
   for (let index = 0; index < 2000; index++) assert.strictEqual(moved.actions[index], original.actions[index]);
@@ -128,7 +129,7 @@ test('action drags share unchanged entries and nested targets while keeping one 
   assert.isTrue(action.type === 'face' && moved.actions.at(-1)!.type === 'face');
   const changed = moved.actions.at(-1)!;
   if (action.type === 'face' && changed.type === 'face') assert.strictEqual(changed.target, action.target);
-  document.endActionDrag();
+  actionDrag.end();
   assert.isTrue(document.undo());
   assert.strictEqual(document.workingScene, original);
   assert.isFalse(document.canUndo);

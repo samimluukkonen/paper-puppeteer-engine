@@ -40,7 +40,7 @@ export function SceneAudioControls({
         className="workspace-primary"
         disabled={document.hasActiveGesture}
         data-guide-id={GUIDE_TARGETS.sceneAudioAddTrack}
-        onClick={() => document.addAudioTrack(category)}
+        onClick={() => document.audio.addTrack(category)}
       >
         Add audio track
       </button>
@@ -88,7 +88,7 @@ export function SceneAudioControls({
         onClick={() => {
           if (!selectedAsset || !selectedTrack || !document.workingScene) return;
           playback.pause();
-          document.addAudioClip({
+          document.audio.addClip({
             assetId: selectedAsset.id,
             trackId: selectedTrack.id,
             time: playback.time,
@@ -159,7 +159,7 @@ export function SceneAudioTracks({
                     )
                   )
                     return;
-                  document.removeAudioTrack(track.id, { removeClips: true });
+                  document.audio.removeTrack(track.id, { removeClips: true });
                 }}
               >
                 <Trash2 size={16} aria-hidden="true" />

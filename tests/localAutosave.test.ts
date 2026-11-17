@@ -553,16 +553,16 @@ test('open Actor and action gestures block project snapshots and cancellation re
   workspace.createScene({ id: 'scene' });
   workspace.scenes.addActor(workspace.characterReference('hero'));
   const before = workspace.autosaveRevision;
-  workspace.scenes.beginActorDrag('actor-1');
-  workspace.scenes.moveActorDrag({ x: 50, y: 30 });
+  const actorDrag = workspace.scenes.beginDrag({ kind: 'actor', id: 'actor-1' })!;
+  actorDrag.change({ position: { x: 50, y: 30 } });
   assert.isUndefined(workspace.autosaveRevision);
-  workspace.scenes.cancelActorDrag();
+  actorDrag.cancel();
   assert.equal(workspace.autosaveRevision, before);
   workspace.scenes.addAction({ actorId: 'actor-1', type: 'wait', time: 0, duration: 500 });
-  workspace.scenes.beginActionDrag('action-1');
-  workspace.scenes.changeActionDrag({ id: 'action-1', actorId: 'actor-1', type: 'wait', time: 200, duration: 500 });
+  const actionDrag = workspace.scenes.beginDrag({ kind: 'action', id: 'action-1' })!;
+  actionDrag.change({ id: 'action-1', actorId: 'actor-1', type: 'wait', time: 200, duration: 500 });
   assert.isUndefined(workspace.autosaveRevision);
-  workspace.scenes.endActionDrag();
+  actionDrag.end();
   assert.isDefined(workspace.autosaveRevision);
 });
 

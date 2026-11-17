@@ -24,7 +24,7 @@ export function SceneDialogueControls({
           playback.pause();
           const time = playback.time;
           const next = scene.dialogue?.filter((line) => line.time > time).sort((a, b) => a.time - b.time)[0];
-          document.addDialogueLine({
+          document.dialogue.add({
             time,
             duration: Math.min(2000, (next?.time ?? scene.duration) - time),
             text: '',

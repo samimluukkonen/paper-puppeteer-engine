@@ -112,17 +112,17 @@ test('many drag updates are one history transaction; Escape cancellation preserv
   const { document, id } = fixture();
   const source = document.sourceScene;
   document.markSaved();
-  document.beginActorDrag(id);
-  document.moveActorDrag({ x: 10, y: 20 });
-  document.moveActorDrag({ x: -50.125, y: 300 });
-  document.endActorDrag();
+  let actorDrag = document.beginDrag({ kind: 'actor', id })!;
+  actorDrag.change({ position: { x: 10, y: 20 } });
+  actorDrag.change({ position: { x: -50.125, y: 300 } });
+  actorDrag.end();
   assert.deepEqual(document.workingScene!.actors[0]!.position, { x: -50.125, y: 300 });
   document.undo();
   assert.deepEqual(document.workingScene!.actors[0]!.position, { x: 0, y: 0 });
   assert.isFalse(document.dirty);
-  document.beginActorDrag(id);
-  document.moveActorDrag({ x: 123, y: 321 });
-  document.cancelActorDrag();
+  actorDrag = document.beginDrag({ kind: 'actor', id })!;
+  actorDrag.change({ position: { x: 123, y: 321 } });
+  actorDrag.cancel();
   assert.isTrue(document.canRedo);
   assert.deepEqual(document.workingScene!.actors[0]!.position, { x: 0, y: 0 });
   document.redo();
@@ -133,10 +133,10 @@ test('many drag updates are one history transaction; Escape cancellation preserv
 
 test('switching scenes cancels active movement before retaining independent histories', () => {
   const { document, id } = fixture();
-  document.beginActorDrag(id);
-  document.moveActorDrag({ x: 77, y: 88 });
+  const actorDrag = document.beginDrag({ kind: 'actor', id })!;
+  actorDrag.change({ position: { x: 77, y: 88 } });
   document.createScene({ id: 'other' });
-  assert.isFalse(document.moveActorDrag({ x: 999, y: 999 }));
+  assert.isFalse(actorDrag.change({ position: { x: 999, y: 999 } }));
   document.selectScene('stage');
   assert.deepEqual(document.workingScene!.actors[0]!.position, { x: 0, y: 0 });
   document.undo();
@@ -306,7 +306,7 @@ test('preview updates only changed Actor fields and layer properties without res
   assert.equal(firstCalls.depth.mock.calls.length, 1);
   assert.equal(secondCalls.depth.mock.calls.length, 1);
   assert.equal(secondCalls.pose.mock.calls.length, 0);
-  document.updateLayer('actors', { visible: false });
+  document.artwork.updateLayer('actors', { visible: false });
   assert.isEmpty(preview.sync(document.workingScene!, definitions));
   assert.equal(first.puppet.container.visible, false);
   assert.equal(second.puppet.container.visible, false);

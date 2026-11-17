@@ -284,7 +284,7 @@ export async function profileScene() {
         const editsStart = performance.now();
         for (let i = 0; i < 60; i++) {
           flushSync(() => {
-            doc.setCameraKey(i * 100, { x: i * 5, y: 0, zoom: 1 + i / 100 });
+            doc.camera.setCameraKey(i * 100, { x: i * 5, y: 0, zoom: 1 + i / 100 });
             root.render(
               <SceneTimeline scene={doc.workingScene!} document={doc} registry={registry} playback={playback} />,
             );

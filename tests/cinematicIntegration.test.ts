@@ -26,14 +26,14 @@ test('complete cinematic project survives history, scene/project switching, reco
   const doc = project.scenes;
   const png = assets.documents['images/paper.png'] as Uint8Array<ArrayBuffer>;
   const reference = await doc.images.add(png, 'background.png');
-  for (let i = 0; i < 3; i++) assert.isTrue(doc.addImage(reference));
-  assert.isTrue(doc.addLayer());
-  assert.isTrue(doc.updateLayer('layer-1', { name: 'Mountains', parallax: 0.2 }));
-  assert.isTrue(doc.assignImageLayer('image-2', 'layer-1'));
-  assert.isTrue(doc.reorderLayer('layer-1', -1));
-  assert.isTrue(doc.addLayer());
-  assert.isTrue(doc.updateLayer('layer-2', { name: 'Foreground', parallax: 1.2 }));
-  assert.isTrue(doc.assignImageLayer('image-3', 'layer-2'));
+  for (let i = 0; i < 3; i++) assert.isTrue(doc.artwork.addImage(reference));
+  assert.isTrue(doc.artwork.addLayer());
+  assert.isTrue(doc.artwork.updateLayer('layer-1', { name: 'Mountains', parallax: 0.2 }));
+  assert.isTrue(doc.artwork.assignImageLayer('image-2', 'layer-1'));
+  assert.isTrue(doc.artwork.reorderLayer('layer-1', -1));
+  assert.isTrue(doc.artwork.addLayer());
+  assert.isTrue(doc.artwork.updateLayer('layer-2', { name: 'Foreground', parallax: 1.2 }));
+  assert.isTrue(doc.artwork.assignImageLayer('image-3', 'layer-2'));
   for (let i = 0; i < 2; i++) assert.isTrue(doc.addActor(project.characterReference('hero'), { x: i * 100, y: 0 }));
   assert.isTrue(
     doc.addAction({ type: 'move', actorId: 'actor-1', time: 0, duration: 6000, destination: { x: 200, y: 30 } }),
@@ -49,12 +49,12 @@ test('complete cinematic project survives history, scene/project switching, reco
       speed: 1,
     }),
   );
-  assert.isTrue(doc.setCameraKey(0, { x: 0, y: 0, zoom: 1 }));
-  assert.isTrue(doc.setCameraKey(2000, { x: 100, y: 40, zoom: 1.5 }));
-  assert.isTrue(doc.setCameraCut(3000, { x: -100, y: 20, zoom: 2 }));
-  assert.isTrue(doc.addTransition({ time: 0, duration: 1000, type: 'fade-in', color: '#000000' }));
+  assert.isTrue(doc.camera.setCameraKey(0, { x: 0, y: 0, zoom: 1 }));
+  assert.isTrue(doc.camera.setCameraKey(2000, { x: 100, y: 40, zoom: 1.5 }));
+  assert.isTrue(doc.camera.setCameraCut(3000, { x: -100, y: 20, zoom: 2 }));
+  assert.isTrue(doc.transitions.addTransition({ time: 0, duration: 1000, type: 'fade-in', color: '#000000' }));
   const beforeFade = doc.workingScene;
-  assert.isTrue(doc.addTransition({ time: 5000, duration: 1000, type: 'fade-out', color: '#123456' }));
+  assert.isTrue(doc.transitions.addTransition({ time: 5000, duration: 1000, type: 'fade-out', color: '#123456' }));
   const authored = doc.workingScene;
   assert.isTrue(doc.undo());
   assert.deepEqual(doc.workingScene, beforeFade);

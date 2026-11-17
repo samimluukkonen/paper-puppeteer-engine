@@ -1,16 +1,20 @@
 import type { AudioAssetDefinition, AudioCategory, SceneAudioClip } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import type { SceneGestureKind } from './SceneEditorGestures.js';
 
 type State = Pick<
   SceneEditorDocument,
   'workingScene' | 'replaceScene' | 'selectAudioClip' | 'audioAssets' | 'reportError'
 >;
+/** The audio edits a scene document exposes as `document.audio`. */
+export type SceneAudioEditing = Pick<SceneAudioCommands, keyof SceneAudioCommands>;
 
 /** Proposals share the document's validation, immutable snapshots and history owner. */
 export class SceneAudioCommands {
   constructor(
     private readonly state: State,
-    private readonly finishGestures: () => void,
+    /** Commit the active gesture, unless it is a drag of `unlessDragging`. */
+    private readonly finishGestures: (unlessDragging?: SceneGestureKind) => void,
   ) {}
 
   addTrack(category: AudioCategory): boolean {
@@ -70,6 +74,7 @@ export class SceneAudioCommands {
     });
   }
   updateClip(id: string, patch: Partial<Omit<SceneAudioClip, 'id'>>): boolean {
+    this.finishGestures('audio');
     const scene = this.state.workingScene;
     if (!scene?.audioClips?.some((clip) => clip.id === id)) return false;
     const asset = patch.assetId && this.state.audioAssets.find((asset) => asset.id === patch.assetId);
@@ -79,6 +84,10 @@ export class SceneAudioCommands {
       audioAssets: asset && !assets.some((entry) => entry.id === asset.id) ? [...assets, asset] : assets,
       audioClips: scene.audioClips.map((clip) => (clip.id === id ? { ...clip, ...patch, id } : clip)),
     });
+  }
+  duplicateClip(id: string): boolean {
+    const clip = this.state.workingScene?.audioClips?.find((clip) => clip.id === id);
+    return clip ? this.addClip({ ...clip }) : false;
   }
   removeClip(id: string): boolean {
     this.finishGestures();

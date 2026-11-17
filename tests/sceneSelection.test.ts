@@ -64,7 +64,7 @@ test('toggling camera preview keeps the dialogue, audio, transition or camera-ke
     doc.setCameraPreview(false);
     assert.isDefined(selected());
   }
-  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  assert.isTrue(doc.camera.setCameraKey(0, { x: 10 }));
   const key = doc.workingScene!.cameraTracks!.x![0]!;
   doc.selectCameraKey('x', key.id);
   doc.setCameraPreview(true);
@@ -73,7 +73,7 @@ test('toggling camera preview keeps the dialogue, audio, transition or camera-ke
 
 test('enabling camera key editing keeps the selected key; disabling clears the key and keeps the camera', () => {
   const doc = document();
-  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  assert.isTrue(doc.camera.setCameraKey(0, { x: 10 }));
   const key = doc.workingScene!.cameraTracks!.x![0]!;
   doc.selectCameraKey('x', key.id);
   doc.setCameraKeyEditing(true);
@@ -163,7 +163,7 @@ test('every selectable kind replaces the others', () => {
 
 test('selecting a camera key publishes one selection change', () => {
   const doc = document();
-  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  assert.isTrue(doc.camera.setCameraKey(0, { x: 10 }));
   const key = doc.workingScene!.cameraTracks!.x![0]!;
   doc.selectActor('hero');
   const listener = vi.fn();

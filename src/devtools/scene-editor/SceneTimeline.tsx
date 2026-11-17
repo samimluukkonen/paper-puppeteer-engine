@@ -20,7 +20,13 @@ import { SceneAnimationLibrary } from './SceneAnimationLibrary.js';
 import { SceneAudioControls, SceneAudioTracks } from './SceneAudioTimeline.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
 import { SceneDialogueControls, SceneDialogueTrack } from './SceneDialogueTimeline.js';
-import type { ReadonlyScene, SceneEditorDocument, SceneActionInput } from './SceneEditorDocument.js';
+import type {
+  ReadonlyScene,
+  SceneActionInput,
+  SceneDrag,
+  SceneDragChanges,
+  SceneEditorDocument,
+} from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import {
   ScenePlaybackControls,
@@ -39,6 +45,7 @@ type Drag = {
   resize: boolean;
   valid: boolean;
   width: number;
+  drag: SceneDrag<SceneDragChanges['action']>;
 };
 export function SceneTimeline({
   scene,
@@ -61,6 +68,7 @@ export function SceneTimeline({
     edge: 'move' | 'start' | 'end';
     width: number;
     valid: boolean;
+    drag: SceneDrag<SceneDragChanges['audio']>;
   } | null>(null);
   const gesture = useRef<Drag | null>(null);
   const cameraGesture = useRef<{
@@ -71,8 +79,17 @@ export function SceneTimeline({
     id: string;
     width: number;
     valid: boolean;
+    drag: SceneDrag<SceneDragChanges['cameraKey']>;
   } | null>(null);
   const scrub = useRef<number | null>(null);
+  /** Cancel the drags this timeline started; stage drags are not the timeline's to cancel. */
+  const cancelDrags = (): void => {
+    const drags = [audioGesture.current?.drag, gesture.current?.drag, cameraGesture.current?.drag];
+    audioGesture.current = null;
+    gesture.current = null;
+    cameraGesture.current = null;
+    for (const drag of drags) drag?.cancel();
+  };
   const [viewportWidth, setViewportWidth] = useState(600);
   const [zoom, setZoom] = useState(1);
   const [snap, setSnap] = useState(true);
@@ -101,13 +118,8 @@ export function SceneTimeline({
   useEffect(() => {
     const cancel = (): void => {
       playback.cancelSeek();
-      audioGesture.current = null;
-      document.cancelAudioDrag();
-      gesture.current = null;
-      cameraGesture.current = null;
       scrub.current = null;
-      document.cancelActionDrag();
-      document.cancelCameraDrag();
+      cancelDrags();
     };
     window.addEventListener('blur', cancel);
     const escape = (event: KeyboardEvent): void => {
@@ -242,7 +254,7 @@ export function SceneTimeline({
                   disabled={document.hasActiveGesture}
                   onClick={() => {
                     playback.pause();
-                    document.setCameraKey(playback.time);
+                    document.camera.setCameraKey(playback.time);
                     document.setCameraKeyEditing(true);
                   }}
                 >
@@ -254,7 +266,7 @@ export function SceneTimeline({
                   disabled={document.hasActiveGesture}
                   onClick={() => {
                     playback.pause();
-                    document.setCameraCut(playback.time);
+                    document.camera.setCameraCut(playback.time);
                   }}
                 >
                   Set Camera Cut
@@ -285,7 +297,7 @@ export function SceneTimeline({
                   disabled={document.hasActiveGesture || playback.time >= scene.duration}
                   onClick={() => {
                     playback.pause();
-                    document.addTransition({
+                    document.transitions.addTransition({
                       type: fadeType,
                       time: playback.time,
                       duration: Math.min(1000, scene.duration - playback.time),
@@ -383,7 +395,7 @@ export function SceneTimeline({
           }
           const audioDrag = audioGesture.current;
           if (audioDrag?.pointer === event.pointerId) {
-            audioDrag.valid = document.changeAudioDrag(
+            audioDrag.valid = audioDrag.drag.change(
               editAudioClipOnTimeline(
                 scene,
                 audioDrag.clip,
@@ -410,7 +422,7 @@ export function SceneTimeline({
               scene.duration,
               cameraDrag,
             );
-            cameraDrag.valid = document.changeCameraKeyDrag(time);
+            cameraDrag.valid = cameraDrag.drag.change(time);
             return;
           }
           if (!drag || drag.pointer !== event.pointerId) return;
@@ -441,7 +453,7 @@ export function SceneTimeline({
             );
             next = { ...action, time };
           }
-          drag.valid = document.changeActionDrag(next);
+          drag.valid = drag.drag.change(next);
         }}
         onPointerUp={(event) => {
           if (scrub.current === event.pointerId) {
@@ -454,47 +466,35 @@ export function SceneTimeline({
           const audioDrag = audioGesture.current;
           if (audioDrag?.pointer === event.pointerId) {
             audioGesture.current = null;
-            if (audioDrag.valid) document.endAudioDrag();
-            else document.cancelAudioDrag();
+            if (audioDrag.valid) audioDrag.drag.end();
+            else audioDrag.drag.cancel();
             event.currentTarget.releasePointerCapture(event.pointerId);
             return;
           }
           const cameraDrag = cameraGesture.current;
           if (cameraDrag?.pointer === event.pointerId) {
             cameraGesture.current = null;
-            if (cameraDrag.valid) document.endCameraDrag();
-            else document.cancelCameraDrag();
+            if (cameraDrag.valid) cameraDrag.drag.end();
+            else cameraDrag.drag.cancel();
             event.currentTarget.releasePointerCapture(event.pointerId);
             return;
           }
           const drag = gesture.current;
           if (!drag || drag.pointer !== event.pointerId) return;
-          audioGesture.current = null;
-          document.cancelAudioDrag();
           gesture.current = null;
-          if (drag.valid) document.endActionDrag();
-          else document.cancelActionDrag();
+          if (drag.valid) drag.drag.end();
+          else drag.drag.cancel();
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
         onPointerCancel={() => {
           playback.cancelSeek();
           scrub.current = null;
-          audioGesture.current = null;
-          document.cancelAudioDrag();
-          gesture.current = null;
-          document.cancelActionDrag();
-          cameraGesture.current = null;
-          document.cancelCameraDrag();
+          cancelDrags();
         }}
         onLostPointerCapture={() => {
           playback.cancelSeek();
           scrub.current = null;
-          audioGesture.current = null;
-          document.cancelAudioDrag();
-          gesture.current = null;
-          document.cancelActionDrag();
-          cameraGesture.current = null;
-          document.cancelCameraDrag();
+          cancelDrags();
         }}
       >
         <div className="scene-timeline-content" style={{ width: width + 146 }}>
@@ -574,9 +574,11 @@ export function SceneTimeline({
                             return;
                           }
                           viewport.current?.focus();
-                          if (!document.beginActionDrag(action.id)) return;
+                          const drag = document.beginDrag({ kind: 'action', id: action.id });
+                          if (!drag) return;
                           viewport.current?.setPointerCapture(event.pointerId);
                           gesture.current = {
+                            drag,
                             pointer: event.pointerId,
                             x: event.clientX,
                             action: structuredClone(action) as SceneActionDefinition,
@@ -634,9 +636,11 @@ export function SceneTimeline({
                         event.preventDefault();
                         viewport.current?.focus();
                         playback.pause();
-                        if (!document.beginCameraKeyDrag(property, key.id)) return;
+                        const drag = document.beginDrag({ kind: 'cameraKey', property, id: key.id });
+                        if (!drag) return;
                         viewport.current?.setPointerCapture(event.pointerId);
                         cameraGesture.current = {
+                          drag,
                           pointer: event.pointerId,
                           x: event.clientX,
                           time: key.time,
@@ -710,10 +714,12 @@ export function SceneTimeline({
               event.preventDefault();
               viewport.current?.focus();
               playback.pause();
-              if (!document.beginAudioDrag(clip.id)) return;
+              const drag = document.beginDrag({ kind: 'audio', id: clip.id });
+              if (!drag) return;
               viewport.current?.setPointerCapture(event.pointerId);
               const edge = (event.target as HTMLElement).dataset.audioEdge;
               audioGesture.current = {
+                drag,
                 pointer: event.pointerId,
                 x: event.clientX,
                 clip: { ...clip },

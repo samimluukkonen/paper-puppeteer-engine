@@ -77,9 +77,9 @@ test('authored subscriptions ignore selection, diagnostics and checkpoints, incl
   assert.equal(document.getAuthoredSnapshot(), authored + 1);
   document.undo();
   document.redo();
-  document.beginActorDrag('hero');
-  document.moveActorDrag({ x: 30, y: 40 });
-  document.cancelActorDrag();
+  const actorDrag = document.beginDrag({ kind: 'actor', id: 'hero' })!;
+  actorDrag.change({ position: { x: 30, y: 40 } });
+  actorDrag.cancel();
   assert.equal(reconcile.mock.calls.length, 5, 'undo, redo, drag movement and cancellation each reconcile');
   document.createScene({ id: 'other' });
   document.selectScene('opening');

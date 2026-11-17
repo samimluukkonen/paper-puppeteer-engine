@@ -24,8 +24,8 @@ async function fixture() {
   document.createScene({ id: 'forest' });
   const bytes = new Uint8Array(artworkFixture().documents['images/paper.png'] as Uint8Array<ArrayBuffer>);
   const reference = await document.images.add(bytes, 'forest.png');
-  document.addImage(reference);
-  document.addImage(reference);
+  document.artwork.addImage(reference);
+  document.artwork.addImage(reference);
   document.addActor('hero.json', { x: 20, y: 30 });
   return { document, reference, bytes };
 }
@@ -41,19 +41,19 @@ test('legacy scenes receive virtual Background/Actors bands without rewriting th
 test('layer and image commands round-trip independently through history without changing Actor choreography', async () => {
   const { document } = await fixture();
   const original = document.workingScene!;
-  document.addLayer();
+  document.artwork.addLayer();
   const created = document.workingScene!;
   assert.lengthOf(created.layers!, 3);
   document.undo();
   assert.strictEqual(document.workingScene, original);
   document.redo();
   assert.strictEqual(document.workingScene, created);
-  document.updateLayer('layer-1', { name: 'Foreground trees', parallax: 1.2 });
-  document.assignImageLayer('image-2', 'layer-1');
+  document.artwork.updateLayer('layer-1', { name: 'Foreground trees', parallax: 1.2 });
+  document.artwork.assignImageLayer('image-2', 'layer-1');
   const beforeOrder = document.workingScene!;
   const tree = beforeOrder.images![1]!;
   assert.isAbove(sceneImageDepth(beforeOrder, tree, 1), sceneActorDepth(beforeOrder, 0));
-  document.reorderLayer('layer-1', -1);
+  document.artwork.reorderLayer('layer-1', -1);
   assert.isBelow(sceneImageDepth(document.workingScene!, tree, 1), sceneActorDepth(document.workingScene!, 0));
   document.undo();
   assert.strictEqual(document.workingScene, beforeOrder);
@@ -70,23 +70,23 @@ test('layer and image commands round-trip independently through history without 
 
 test('image ordering normalizes tied orders stably and remains undoable', async () => {
   const { document } = await fixture();
-  document.updateImage('image-2', { order: 0 });
+  document.artwork.updateImage('image-2', { order: 0 });
   const before = document.workingScene!;
-  document.reorderImage('image-1', 1);
+  document.artwork.reorderImage('image-1', 1);
   const scene = document.workingScene!;
   assert.isAbove(sceneImageDepth(scene, scene.images![0]!, 0), sceneImageDepth(scene, scene.images![1]!, 1));
   document.undo();
   assert.strictEqual(document.workingScene, before);
   document.redo();
-  assert.isFalse(document.reorderImage('image-1', 1));
+  assert.isFalse(document.artwork.reorderImage('image-1', 1));
 });
 
 test('removing a layer reassigns artwork atomically and retains its binary for undo and redo', async () => {
   const { document, reference } = await fixture();
-  document.addLayer();
-  document.assignImageLayer('image-1', 'layer-1');
+  document.artwork.addLayer();
+  document.artwork.assignImageLayer('image-1', 'layer-1');
   const before = document.workingScene;
-  assert.isTrue(document.removeLayer('layer-1'));
+  assert.isTrue(document.artwork.removeLayer('layer-1'));
   assert.equal(document.workingScene!.images![0]!.layerId, 'background');
   assert.lengthOf(document.workingScene!.images!, 2);
   assert.isTrue(document.images.has(reference));
@@ -94,29 +94,29 @@ test('removing a layer reassigns artwork atomically and retains its binary for u
   assert.strictEqual(document.workingScene, before);
   document.redo();
   assert.equal(document.cleanupImages(), 0);
-  assert.isFalse(document.removeLayer('actors'));
-  assert.isFalse(document.removeLayer('background'));
+  assert.isFalse(document.artwork.removeLayer('actors'));
+  assert.isFalse(document.artwork.removeLayer('background'));
 });
 
 test('editor-only locks cancel gestures, guard authored image commands, preserve redo and never enter export', async () => {
   const { document } = await fixture();
-  document.addLayer();
-  document.assignImageLayer('image-1', 'layer-1');
+  document.artwork.addLayer();
+  document.artwork.assignImageLayer('image-1', 'layer-1');
   const before = document.workingScene;
-  document.updateImage('image-1', { visible: false });
+  document.artwork.updateImage('image-1', { visible: false });
   document.undo();
-  document.beginImageDrag('image-1');
-  document.moveImageDrag({ position: { x: 100, y: 200 }, scale: { x: 2, y: 2 } });
+  let imageDrag = document.beginDrag({ kind: 'image', id: 'image-1' })!;
+  imageDrag.change({ position: { x: 100, y: 200 }, scale: { x: 2, y: 2 } });
   document.setLayerLocked('layer-1', true);
   assert.strictEqual(document.workingScene, before);
   assert.isTrue(document.canRedo);
   assert.isFalse(document.hasActiveGesture);
-  assert.isFalse(document.beginImageDrag('image-1'));
-  assert.isFalse(document.updateImage('image-1', { visible: false }));
-  assert.isFalse(document.assignImageLayer('image-1', 'background'));
-  assert.isFalse(document.removeImage('image-1'));
-  assert.isFalse(document.removeLayer('layer-1'));
-  assert.isFalse(document.assignImageLayer('image-2', 'layer-1'));
+  assert.isNull(document.beginDrag({ kind: 'image', id: 'image-1' }));
+  assert.isFalse(document.artwork.updateImage('image-1', { visible: false }));
+  assert.isFalse(document.artwork.assignImageLayer('image-1', 'background'));
+  assert.isFalse(document.artwork.removeImage('image-1'));
+  assert.isFalse(document.artwork.removeLayer('layer-1'));
+  assert.isFalse(document.artwork.assignImageLayer('image-2', 'layer-1'));
   document.selectImage('image-1');
   const json = document.exportJson();
   assert.notInclude(json, 'locked');
@@ -129,8 +129,9 @@ test('editor-only locks cancel gestures, guard authored image commands, preserve
   document.selectScene('forest');
   assert.isTrue(document.isLayerLocked('layer-1'));
   document.setLayerLocked('layer-1', false);
-  assert.isTrue(document.beginImageDrag('image-1'));
-  document.cancelImageDrag();
+  imageDrag = document.beginDrag({ kind: 'image', id: 'image-1' })!;
+  assert.isNotNull(imageDrag);
+  imageDrag.cancel();
   document.setLayerLocked('layer-1', true);
   assert.isTrue(document.importJson(json, { confirmDiscard: () => true }));
   assert.isFalse(document.isLayerLocked('layer-1'));
@@ -217,9 +218,9 @@ test('all image and Actor slots stay in their bands below ground guides at workl
 test('scene ZIP rebasing retains layer identities, order, visibility and factors', async () => {
   const { document, bytes } = await fixture();
   document.removeActor(document.selectedActorId!);
-  document.addLayer();
-  document.updateLayer('layer-1', { name: 'Far mountains', parallax: 0.2, visible: false });
-  document.assignImageLayer('image-2', 'layer-1');
+  document.artwork.addLayer();
+  document.artwork.updateLayer('layer-1', { name: 'Far mountains', parallax: 0.2, visible: false });
+  document.artwork.assignImageLayer('image-2', 'layer-1');
   const source = document.workingScene!;
   const packaged = await buildScenePackage(source, {
     baseUrl: 'https://example.test/scene.json',

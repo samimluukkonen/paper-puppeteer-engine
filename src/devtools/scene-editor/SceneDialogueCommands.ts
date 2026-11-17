@@ -9,6 +9,9 @@ export type SceneDialoguePatch = Partial<Omit<SceneDialogueLine, 'id' | 'actorId
 
 type State = Pick<SceneEditorDocument, 'workingScene' | 'replaceScene' | 'selectDialogueLine' | 'reportError'>;
 
+/** The dialogue edits a scene document exposes as `document.dialogue`. */
+export type SceneDialogueEditing = Pick<SceneDialogueCommands, keyof SceneDialogueCommands>;
+
 /** Proposals use the shared scene validation/history boundary. Text is never normalized. */
 export class SceneDialogueCommands {
   constructor(

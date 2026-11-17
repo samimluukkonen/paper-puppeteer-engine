@@ -115,8 +115,8 @@ test('background tour has unique real anchors before import and with selected, l
     new Uint8Array(artworkFixture().documents['images/paper.png'] as Uint8Array<ArrayBuffer>),
     'forest.png',
   );
-  document.addImage(reference);
-  document.addLayer();
+  document.artwork.addImage(reference);
+  document.artwork.addLayer();
   document.setLayerLocked('background', true);
   anchors();
   assert.include(markup(), '<fieldset disabled');
@@ -256,14 +256,14 @@ test('camera keyframe guide exposes unique anchors with or without keys and pres
   };
   inspect(false);
   assert.isUndefined(document.workingScene!.cameraTracks);
-  document.setCameraKey(0, { x: 0, y: 0, zoom: 1 });
-  document.setCameraKey(3000, { x: 120, y: -40, zoom: 2 });
+  document.camera.setCameraKey(0, { x: 0, y: 0, zoom: 1 });
+  document.camera.setCameraKey(3000, { x: 120, y: -40, zoom: 2 });
   document.setCameraTimeProvider(() => 1500);
   document.setCameraPreview(true);
   document.setCameraOverlays(true);
   const id = document.workingScene!.cameraTracks!.x![0]!.id;
   document.selectCameraKey('x', id);
-  document.updateCameraKey('x', id, {
+  document.camera.updateCameraKey('x', id, {
     curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } },
   });
   document.undo();
@@ -329,14 +329,14 @@ test('cuts and fades guide exposes real targets in empty and selected-effect sta
     inspect(false);
     assert.isUndefined(document.workingScene!.transitions);
     assert.isUndefined(document.workingScene!.cameraTracks);
-    document.setCameraCut(2000, { x: 120, y: 0, zoom: 2 });
-    document.addTransition({ time: 3000, duration: 1000, type: 'fade-out', color: '#123456' });
+    document.camera.setCameraCut(2000, { x: 120, y: 0, zoom: 2 });
+    document.transitions.addTransition({ time: 3000, duration: 1000, type: 'fade-out', color: '#123456' });
     const id = document.selectedTransition!.id;
     document.setCameraTimeProvider(() => 1500);
     document.setCameraPreview(true);
     document.setCameraOverlays(true);
     document.selectTransition(id);
-    document.updateTransition(id, { duration: 500 });
+    document.transitions.updateTransition(id, { duration: 500 });
     document.undo();
     inspect(true);
   } finally {
@@ -460,7 +460,7 @@ test.each([
       document.setCameraPreview(true);
       document.setCameraOverlays(true);
       document.selectAudioClip('voice-clip');
-      document.updateAudioClip('voice-clip', { volume: 0.6 });
+      document.audio.updateClip('voice-clip', { volume: 0.6 });
       document.undo();
       launcher.refresh();
       inspect(true);
@@ -548,7 +548,7 @@ test.each(['scene-dialogue-authoring', 'scene-creating-dialogue'])(
     };
     try {
       inspect(false);
-      document.addDialogueLine({
+      document.dialogue.add({
         time: 500,
         duration: 1000,
         text: '森は静かだった。\n  Hello 👋',
@@ -558,7 +558,7 @@ test.each(['scene-dialogue-authoring', 'scene-creating-dialogue'])(
       document.setCameraPreview(true);
       document.setCameraOverlays(true);
       document.selectDialogueLine(id);
-      document.updateDialogueLine(id, { text: 'Temporary edit' });
+      document.dialogue.update(id, { text: 'Temporary edit' });
       document.undo();
       inspect(true);
       assert.isTrue(document.canRedo);

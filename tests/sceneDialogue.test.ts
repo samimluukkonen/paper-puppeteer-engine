@@ -58,11 +58,11 @@ test('legacy scenes stay unchanged; plain multiline Unicode, whitespace and labe
 test('add and select narration, apply timing/text/speaker edits, delete, Undo and Redo share immutable history', () => {
   const doc = document();
   const original = doc.workingScene;
-  expect(doc.addDialogueLine({ time: 1000, duration: 400, text: 'New line' })).toBe(true);
+  expect(doc.dialogue.add({ time: 1000, duration: 400, text: 'New line' })).toBe(true);
   const id = doc.selectedDialogueLine!.id;
   expect(doc.selectedActorId).toBeNull();
   expect(
-    doc.updateDialogueLine(id, { text: line.text, actorId: 'friend', speakerName: '友達', time: 1100, duration: 600 }),
+    doc.dialogue.update(id, { text: line.text, actorId: 'friend', speakerName: '友達', time: 1100, duration: 600 }),
   ).toBe(true);
   expect(doc.selectedDialogueLine).toEqual({
     id,
@@ -73,7 +73,7 @@ test('add and select narration, apply timing/text/speaker edits, delete, Undo an
     duration: 600,
   });
   const edited = doc.workingScene;
-  expect(doc.removeDialogueLine(id)).toBe(true);
+  expect(doc.dialogue.remove(id)).toBe(true);
   expect(doc.selectedDialogueLine).toBeNull();
   expect(doc.undo()).toBe(true);
   expect(doc.workingScene).toBe(edited);
@@ -90,12 +90,12 @@ test('add and select narration, apply timing/text/speaker edits, delete, Undo an
 
 test('duplicate skips occupied intervals, assigns a new ID and reports no room without modifying history', () => {
   const doc = document();
-  expect(doc.duplicateDialogueLine('opening')).toBe(true);
+  expect(doc.dialogue.duplicate('opening')).toBe(true);
   expect(doc.selectedDialogueLine).toEqual({ ...line, id: 'dialogue-1', time: 1000 });
-  expect(doc.duplicateDialogueLine('opening')).toBe(true);
+  expect(doc.dialogue.duplicate('opening')).toBe(true);
   expect(doc.selectedDialogueLine).toEqual({ ...line, id: 'dialogue-2', time: 1500 });
   const full = doc.workingScene;
-  expect(doc.duplicateDialogueLine('opening')).toBe(false);
+  expect(doc.dialogue.duplicate('opening')).toBe(false);
   expect(doc.workingScene).toBe(full);
   expect(doc.validationIssues[0]!.message).toMatch(/No room.*extend the scene/);
   expect(doc.undo()).toBe(true);
@@ -110,14 +110,14 @@ test('single subtitle intervals reject overlaps in any input order and accept ex
   expect(validateSceneDefinition({ ...source, dialogue: [...source.dialogue!].reverse() })).toEqual([]);
   const doc = document();
   const before = doc.workingScene;
-  expect(doc.updateDialogueLine('hero-line', { time: 499.999 })).toBe(false);
+  expect(doc.dialogue.update('hero-line', { time: 499.999 })).toBe(false);
   expect(doc.validationIssues.some((issue) => /must not overlap/.test(issue.message))).toBe(true);
   expect(doc.workingScene).toBe(before);
   expect(doc.canUndo).toBe(false);
-  expect(doc.addDialogueLine({ time: 250, duration: 1500, text: 'conflict' })).toBe(false);
+  expect(doc.dialogue.add({ time: 250, duration: 1500, text: 'conflict' })).toBe(false);
   expect(doc.updateProperties({ duration: 999 })).toBe(false);
   expect(doc.workingScene).toBe(before);
-  expect(doc.updateDialogueLine('hero-line', { time: 500, duration: 1000 })).toBe(true);
+  expect(doc.dialogue.update('hero-line', { time: 500, duration: 1000 })).toBe(true);
 });
 
 test.each([
@@ -155,7 +155,7 @@ test('duplicate line IDs and excess raw collection sizes are rejected', () => {
 test('same-character Actors retain distinct speaker IDs, rename atomically and require reassignment before removal', () => {
   const doc = document();
   expect(doc.workingScene!.actors[0]!.character).toEqual(doc.workingScene!.actors[1]!.character);
-  expect(doc.updateDialogueLine('opening', { actorId: 'friend' })).toBe(true);
+  expect(doc.dialogue.update('opening', { actorId: 'friend' })).toBe(true);
   expect(doc.updateActor('hero', { id: 'lead' })).toBe(true);
   expect(doc.workingScene!.dialogue!.map((entry) => entry.actorId)).toEqual(['friend', 'lead']);
   expect(doc.undo()).toBe(true);
@@ -165,7 +165,7 @@ test('same-character Actors retain distinct speaker IDs, rename atomically and r
   expect(doc.removeActor('lead', { removeActions: true })).toBe(false);
   expect(doc.validationIssues[0]!.message).toMatch(/hero-line.*Reassign.*narration/);
   expect(doc.workingScene).toBe(before);
-  expect(doc.updateDialogueLine('hero-line', { actorId: null, speakerName: 'Narration' })).toBe(true);
+  expect(doc.dialogue.update('hero-line', { actorId: null, speakerName: 'Narration' })).toBe(true);
   expect(doc.removeActor('lead', { removeActions: true })).toBe(true);
   expect(doc.workingScene!.dialogue![1]).not.toHaveProperty('actorId');
   expect(doc.undo()).toBe(true);
@@ -178,8 +178,8 @@ test('same-character Actors retain distinct speaker IDs, rename atomically and r
 test('selection cancels active gestures, excludes other object selections and is retained per scene', () => {
   const doc = document();
   const before = doc.workingScene;
-  doc.beginActorDrag('hero');
-  doc.moveActorDrag({ x: 900, y: 800 });
+  const actorDrag = doc.beginDrag({ kind: 'actor', id: 'hero' })!;
+  actorDrag.change({ position: { x: 900, y: 800 } });
   doc.selectDialogueLine('opening');
   expect(doc.workingScene).toBe(before);
   expect(doc.hasActiveGesture).toBe(false);
@@ -218,7 +218,7 @@ test('deterministic half-open intervals and shared timeline snapping include dia
 
 test('inspector starts collapsed and treats markup as literal text', () => {
   const doc = document();
-  doc.updateDialogueLine('opening', { text: '<script>alert(1)</script>\n日本語' });
+  doc.dialogue.update('opening', { text: '<script>alert(1)</script>\n日本語' });
   doc.selectDialogueLine('opening');
   const html = renderToStaticMarkup(createElement(SceneDialogueInspector, { document: doc }));
   expect(html).not.toContain('<details open');
@@ -232,7 +232,7 @@ test('inspector starts collapsed and treats markup as literal text', () => {
 test('progression edits use scene history, preserve legacy fields and persist through JSON', () => {
   const doc = document();
   const original = doc.workingScene;
-  expect(doc.updateDialogueLine('opening', { progression: 'advance-required' })).toBe(true);
+  expect(doc.dialogue.update('opening', { progression: 'advance-required' })).toBe(true);
   const edited = doc.workingScene;
   expect(edited!.dialogue![0]!.progression).toBe('advance-required');
   expect(edited!.dialogue![1]).not.toHaveProperty('progression');
@@ -267,8 +267,8 @@ test('Actor hold idle authoring shares immutable history, validates live catalog
 
 test('simultaneous holds have separate selectable timeline lanes in stable playback order', () => {
   const doc = document();
-  doc.updateDialogueLine('opening', { progression: 'advance-required' });
-  expect(doc.addDialogueLine({ ...line, progression: 'advance-required' })).toBe(true);
+  doc.dialogue.update('opening', { progression: 'advance-required' });
+  expect(doc.dialogue.add({ ...line, progression: 'advance-required' })).toBe(true);
   const html = renderToStaticMarkup(
     createElement(SceneDialogueTrack, {
       scene: doc.workingScene!,
@@ -305,8 +305,8 @@ function voiceProject() {
     new Uint8Array(readFileSync(new URL('./fixtures/audio/tone.wav', import.meta.url))),
   );
   workspace.createScene({ id: 'talk' });
-  workspace.scenes.addAudioTrack('voice');
-  workspace.scenes.addAudioClip({
+  workspace.scenes.audio.addTrack('voice');
+  workspace.scenes.audio.addClip({
     assetId: 'voice',
     trackId: 'voice-1',
     time: 0,
@@ -315,7 +315,7 @@ function voiceProject() {
     volume: 1,
     loop: false,
   });
-  workspace.scenes.addDialogueLine({
+  workspace.scenes.dialogue.add({
     ...line,
     progression: 'advance-required',
     voiceClipId: workspace.scenes.selectedAudioClip!.id,
@@ -335,13 +335,13 @@ test('voice associations are metadata, dependency inspection sees them and clip 
       .dependencies.some(({ from, to }) => from.kind === 'dialogue' && from.id === id && to.kind === 'audio'),
   ).toBe(true);
   const before = doc.workingScene;
-  expect(doc.removeAudioClip(clip.id)).toBe(false);
-  expect(doc.removeAudioTrack('voice-1', { removeClips: true })).toBe(false);
+  expect(doc.audio.removeClip(clip.id)).toBe(false);
+  expect(doc.audio.removeTrack('voice-1', { removeClips: true })).toBe(false);
   expect(doc.workingScene).toBe(before);
   expect(doc.validationIssues.some((issue) => /clear the voice reference/.test(issue.message))).toBe(true);
-  expect(doc.updateDialogueLine(id, { voiceClipId: null, time: 3000, duration: 1500 })).toBe(true);
+  expect(doc.dialogue.update(id, { voiceClipId: null, time: 3000, duration: 1500 })).toBe(true);
   expect(doc.workingScene!.audioClips![0]).toEqual(clip);
-  expect(doc.removeAudioClip(clip.id)).toBe(true);
+  expect(doc.audio.removeClip(clip.id)).toBe(true);
   doc.undo();
   doc.undo();
   expect(doc.workingScene).toBe(before);
@@ -350,9 +350,9 @@ test('voice associations are metadata, dependency inspection sees them and clip 
 test('project/standalone ZIPs and standalone recovery retain dialogue with voice metadata and detect authored changes', async () => {
   const workspace = voiceProject();
   const doc = workspace.scenes;
-  expect(doc.addAudioTrack('ambience')).toBe(true);
+  expect(doc.audio.addTrack('ambience')).toBe(true);
   expect(
-    doc.addAudioClip({
+    doc.audio.addClip({
       ...doc.workingScene!.audioClips![0]!,
       trackId: 'ambience-1',
       loop: true,
@@ -376,7 +376,7 @@ test('project/standalone ZIPs and standalone recovery retain dialogue with voice
     expect(recovered.scenes.workingScene!.dialogue).toEqual(authored.dialogue);
     expect(recovered.scenes.workingScene!.audioClips).toEqual(authored.audioClips);
     const before = sceneFingerprint(standalone.workingScene!);
-    standalone.updateDialogueLine(authored.dialogue![0]!.id, { text: '変更\nnew line' });
+    standalone.dialogue.update(authored.dialogue![0]!.id, { text: '変更\nnew line' });
     expect(sceneFingerprint(standalone.workingScene!)).not.toBe(before);
     expect(standalone.dirty).toBe(true);
   } finally {

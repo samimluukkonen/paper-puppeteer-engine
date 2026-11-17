@@ -1,29 +1,21 @@
 import { sceneLayers } from '../../engine/core.js';
 import type { SceneImageDefinition, SceneLayerDefinition } from '../../engine/data.js';
 import type { SceneEditorDocument } from './SceneEditorDocument.js';
+import type { SceneGestureKind } from './SceneEditorGestures.js';
 
 type CommandState = Pick<
   SceneEditorDocument,
-  | 'endActionDrag'
-  | 'endActorDrag'
-  | 'endCameraDrag'
-  | 'endImageDrag'
-  | 'images'
-  | 'isImageLocked'
-  | 'isLayerLocked'
-  | 'replaceScene'
-  | 'reportError'
-  | 'selectImage'
-  | 'updateImage'
-  | 'workingScene'
+  'images' | 'isImageLocked' | 'isLayerLocked' | 'replaceScene' | 'reportError' | 'selectImage' | 'workingScene'
 >;
+/** The artwork edits a scene document exposes as `document.artwork`. */
+export type SceneArtworkEditing = Pick<SceneArtworkCommands, keyof SceneArtworkCommands>;
 
 /** Build artwork and layer proposals without owning snapshots, selection, binary assets or history. */
 export class SceneArtworkCommands {
   constructor(
     private readonly state: CommandState,
-    private readonly finishGestures: () => void,
-    private readonly isDragging: () => boolean,
+    /** Commit the active gesture, unless it is a drag of `unlessDragging`. */
+    private readonly finishGestures: (unlessDragging?: SceneGestureKind) => void,
   ) {}
 
   addLayer(): boolean {
@@ -81,7 +73,7 @@ export class SceneArtworkCommands {
   assignImageLayer(id: string, layerId: string): boolean {
     this.finishGestures();
     if (this.state.isLayerLocked(layerId)) return false;
-    return this.state.updateImage(id, { layerId });
+    return this.updateImage(id, { layerId });
   }
   reorderImage(id: string, offset: -1 | 1): boolean {
     this.finishGestures();
@@ -102,10 +94,7 @@ export class SceneArtworkCommands {
     });
   }
   addImage(reference: string): boolean {
-    this.state.endImageDrag();
-    this.state.endCameraDrag();
-    this.state.endActorDrag();
-    this.state.endActionDrag();
+    this.finishGestures();
     const scene = this.state.workingScene;
     if (!scene) return false;
     if (this.state.isLayerLocked('background'))
@@ -136,11 +125,7 @@ export class SceneArtworkCommands {
   }
   updateImage(id: string, patch: Partial<Omit<SceneImageDefinition, 'id'>>): boolean {
     if (this.state.isImageLocked(id) || (patch.layerId && this.state.isLayerLocked(patch.layerId))) return false;
-    if (!this.isDragging()) {
-      this.state.endCameraDrag();
-      this.state.endActorDrag();
-      this.state.endActionDrag();
-    }
+    this.finishGestures('image');
     const scene = this.state.workingScene;
     if (!scene?.images?.some((image) => image.id === id)) return false;
     return this.state.replaceScene({

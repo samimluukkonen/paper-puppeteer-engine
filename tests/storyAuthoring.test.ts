@@ -130,7 +130,7 @@ test.each(['export', 'recovery'] as const)(
     const duplicate = project.duplicateStoryScene(story, entries[0]!);
     project.removeStoryScene(story, duplicate);
     project.scenes.selectScene('forest');
-    project.scenes.addDialogueLine({ text: 'Opening hold', time: 0, duration: 0, progression: 'advance-required' });
+    project.scenes.dialogue.add({ text: 'Opening hold', time: 0, duration: 0, progression: 'advance-required' });
     expect(project.scenes.scene('forest')!.actions).toBe(source.actions);
     expect(project.scenes.scene('sword')).toBe(other);
     expect(project.sceneReuse).toEqual(library);
@@ -151,7 +151,7 @@ test.each(['export', 'recovery'] as const)(
   async (mode) => {
     const { workspace, id, first, second } = fixture();
     workspace.scenes.selectScene('a');
-    workspace.scenes.addDialogueLine({ text: 'Read me', time: 0, duration: 0, progression: 'advance-required' });
+    workspace.scenes.dialogue.add({ text: 'Read me', time: 0, duration: 0, progression: 'advance-required' });
     const dialogue = workspace.scenes.workingScene;
     workspace.reorderStoryScene(id, second, 0);
     workspace.duplicateStoryScene(id, first);

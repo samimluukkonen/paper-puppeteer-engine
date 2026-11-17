@@ -177,7 +177,7 @@ test.each(['source', 'saved', 'undo', 'redo', 'operation'] as const)(
         : project.scenes.replaceScene(referenced);
     expect(installed, JSON.stringify(project.scenes.validationIssues)).toBe(true);
     if (root === 'saved') project.scenes.markSaved();
-    if (root === 'operation') expect(project.scenes.beginActorDrag('actor')).toBe(true);
+    if (root === 'operation') expect(project.scenes.beginDrag({ kind: 'actor', id: 'actor' })).not.toBeNull();
     if (root === 'redo') expect(project.scenes.undo()).toBe(true);
     else expect(project.scenes.replaceScene(empty)).toBe(true);
     if (root === 'source' || root === 'saved')
@@ -202,8 +202,8 @@ test('scene history expiry releases dependencies without another project members
   project.createScene({ id: 'scene' });
   project.scenes.addActor(project.characterReference('hero'));
   project.scenes.removeActor(project.scenes.selectedActorId!);
-  project.scenes.addAudioTrack('sfx');
-  project.scenes.addAudioClip({
+  project.scenes.audio.addTrack('sfx');
+  project.scenes.audio.addClip({
     assetId: 'tone',
     trackId: 'sfx-1',
     time: 0,
@@ -212,7 +212,7 @@ test('scene history expiry releases dependencies without another project members
     volume: 1,
     loop: false,
   });
-  project.scenes.removeAudioClip(project.scenes.selectedAudioClip!.id);
+  project.scenes.audio.removeClip(project.scenes.selectedAudioClip!.id);
   project.remove('characters', 'hero');
   project.removeAudio(audio.id);
   expireMembership(project);

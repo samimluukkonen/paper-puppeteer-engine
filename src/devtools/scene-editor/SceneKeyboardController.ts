@@ -8,13 +8,8 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
     if (blocksEditorShortcut(event) || !document.workingScene) return;
     if (event.key === 'Escape' && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
-      if (document.hasActiveGesture) {
-        document.cancelAudioDrag();
-        document.cancelCameraDrag();
-        document.cancelImageDrag();
-        document.cancelActorDrag();
-        document.cancelActionDrag();
-      } else if (document.cameraSelected) document.selectCamera(false);
+      if (document.hasActiveGesture) document.cancelDrag();
+      else if (document.cameraSelected) document.selectCamera(false);
       else if (document.selectedDialogueLine) document.selectDialogueLine(null);
       else if (document.selectedAudioClip) document.selectAudioClip(null);
       else if (document.selectedTransition) document.selectTransition(null);
@@ -44,24 +39,24 @@ export function bindSceneShortcuts(document: SceneEditorDocument, playback: Scen
       event.preventDefault();
       if (event.repeat) return;
       if (document.selectedDialogueLine) {
-        document.removeDialogueLine(document.selectedDialogueLine.id);
+        document.dialogue.remove(document.selectedDialogueLine.id);
         return;
       }
       if (document.selectedAudioClip) {
-        document.removeAudioClip(document.selectedAudioClip.id);
+        document.audio.removeClip(document.selectedAudioClip.id);
         return;
       }
       if (document.selectedTransition) {
-        document.removeTransition(document.selectedTransition.id);
+        document.transitions.removeTransition(document.selectedTransition.id);
         return;
       }
       const cameraKey = document.selectedCameraKey;
       if (cameraKey) {
-        document.removeCameraKey(cameraKey.property, cameraKey.key.id);
+        document.camera.removeCameraKey(cameraKey.property, cameraKey.key.id);
         return;
       }
       if (document.cameraSelected) return;
-      if (document.selectedImageId) document.removeImage(document.selectedImageId);
+      if (document.selectedImageId) document.artwork.removeImage(document.selectedImageId);
       else if (document.selectedActionId) document.removeAction(document.selectedActionId);
       else if (document.selectedActorId) {
         const id = document.selectedActorId;

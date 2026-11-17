@@ -19,7 +19,7 @@ function TransitionProperties({
         onSubmit={(event) => {
           event.preventDefault();
           const { id: _id, ...properties } = draft;
-          document.updateTransition(effect.id, properties);
+          document.transitions.updateTransition(effect.id, properties);
         }}
       >
         <label>
@@ -78,7 +78,11 @@ function TransitionProperties({
         Fade out holds its color until a later fade. Add a fade in after a hold to reveal the scene. Fade intervals
         cannot overlap.
       </p>
-      <button type="button" className="workspace-danger" onClick={() => document.removeTransition(effect.id)}>
+      <button
+        type="button"
+        className="workspace-danger"
+        onClick={() => document.transitions.removeTransition(effect.id)}
+      >
         Delete transition
       </button>
     </details>

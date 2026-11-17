@@ -63,9 +63,9 @@ function project() {
   const workspace = new ProjectWorkspace('Audio film', 'film');
   workspace.addAudio(asset, bytes());
   workspace.createScene({ id: 'audio' });
-  workspace.scenes.addAudioTrack('sfx');
+  workspace.scenes.audio.addTrack('sfx');
   const { id: _id, ...input } = clip;
-  expect(workspace.scenes.addAudioClip(input)).toBe(true);
+  expect(workspace.scenes.audio.addClip(input)).toBe(true);
   return workspace;
 }
 
@@ -81,9 +81,9 @@ test.each(AUDIO_CATEGORIES.flatMap((category) => ['undo', 'redo'].map((direction
       workspace.undo();
     }
     workspace.scenes.selectScene('audio');
-    expect(workspace.scenes.addAudioTrack(category)).toBe(true);
+    expect(workspace.scenes.audio.addTrack(category)).toBe(true);
     const { id: _id, ...input } = clip;
-    expect(workspace.scenes.addAudioClip({ ...input, trackId: `${category}-1` })).toBe(true);
+    expect(workspace.scenes.audio.addClip({ ...input, trackId: `${category}-1` })).toBe(true);
     workspace.scenes.selectScene('other');
     const metadata = workspace.definition;
     const scene = workspace.scenes.scene('audio');
@@ -119,9 +119,9 @@ test('project history ignores removed scenes but checks their audio when restori
   workspace.createScene({ id: 'audio' });
   workspace.remove('scenes', 'audio');
   workspace.addAudio(asset, bytes());
-  workspace.scenes.addAudioTrack('sfx');
+  workspace.scenes.audio.addTrack('sfx');
   const { id: _id, ...input } = clip;
-  expect(workspace.scenes.addAudioClip(input)).toBe(true);
+  expect(workspace.scenes.audio.addClip(input)).toBe(true);
 
   workspace.undo();
   expect(workspace.audioSource(asset.id)).toBeUndefined();
@@ -142,15 +142,22 @@ test('old scene data stays unchanged and optional audio data round-trips without
 test('add, select, duplicate, reassign, remove, Undo and Redo preserve IDs, values and source snapshots', () => {
   const doc = document();
   const source = doc.sourceScene;
-  expect(doc.addAudioTrack('voice')).toBe(true);
-  expect(doc.duplicateAudioClip('clip')).toBe(true);
+  expect(doc.audio.addTrack('voice')).toBe(true);
+  expect(doc.audio.duplicateClip('clip')).toBe(true);
   const id = doc.selectedAudioClip!.id;
   expect(id).not.toBe('clip');
   expect(
-    doc.updateAudioClip(id, { trackId: 'voice-1', volume: 0.4, loop: true, duration: 4000, fadeIn: 400, fadeOut: 900 }),
+    doc.audio.updateClip(id, {
+      trackId: 'voice-1',
+      volume: 0.4,
+      loop: true,
+      duration: 4000,
+      fadeIn: 400,
+      fadeOut: 900,
+    }),
   ).toBe(true);
   expect(doc.selectedAudioClip).toMatchObject({ trackId: 'voice-1', volume: 0.4, loop: true, duration: 4000 });
-  expect(doc.removeAudioClip(id)).toBe(true);
+  expect(doc.audio.removeClip(id)).toBe(true);
   expect(doc.undo()).toBe(true);
   expect(doc.selectedAudioClip?.id).toBe(id);
   expect(doc.redo()).toBe(true);
@@ -162,12 +169,12 @@ test('add, select, duplicate, reassign, remove, Undo and Redo preserve IDs, valu
 test('all track categories allow multiple tracks and intentional overlaps on the same track', () => {
   const doc = document();
   for (const category of AUDIO_CATEGORIES) {
-    expect(doc.addAudioTrack(category)).toBe(true);
-    expect(doc.addAudioTrack(category)).toBe(true);
+    expect(doc.audio.addTrack(category)).toBe(true);
+    expect(doc.audio.addTrack(category)).toBe(true);
   }
   expect(doc.workingScene!.audioTracks).toHaveLength(9);
-  doc.duplicateAudioClip('clip');
-  doc.duplicateAudioClip('clip');
+  doc.audio.duplicateClip('clip');
+  doc.audio.duplicateClip('clip');
   expect(validateSceneDefinition(doc.workingScene)).toEqual([]);
   expect(layoutAudioClips(doc.workingScene!.audioClips!, 10000, 1000).map(({ lane }) => lane)).toEqual([0, 1, 2]);
   expect(layoutAudioClips([clip, { ...clip, id: 'next', time: 2000 }], 10000, 1000).map(({ lane }) => lane)).toEqual([
@@ -177,9 +184,9 @@ test('all track categories allow multiple tracks and intentional overlaps on the
 
 test('empty tracks can be removed and restored without altering audio clips or media', () => {
   const doc = document();
-  doc.addAudioTrack('music');
+  doc.audio.addTrack('music');
   const before = doc.workingScene;
-  expect(doc.removeAudioTrack('music-1')).toBe(true);
+  expect(doc.audio.removeTrack('music-1')).toBe(true);
   expect(doc.workingScene!.audioTracks!.map((track) => track.id)).toEqual(['sfx-1']);
   expect(doc.workingScene!.audioClips).toEqual([clip]);
   expect(doc.readAudio(asset.path)).toEqual(bytes());
@@ -192,8 +199,8 @@ test('empty tracks can be removed and restored without altering audio clips or m
 test('removing a populated track requires explicit clip removal and preserves rejected proposals', () => {
   const doc = document();
   const before = doc.workingScene;
-  expect(doc.removeAudioTrack('missing')).toBe(false);
-  expect(doc.removeAudioTrack('sfx-1')).toBe(false);
+  expect(doc.audio.removeTrack('missing')).toBe(false);
+  expect(doc.audio.removeTrack('sfx-1')).toBe(false);
   expect(doc.validationIssues[0]!.message).toContain('contains clips');
   expect(doc.workingScene).toBe(before);
   expect(doc.canUndo).toBe(false);
@@ -201,12 +208,12 @@ test('removing a populated track requires explicit clip removal and preserves re
 
 test('track and overlapping clips are removed in one history entry, preserving sibling tracks and source assets', () => {
   const doc = document();
-  doc.duplicateAudioClip('clip');
-  doc.addAudioTrack('ambience');
-  doc.addAudioClip({ ...clip, trackId: 'ambience-1', time: 2000 });
+  doc.audio.duplicateClip('clip');
+  doc.audio.addTrack('ambience');
+  doc.audio.addClip({ ...clip, trackId: 'ambience-1', time: 2000 });
   doc.selectAudioClip('clip');
   const before = doc.workingScene;
-  expect(doc.removeAudioTrack('sfx-1', { removeClips: true })).toBe(true);
+  expect(doc.audio.removeTrack('sfx-1', { removeClips: true })).toBe(true);
   expect(doc.selectedAudioClip).toBeNull();
   expect(doc.workingScene!.audioTracks!.map((track) => track.id)).toEqual(['ambience-1']);
   expect(doc.workingScene!.audioClips).toHaveLength(1);
@@ -225,22 +232,23 @@ test('track and overlapping clips are removed in one history entry, preserving s
 test('one complete audio drag creates one undo transaction; invalid proposals and cancelled drags preserve history', () => {
   const doc = document();
   const initial = doc.workingScene;
-  expect(doc.beginAudioDrag('clip')).toBe(true);
+  let audioDrag = doc.beginDrag({ kind: 'audio', id: 'clip' })!;
+  expect(audioDrag).not.toBeNull();
   expect(doc.hasActiveGesture).toBe(true);
   expect(doc.hasOpenOperation).toBe(true);
-  expect(doc.changeAudioDrag({ ...clip, time: 2345 })).toBe(true);
-  expect(doc.changeAudioDrag({ ...clip, time: 3000 })).toBe(true);
+  expect(audioDrag.change({ ...clip, time: 2345 })).toBe(true);
+  expect(audioDrag.change({ ...clip, time: 3000 })).toBe(true);
   const valid = doc.workingScene;
-  expect(doc.changeAudioDrag({ ...clip, time: 9500 })).toBe(false);
+  expect(audioDrag.change({ ...clip, time: 9500 })).toBe(false);
   expect(doc.workingScene).toBe(valid);
-  doc.endAudioDrag();
+  audioDrag.end();
   expect(doc.hasOpenOperation).toBe(false);
   expect(doc.undo()).toBe(true);
   expect(doc.workingScene).toBe(initial);
   expect(doc.canUndo).toBe(false);
-  doc.beginAudioDrag('clip');
-  doc.changeAudioDrag({ ...clip, time: 4000 });
-  doc.cancelAudioDrag();
+  audioDrag = doc.beginDrag({ kind: 'audio', id: 'clip' })!;
+  audioDrag.change({ ...clip, time: 4000 });
+  audioDrag.cancel();
   expect(doc.canRedo).toBe(true);
   doc.redo();
   expect(doc.workingScene).toBe(valid);
@@ -255,8 +263,8 @@ test('switching scenes and selecting other editor objects cancel unfinished audi
     () => doc.createScene({ id: 'other' }),
   ]) {
     const before = doc.workingScene;
-    doc.beginAudioDrag('clip');
-    doc.changeAudioDrag({ ...clip, time: 4000 });
+    const audioDrag = doc.beginDrag({ kind: 'audio', id: 'clip' })!;
+    audioDrag.change({ ...clip, time: 4000 });
     cancel();
     doc.selectScene('audio');
     expect(doc.workingScene).toBe(before);
@@ -268,9 +276,9 @@ test('trims distinguish source offset, timeline duration and scene time; moves l
   expect(trimSceneAudioClip(clip, 'start', 1200)).toEqual({ ...clip, time: 1200, sourceOffset: 400, duration: 800 });
   expect(trimSceneAudioClip(clip, 'end', 1700)).toEqual({ ...clip, duration: 700 });
   const doc = document();
-  doc.beginAudioDrag('clip');
-  expect(doc.changeAudioDrag(trimSceneAudioClip(clip, 'start', 1200))).toBe(true);
-  doc.endAudioDrag();
+  const audioDrag = doc.beginDrag({ kind: 'audio', id: 'clip' })!;
+  expect(audioDrag.change(trimSceneAudioClip(clip, 'start', 1200))).toBe(true);
+  audioDrag.end();
   expect(doc.readAudio(asset.path)).toEqual(bytes());
   const moved = editAudioClipOnTimeline(scene(), clip, 'move', 1234, 1000, 0, false);
   expect(moved).toEqual({ ...clip, time: 2234 });
@@ -358,7 +366,7 @@ test('project dependency inspection blocks removal of used audio and sees missin
   expect(workspace.inspect('export').counts.error).toBe(0);
   expect(() => workspace.removeAudio('tone')).toThrow(/in use.*audio clip/);
   const id = workspace.scenes.selectedAudioClip!.id;
-  workspace.scenes.removeAudioClip(id);
+  workspace.scenes.audio.removeClip(id);
   workspace.removeAudio('tone');
   workspace.scenes.undo();
   expect(workspace.inspect('export').issues.some((issue) => /Missing audio asset/.test(issue.message))).toBe(true);
@@ -370,14 +378,14 @@ test('project dependency inspection blocks removal of used audio and sees missin
 test('project and standalone ZIPs include one binary per referenced audio asset and retain all playback properties', async () => {
   const workspace = project();
   const doc = workspace.scenes;
-  doc.updateAudioClip(doc.selectedAudioClip!.id, {
+  doc.audio.updateClip(doc.selectedAudioClip!.id, {
     volume: 0.25,
     fadeIn: 100,
     fadeOut: 200,
     loop: true,
     duration: 5000,
   });
-  doc.duplicateAudioClip(doc.selectedAudioClip!.id);
+  doc.audio.duplicateClip(doc.selectedAudioClip!.id);
   const authored = doc.workingScene!;
   const captured = await buildProjectPackage(workspace);
   const restored = await importProjectPackage(decodePackageZip(encodePackageZip(captured.files)));

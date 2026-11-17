@@ -158,7 +158,7 @@ test('Set Camera Cut anchors old shots and jumps all channels at the exact bound
   const doc = document();
   doc.updateCamera({ x: -100, y: 50, zoom: 0.5 });
   const before = doc.workingScene;
-  assert.isTrue(doc.setCameraCut(3000, { x: 200, y: -50, zoom: 2 }));
+  assert.isTrue(doc.camera.setCameraCut(3000, { x: 200, y: -50, zoom: 2 }));
   const cut = doc.workingScene!;
   for (const time of [0, 1500, 2999.999])
     assert.deepEqual(evaluateCameraAtTime(cut, time), { x: -100, y: 50, zoom: 0.5 });
@@ -168,26 +168,26 @@ test('Set Camera Cut anchors old shots and jumps all channels at the exact bound
   assert.strictEqual(doc.workingScene, before);
   doc.redo();
   assert.strictEqual(doc.workingScene, cut);
-  assert.isFalse(doc.setCameraCut(11000));
+  assert.isFalse(doc.camera.setCameraCut(11000));
   assert.strictEqual(doc.workingScene, cut);
-  doc.setCameraCut(6000, { x: 0, y: 0, zoom: 1 });
+  doc.camera.setCameraCut(6000, { x: 0, y: 0, zoom: 1 });
   assert.deepEqual(evaluateCameraAtTime(doc.workingScene!, 5999), { x: 200, y: -50, zoom: 2 });
   assert.deepEqual(evaluateCameraAtTime(doc.workingScene!, 6000), { x: 0, y: 0, zoom: 1 });
-  doc.setCameraCut(0, { x: 10, y: 20, zoom: 1 });
+  doc.camera.setCameraCut(0, { x: 10, y: 20, zoom: 1 });
   assert.deepEqual(evaluateCameraAtTime(doc.workingScene!, 0), { x: 10, y: 20, zoom: 1 });
 });
 
 test('fade authoring selects stable IDs, edits duration/time/color, rejects conflicts atomically and supports Undo/Redo', () => {
   const doc = document();
   const before = doc.workingScene;
-  doc.addTransition(fade('ignored', 2000, 500, 'fade-out'));
+  doc.transitions.addTransition(fade('ignored', 2000, 500, 'fade-out'));
   const id = doc.selectedTransition!.id;
   assert.equal(id, 'transition-1');
   const added = doc.workingScene;
-  doc.updateTransition(id, { time: 2500, duration: 750, color: '#abcdef', type: 'fade-in' });
+  doc.transitions.updateTransition(id, { time: 2500, duration: 750, color: '#abcdef', type: 'fade-in' });
   const edited = doc.workingScene;
   assert.equal(doc.selectedTransition!.time, 2500);
-  assert.isFalse(doc.updateTransition(id, { time: 500 }));
+  assert.isFalse(doc.transitions.updateTransition(id, { time: 500 }));
   assert.strictEqual(doc.workingScene, edited);
   assert.isFalse(doc.updateProperties({ duration: 9000 }));
   assert.strictEqual(doc.workingScene, edited);
@@ -198,7 +198,7 @@ test('fade authoring selects stable IDs, edits duration/time/color, rejects conf
   doc.redo();
   doc.redo();
   assert.strictEqual(doc.workingScene, edited);
-  doc.removeTransition(id);
+  doc.transitions.removeTransition(id);
   assert.isNull(doc.selectedTransition);
   doc.undo();
   assert.equal(doc.selectedTransition!.id, id);
@@ -271,7 +271,7 @@ test('fade edits and history retain editor clock, playback status and Actor inst
   playback.seek(5500);
   playback.play();
   const actor = playback.actors!.get('actor-1');
-  doc.updateTransition('out', { color: '#ffffff', duration: 2000 });
+  doc.transitions.updateTransition('out', { color: '#ffffff', duration: 2000 });
   assert.equal(playback.time, 5500);
   assert.equal(playback.status, 'playing');
   assert.strictEqual(playback.actors!.get('actor-1'), actor);
@@ -285,7 +285,7 @@ test('fade edits and history retain editor clock, playback status and Actor inst
 
 test('JSON, standalone ZIP and project recovery preserve fades and cuts with identical sampling', async () => {
   const doc = document();
-  doc.setCameraCut(3000, { x: 100, y: 20, zoom: 2 });
+  doc.camera.setCameraCut(3000, { x: 100, y: 20, zoom: 2 });
   const source = doc.workingScene!;
   assert.deepEqual(parseSceneJson(doc.exportJson()), source);
   const portable = await validateScenePackage(

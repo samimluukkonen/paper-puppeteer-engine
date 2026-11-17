@@ -3,6 +3,9 @@ import type { SceneEditorDocument } from './SceneEditorDocument.js';
 
 type CommandState = Pick<SceneEditorDocument, 'replaceScene' | 'selectTransition' | 'workingScene'>;
 
+/** The transition edits a scene document exposes as `document.transitions`. */
+export type SceneTransitionEditing = Pick<SceneTransitionCommands, keyof SceneTransitionCommands>;
+
 /** Build transition proposals; the document retains validation, selection and the sole scene history. */
 export class SceneTransitionCommands {
   constructor(

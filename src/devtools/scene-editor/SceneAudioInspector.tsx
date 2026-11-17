@@ -18,7 +18,7 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          document.updateAudioClip(clip.id, draft);
+          document.audio.updateClip(clip.id, draft);
         }}
       >
         <label>
@@ -140,10 +140,10 @@ function AudioProperties({ document, clip }: { document: SceneEditorDocument; cl
         Edits preserve the audio file and scene duration.
       </p>
       <div className="scene-audio-actions" data-guide-id={GUIDE_TARGETS.sceneAudioActions}>
-        <button type="button" onClick={() => document.duplicateAudioClip(clip.id)}>
+        <button type="button" onClick={() => document.audio.duplicateClip(clip.id)}>
           Duplicate audio clip
         </button>
-        <button type="button" className="workspace-danger" onClick={() => document.removeAudioClip(clip.id)}>
+        <button type="button" className="workspace-danger" onClick={() => document.audio.removeClip(clip.id)}>
           Delete audio clip
         </button>
       </div>

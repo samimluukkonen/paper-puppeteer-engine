@@ -21,7 +21,7 @@ function DialogueProperties({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          document.updateDialogueLine(line.id, {
+          document.dialogue.update(line.id, {
             text: draft.text,
             time: draft.time,
             duration: draft.duration,
@@ -140,10 +140,10 @@ function DialogueProperties({
         <DialogueHoldSettings document={document} line={draft} {...(registry ? { registry } : {})} />
       )}
       <div className="scene-audio-actions" data-guide-id={GUIDE_TARGETS.sceneDialogueActions}>
-        <button type="button" onClick={() => document.duplicateDialogueLine(line.id)}>
+        <button type="button" onClick={() => document.dialogue.duplicate(line.id)}>
           Duplicate dialogue line
         </button>
-        <button type="button" className="workspace-danger" onClick={() => document.removeDialogueLine(line.id)}>
+        <button type="button" className="workspace-danger" onClick={() => document.dialogue.remove(line.id)}>
           Delete dialogue line
         </button>
       </div>

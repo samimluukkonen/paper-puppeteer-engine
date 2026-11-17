@@ -208,13 +208,14 @@ test('feet drag snapping preserves X, allows Shift bypass and hidden/disabled gu
   const f = fixture();
   f.workspace.update({ snapEnabled: true });
   const initial = f.document.workingScene!;
-  assert.isTrue(f.document.beginActorDrag('a'));
-  f.document.moveActorDrag({ x: 13, y: -300 });
+  let actorDrag = f.document.beginDrag({ kind: 'actor', id: 'a' });
+  assert.isNotNull(actorDrag);
+  actorDrag.change({ position: { x: 13, y: -300 } });
   assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 13, y: 65 });
-  f.document.moveActorDrag({ x: 22, y: -250 }, { bypassGround: true });
+  actorDrag.change({ position: { x: 22, y: -250 }, bypassGround: true });
   assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 22, y: -250 });
-  f.document.moveActorDrag({ x: 30, y: -200 });
-  f.document.endActorDrag();
+  actorDrag.change({ position: { x: 30, y: -200 } });
+  actorDrag.end();
   assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 30, y: 65 });
   assert.deepEqual(f.document.workingScene!.actions, initial.actions);
   f.document.undo();
@@ -223,10 +224,10 @@ test('feet drag snapping preserves X, allows Shift bypass and hidden/disabled gu
   assert.equal(f.document.workingScene!.actors[0]!.position.x, 30);
   for (const patch of [{ enabled: false }, { enabled: true, snapEnabled: false }]) {
     f.workspace.update(patch);
-    f.document.beginActorDrag('a');
-    f.document.moveActorDrag({ x: 66, y: -42 });
+    actorDrag = f.document.beginDrag({ kind: 'actor', id: 'a' })!;
+    actorDrag.change({ position: { x: 66, y: -42 } });
     assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 66, y: -42 });
-    f.document.cancelActorDrag();
+    actorDrag.cancel();
     assert.equal(f.document.workingScene!.actors[0]!.position.x, 30);
   }
 });
@@ -434,10 +435,10 @@ test('missing contacts disable alignment and leave snapping free; measurements s
   assert.include(markup, 'disabled="">Align Feet to Ground');
   assert.include(markup, 'No marker or legacy sole contact is available');
   f.workspace.update({ snapEnabled: true });
-  f.document.beginActorDrag('a');
-  f.document.moveActorDrag({ x: 15, y: -20 });
+  const actorDrag = f.document.beginDrag({ kind: 'actor', id: 'a' })!;
+  actorDrag.change({ position: { x: 15, y: -20 } });
   assert.deepEqual(f.document.workingScene!.actors[0]!.position, { x: 15, y: -20 });
-  f.document.cancelActorDrag();
+  actorDrag.cancel();
   f.document.setActorGroundOffsets(
     new Map([
       ['a', NaN],

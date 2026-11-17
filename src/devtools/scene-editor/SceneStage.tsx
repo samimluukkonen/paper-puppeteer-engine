@@ -27,19 +27,26 @@ import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { SceneActorPreview } from './SceneActorPreview.js';
 import { SceneCameraPreview } from './SceneCameraPreview.js';
 import type { SceneCharacterRegistry } from './SceneCharacterRegistry.js';
-import type { ActorGroundContact, SceneEditorDocument } from './SceneEditorDocument.js';
+import type { ActorGroundContact, SceneDrag, SceneDragChanges, SceneEditorDocument } from './SceneEditorDocument.js';
 import type { SceneEditorPlayback } from './SceneEditorPlayback.js';
 import { SceneGroundHandle } from './SceneGroundHandle.js';
 import { useSceneProject } from './sceneProject.js';
 import { draggedPosition, stagePoint } from './stageCoordinates.js';
 
 type Point = { x: number; y: number };
-type Gesture = { pointer: number; scene: string; start: Point; origin: Point; axis: 'x' | 'y' | 'both' };
+type Gesture<Change> = {
+  pointer: number;
+  scene: string;
+  start: Point;
+  origin: Point;
+  axis: 'x' | 'y' | 'both';
+  drag: SceneDrag<Change>;
+};
 
 /** Phaser owns rendering; React/document changes reconcile existing instances without remounting the game. */
 class SceneStage extends Phaser.Scene {
   private cameraPreview!: SceneCameraPreview;
-  private cameraGesture: Gesture | undefined;
+  private cameraGesture: Gesture<SceneDragChanges['camera']> | undefined;
   private artwork!: SceneImageLayer;
   private imageGesture:
     | {
@@ -51,6 +58,7 @@ class SceneStage extends Phaser.Scene {
         scale: Point;
         size: Point;
         resize: boolean;
+        drag: SceneDrag<SceneDragChanges['image']>;
       }
     | undefined;
   private preview!: SceneActorPreview;
@@ -60,7 +68,7 @@ class SceneStage extends Phaser.Scene {
   private dialogue!: SceneDialogueOverlay;
   private groundOverlay!: GroundGuideOverlay;
   private groundHandle!: SceneGroundHandle;
-  private gesture: Gesture | undefined;
+  private gesture: Gesture<SceneDragChanges['actor']> | undefined;
   private pan: { pointer: number; x: number; y: number } | undefined;
   private readonly definitions = new Map<string, CharacterDefinition>();
   private readonly requests = new Set<string>();
@@ -86,12 +94,7 @@ class SceneStage extends Phaser.Scene {
       !Number.isFinite(scroll.y)
     )
       return;
-    this.document.cancelCameraDrag();
-    this.cameraGesture = undefined;
-    this.document.cancelImageDrag();
-    this.document.cancelActorDrag();
-    this.gesture = undefined;
-    this.imageGesture = undefined;
+    this.cancelGestures();
     this.groundHandle.cancel();
     this.cameras.main.scrollX += scroll.x - this.cinematicScroll.x;
     this.cameras.main.scrollY += scroll.y - this.cinematicScroll.y;
@@ -221,27 +224,15 @@ class SceneStage extends Phaser.Scene {
     });
     const unsubscribeImages = this.document.images.subscribe(sync);
     const cancel = (): void => {
-      this.gesture = undefined;
-      this.imageGesture = undefined;
       this.pan = undefined;
       this.groundHandle.cancel();
-      this.document.cancelCameraDrag();
-      this.cameraGesture = undefined;
-      this.document.cancelImageDrag();
-      this.document.cancelActorDrag();
+      this.cancelGestures();
     };
     const unsubscribePlayback = this.playback.subscribe(() => {
       this.syncCamera();
       this.syncArtwork();
       this.document.setGroundPreviewing(this.playback.previewing);
-      if (this.playback.previewing && (this.gesture || this.imageGesture)) {
-        this.gesture = undefined;
-        this.imageGesture = undefined;
-        this.document.cancelCameraDrag();
-        this.cameraGesture = undefined;
-        this.document.cancelImageDrag();
-        this.document.cancelActorDrag();
-      }
+      if (this.playback.previewing && (this.gesture || this.imageGesture)) this.cancelGestures();
     });
     canvas.addEventListener(
       'pointerdown',
@@ -258,9 +249,12 @@ class SceneStage extends Phaser.Scene {
           return;
         }
         const point = this.point(event);
-        if (!this.document.cameraPreviewing && this.hitCamera(point) && this.document.beginCameraDrag()) {
+        const cameraDrag =
+          !this.document.cameraPreviewing && this.hitCamera(point) ? this.document.beginDrag({ kind: 'camera' }) : null;
+        if (cameraDrag) {
           this.playback.pause();
           this.cameraGesture = {
+            drag: cameraDrag,
             pointer: event.pointerId,
             scene: this.document.selectedSceneId!,
             start: point,
@@ -274,7 +268,7 @@ class SceneStage extends Phaser.Scene {
         if (this.playback.previewing) return;
         const selected = this.document.workingScene.actors.find((actor) => actor.id === this.document.selectedActorId);
         let id: string | null = null;
-        let axis: Gesture['axis'] = 'both';
+        let axis: Gesture<unknown>['axis'] = 'both';
         const zoom = this.cameras.main.zoom;
         if (!this.document.cameraSelected && selected && sceneLayer(this.document.workingScene, 'actors').visible) {
           const dx = (point.x - selected.position.x) * zoom;
@@ -338,8 +332,10 @@ class SceneStage extends Phaser.Scene {
         }
         this.document.selectActor(id);
         const actor = this.document.workingScene.actors.find((actor) => actor.id === id);
-        if (actor && this.document.beginActorDrag(actor.id)) {
+        const actorDrag = actor ? this.document.beginDrag({ kind: 'actor', id: actor.id }) : null;
+        if (actor && actorDrag) {
           this.gesture = {
+            drag: actorDrag,
             pointer: event.pointerId,
             scene: this.document.workingScene.id,
             start: point,
@@ -364,14 +360,15 @@ class SceneStage extends Phaser.Scene {
           this.pan.y = event.clientY;
         } else if (this.cameraGesture?.pointer === event.pointerId) {
           const gesture = this.cameraGesture;
-          this.document.moveCameraDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
+          gesture.drag.change(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
         } else if (this.groundHandle.dragging) {
           this.groundHandle.move(event.pointerId, this.point(event));
         } else if (this.imageGesture?.pointer === event.pointerId) {
           this.moveImageGesture(this.point(event));
         } else if (this.gesture?.pointer === event.pointerId) {
           const gesture = this.gesture;
-          this.document.moveActorDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis), {
+          gesture.drag.change({
+            position: draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis),
             bypassGround: event.shiftKey,
           });
         }
@@ -383,23 +380,25 @@ class SceneStage extends Phaser.Scene {
       (event) => {
         if (this.cameraGesture?.pointer === event.pointerId) {
           const gesture = this.cameraGesture;
-          this.document.moveCameraDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
+          gesture.drag.change(draggedPosition(gesture.start, gesture.origin, this.point(event), 'both'));
           this.cameraGesture = undefined;
-          this.document.endCameraDrag();
+          gesture.drag.end();
         }
         this.groundHandle.up(event.pointerId, this.point(event));
         if (this.imageGesture?.pointer === event.pointerId) {
+          const gesture = this.imageGesture;
           this.moveImageGesture(this.point(event));
           this.imageGesture = undefined;
-          this.document.endImageDrag();
+          gesture.drag.end();
         }
         if (this.gesture?.pointer === event.pointerId) {
           const gesture = this.gesture;
-          this.document.moveActorDrag(draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis), {
+          gesture.drag.change({
+            position: draggedPosition(gesture.start, gesture.origin, this.point(event), gesture.axis),
             bypassGround: event.shiftKey,
           });
           this.gesture = undefined;
-          this.document.endActorDrag();
+          gesture.drag.end();
         }
         if (this.pan?.pointer === event.pointerId) this.pan = undefined;
         if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
@@ -526,8 +525,10 @@ class SceneStage extends Phaser.Scene {
   private startImageGesture(pointer: number, point: Point, id: string, resize: boolean): void {
     const image = this.document.workingScene?.images?.find((image) => image.id === id);
     const object = this.artwork.objects.get(id);
-    if (!image || !object || !this.document.beginImageDrag(id)) return;
+    const drag = image && object ? this.document.beginDrag({ kind: 'image', id }) : null;
+    if (!image || !object || !drag) return;
     this.imageGesture = {
+      drag,
       pointer,
       scene: this.document.selectedSceneId!,
       id,
@@ -540,17 +541,25 @@ class SceneStage extends Phaser.Scene {
   }
   private moveImageGesture(point: Point): void {
     const gesture = this.imageGesture;
-    if (!gesture || !this.document.hasActiveGesture) return;
+    if (!gesture) return;
     const scale = gesture.resize
       ? {
           x: roundEditorNumber(Math.max(0.001, gesture.scale.x + (2 * (point.x - gesture.start.x)) / gesture.size.x)),
           y: roundEditorNumber(Math.max(0.001, gesture.scale.y + (2 * (point.y - gesture.start.y)) / gesture.size.y)),
         }
       : gesture.scale;
-    this.document.moveImageDrag({
+    gesture.drag.change({
       position: gesture.resize ? gesture.origin : draggedPosition(gesture.start, gesture.origin, point, 'both'),
       scale,
     });
+  }
+  /** Cancel the drags this stage started; timeline drags are not the stage's to cancel. */
+  cancelGestures(): void {
+    const drags = [this.cameraGesture?.drag, this.imageGesture?.drag, this.gesture?.drag];
+    this.cameraGesture = undefined;
+    this.imageGesture = undefined;
+    this.gesture = undefined;
+    for (const drag of drags) drag?.cancel();
   }
   private point(event: PointerEvent): Point {
     const canvasBounds = this.game.canvas.getBoundingClientRect();
@@ -743,8 +752,7 @@ export function SceneStageView({
     return () => {
       releaseRenderer?.();
       release();
-      document.cancelImageDrag();
-      document.cancelActorDrag();
+      scene.cancelGestures();
       // A project retains this document after its iframe is removed. Release scene
       // subscriptions now; Game.destroy otherwise waits for another animation frame.
       game.scene.stop(scene);
