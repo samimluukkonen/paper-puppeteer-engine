@@ -22,6 +22,10 @@ export interface PoseSource {
   readonly pose?: ReadonlyMap<string, Readonly<Partial<JointTransform>>> | undefined;
   readonly ikAnimation?: IKAnimationPose | undefined;
   readonly meshDeformation?: MeshDeformationPose | undefined;
+  /** Optional live deformation channels, read synchronously by the renderer each frame and never retained.
+   * Lets a source backed by a player skip the frozen `meshDeformation` snapshot on the hot rendering path.
+   */
+  getMeshDeformationForRendering?(): MeshDeformationPose | undefined;
 }
 
 interface PoseProjection {
@@ -276,10 +280,13 @@ export class PosePipeline {
   /** Live deformation channels for synchronous rendering; public reads remain immutable snapshots. */
   getMeshDeformationForRendering(): MeshDeformationPose {
     const source = this.poseSource;
-    // An attached player exposes live channels only through the rendering read; its public
-    // meshDeformation getter is the frozen snapshot and must not be consumed per frame.
-    if (source instanceof AnimationPlayer) return source.getMeshDeformationForRendering();
-    return source?.meshDeformation ?? this.player.getMeshDeformationForRendering();
+    // Prefer a source's live rendering channels; its public meshDeformation is a frozen
+    // snapshot and must not be consumed per frame when live channels are available.
+    return (
+      source?.getMeshDeformationForRendering?.() ??
+      source?.meshDeformation ??
+      this.player.getMeshDeformationForRendering()
+    );
   }
 
   destroy(): void {

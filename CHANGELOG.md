@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Let a `PoseSource` provide live mesh-deformation channels through an optional `getMeshDeformationForRendering()`, and use it in the Animation Editor preview. Rendering no longer deep-copies a deformation snapshot on every sampled frame, which had been happening since the preview switched to an attached pose source. Deformation output is unchanged.
+
 - Add a post-build check (`npm run check:demo`) that fails CI before the Pages upload when a built demo page lacks its entry module script or references missing assets, so a broken artifact can no longer deploy an editor that stays on the loading screen.
 
 - Introduce `AnimationEditSession`, a deep edit-transaction module that owns the mutation ordering once (cancel active drags, pause, end scrub, seek, freeze + install one history entry, batch-notify), replacing the per-command copies in the keyframe, event, IK, deformation, graph, preview and root-motion modules. Collapse their private `*Actions` interfaces into one shared actions shape, shrink the `AnimationEditorState` wiring accordingly, and remove the permanent `setSelectedKeyframeInterpolation` stub, keeping editor APIs and behavior unchanged.

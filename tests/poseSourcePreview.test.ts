@@ -1,6 +1,7 @@
 import { assert, test, vi } from 'vitest';
 import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
 import type { IKAnimationValues } from '../src/engine/ik/AnimationIKPose.js';
+import type { MeshDeformationPose } from '../src/engine/meshDeformation.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -139,6 +140,30 @@ test('pose-source IK channels stay live and detaching restores the runtime chann
     detach();
     puppet.update(16);
     assert.deepEqual(puppet.getIK('arm').resolvedTarget, { x: 65, y: 20 }, 'detaching restores the runtime player');
+  } finally {
+    puppet.destroy();
+  }
+});
+
+test('rendering prefers a source live deformation channel over its public snapshot', () => {
+  const puppet = fixture();
+  try {
+    const snapshot: MeshDeformationPose = new Map();
+    const live: MeshDeformationPose = new Map();
+    const detach = puppet.attachPoseSource({ meshDeformation: snapshot, getMeshDeformationForRendering: () => live });
+    assert.strictEqual(puppet.posePipeline.getMeshDeformationForRendering(), live, 'rendering reads live channels');
+    assert.strictEqual(puppet.meshDeformation, snapshot, 'public reads keep the snapshot');
+    detach();
+    const fallback = puppet.attachPoseSource({
+      meshDeformation: snapshot,
+      getMeshDeformationForRendering: () => undefined,
+    });
+    assert.strictEqual(
+      puppet.posePipeline.getMeshDeformationForRendering(),
+      snapshot,
+      'absent live channels fall back',
+    );
+    fallback();
   } finally {
     puppet.destroy();
   }

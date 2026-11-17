@@ -144,6 +144,8 @@ export class AnimationEditorPreview {
       get meshDeformation() {
         return player?.meshDeformation;
       },
+      // Rendering reads the player's live channels, not a per-sample snapshot copy.
+      getMeshDeformationForRendering: () => player?.getMeshDeformationForRendering(),
     };
     // Sample the working copy into the detached joints, then attach: the pipeline owns
     // prepare → project, so there is no manual pose copying or prepare/sync call here.
