@@ -160,3 +160,16 @@ test('every selectable kind replaces the others', () => {
   doc.selectImage(null);
   assert.deepEqual(state(), none);
 });
+
+test('selecting a camera key publishes one selection change', () => {
+  const doc = document();
+  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  const key = doc.workingScene!.cameraTracks!.x![0]!;
+  doc.selectActor('hero');
+  const listener = vi.fn();
+  const unsubscribe = doc.subscribeSelection(listener);
+  doc.selectCameraKey('x', key.id);
+  unsubscribe();
+  assert.equal(listener.mock.calls.length, 1);
+  assert.equal(doc.selectedCameraKey?.key.id, key.id);
+});

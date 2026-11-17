@@ -383,10 +383,11 @@ export class SceneEditorDocument {
     return selected && key ? { property: selected.property, key } : null;
   }
   selectCameraKey(property: CameraProperty, id: string): void {
-    this.selectCamera();
-    if (!this.entry || !this.workingScene?.cameraTracks?.[property]?.some((key) => key.id === id)) return;
-    this.entry.cameraKeyEdit = true;
-    this.setSelection({ kind: 'camera', key: { property, id } });
+    this.gestures.cancel();
+    if (!this.entry) return;
+    const exists = !!this.workingScene?.cameraTracks?.[property]?.some((key) => key.id === id);
+    if (exists) this.entry.cameraKeyEdit = true;
+    this.setSelection({ kind: 'camera', key: exists ? { property, id } : null });
   }
   /** Explicit capture; channels at the same time are replaced without duplicating keys. */
   setCameraKey(time = this.cameraTime?.() ?? 0, values: Partial<CinematicCameraState> = this.cinematicCamera): boolean {
