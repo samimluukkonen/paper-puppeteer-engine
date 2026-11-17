@@ -380,7 +380,8 @@ export class SceneEditorDocument {
     return this.entry?.cameraKeyEdit ?? false;
   }
   setCameraKeyEditing(enabled: boolean): void {
-    this.selectCamera();
+    if (enabled && this.cameraSelected) this.gestures.cancel();
+    else this.selectCamera();
     if (this.entry) this.entry.cameraKeyEdit = enabled;
     this.notify('presentation');
   }

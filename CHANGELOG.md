@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Fix enabling Scene Editor camera key editing deselecting the selected camera key. Disabling key editing still clears the key and keeps the camera selected.
+
 - Fix toggling Scene Editor camera preview clearing a selected dialogue line, audio clip, transition or camera key; preview now only cancels active gestures and leaves selection unchanged.
 
 - Fix Scene Editor dialogue-line, audio-clip and transition selection publishing two selection changes per click; each now notifies selection subscribers once.

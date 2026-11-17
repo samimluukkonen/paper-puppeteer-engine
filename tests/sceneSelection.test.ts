@@ -70,3 +70,20 @@ test('toggling camera preview keeps the dialogue, audio, transition or camera-ke
   doc.setCameraPreview(true);
   assert.equal(doc.selectedCameraKey?.key.id, key.id);
 });
+
+test('enabling camera key editing keeps the selected key; disabling clears the key and keeps the camera', () => {
+  const doc = document();
+  assert.isTrue(doc.setCameraKey(0, { x: 10 }));
+  const key = doc.workingScene!.cameraTracks!.x![0]!;
+  doc.selectCameraKey('x', key.id);
+  doc.setCameraKeyEditing(true);
+  assert.equal(doc.selectedCameraKey?.key.id, key.id);
+  doc.setCameraKeyEditing(false);
+  assert.isFalse(doc.cameraKeyEditing);
+  assert.isTrue(doc.cameraSelected);
+  assert.isNull(doc.selectedCameraKey);
+  doc.selectDialogueLine('line');
+  doc.setCameraKeyEditing(true);
+  assert.isTrue(doc.cameraSelected);
+  assert.isNull(doc.selectedDialogueLine);
+});
