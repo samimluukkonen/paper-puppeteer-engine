@@ -721,6 +721,77 @@ test.each([8, 32])(
   },
 );
 
+function ownershipReads(runner: SceneRunner): () => number {
+  const spies = [...runner.actors.values()].flatMap((actor) => [
+    vi.spyOn(actor.puppet, 'getPlaybackStatus'),
+    vi.spyOn(actor, 'movementStatus', 'get'),
+  ]);
+  return () => {
+    const total = spies.reduce((sum, spy) => sum + spy.mock.calls.length, 0);
+    for (const spy of spies) spy.mockClear();
+    return total;
+  };
+}
+
+test.each(['play', 'stop', 'pause', 'moveTo', 'cancelMovement'] as const)(
+  '%s on an Actor outside the scene causes no ownership scan in a playing runner',
+  async (operation) => {
+    const { runner } = fixture([move('a', 0, 2000), clip(0, 2000, true)]);
+    runner.play();
+    runner.update(1);
+    const reads = ownershipReads(runner);
+    reads();
+    runner.update(100);
+    const baseline = reads();
+    const outsider = factory().createActor({ id: 'outsider' });
+    switch (operation) {
+      case 'play':
+        outsider.play('gesture');
+        break;
+      case 'stop':
+        outsider.stop();
+        break;
+      case 'pause':
+        outsider.pauseAnimation();
+        break;
+      case 'moveTo':
+        void outsider.moveTo(500, 0);
+        break;
+      case 'cancelMovement':
+        void outsider.moveTo(500, 0);
+        outsider.cancelMovement();
+        break;
+    }
+    runner.update(100);
+    assert.equal(reads(), baseline);
+    assert.equal(runner.status, 'playing');
+    outsider.dispose();
+    await Promise.resolve();
+  },
+);
+
+test('commands on another runner’s Actors cause no ownership scan in this runner', () => {
+  const first = fixture([move('a', 0, 2000), clip(0, 2000, true)]);
+  const second = fixture([move('a', 0, 2000), clip(0, 2000, true)]);
+  first.runner.play();
+  second.runner.play();
+  first.runner.update(1);
+  second.runner.update(1);
+  const reads = ownershipReads(first.runner);
+  reads();
+  first.runner.update(100);
+  const baseline = reads();
+  const other = second.runner.actors.get('a')!;
+  other.cancelMovement();
+  other.puppet.posePipeline.player.stop();
+  second.runner.update(1);
+  assert.equal(second.runner.status, 'interrupted');
+  reads();
+  first.runner.update(100);
+  assert.equal(reads(), baseline);
+  assert.equal(first.runner.status, 'playing');
+});
+
 test.each(
   (['a', 'b'] as const).flatMap((target) =>
     (['cancel-move', 'replace-move', 'pause', 'stop', 'stop-queue', 'clear', 'replace', 'restart'] as const).map(

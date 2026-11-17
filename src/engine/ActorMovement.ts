@@ -1,7 +1,7 @@
 import { faceWorldDirection } from './ActorFacing.js';
 import type { Point } from './affineMath.js';
 import { AnimationStateController } from './AnimationStateController.js';
-import { invalidateOwnership } from './ownershipRevision.js';
+import { type OwnershipWatch, OwnershipWatchSlot } from './ownershipWatch.js';
 import type { Puppet } from './Puppet.js';
 import { assertFinite } from './types.js';
 
@@ -72,9 +72,15 @@ export class ActorMovement {
   private current: MovementRequest | undefined;
   private nextRequestId = 1;
   private latest: ActorMovementStatus | undefined;
+  private readonly ownershipWatch = new OwnershipWatchSlot();
 
   get status(): ActorMovementStatus | undefined {
     return this.latest;
+  }
+
+  /** Report ownership-changing commands to one scene owner until the returned release runs. */
+  attachOwnershipWatch(watch: OwnershipWatch): () => void {
+    return this.ownershipWatch.attach(watch);
   }
 
   constructor(private readonly puppet: Puppet) {}
@@ -126,7 +132,7 @@ export class ActorMovement {
       };
       this.current = request;
       this.latest = Object.freeze({ requestId: request.requestId, status: 'moving' });
-      invalidateOwnership();
+      this.ownershipWatch.invalidate();
       request.unsubscribeUpdate = this.puppet.onUpdate((delta) => this.update(request, delta));
       if (options.signal) {
         const signal = options.signal;
@@ -168,7 +174,7 @@ export class ActorMovement {
           this.release(request);
           this.current = undefined;
           this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
-          invalidateOwnership();
+          this.ownershipWatch.invalidate();
         }
         reject(error);
       }
@@ -203,7 +209,7 @@ export class ActorMovement {
       if (this.current === request) {
         this.current = undefined;
         this.latest = Object.freeze({ requestId: request.requestId, status: 'cancelled' });
-        invalidateOwnership();
+        this.ownershipWatch.invalidate();
         this.release(request);
         if (
           playbackId !== undefined &&
@@ -293,7 +299,7 @@ export class ActorMovement {
     if (!request) return;
     this.current = undefined;
     this.latest = Object.freeze({ requestId: request.requestId, status });
-    if (status !== 'completed') invalidateOwnership();
+    if (status !== 'completed') this.ownershipWatch.invalidate();
     const ownsPlayback = request.controller?.isActive;
     const result = Object.freeze({
       status,

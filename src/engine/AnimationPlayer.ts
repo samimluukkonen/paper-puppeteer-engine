@@ -15,7 +15,7 @@ import type { IKAnimationPose } from './ik/AnimationIKPose.js';
 import type { Joint } from './Joint.js';
 import { emptyMeshDeformation, meshDeformationIssues } from './meshDeformation.js';
 import { dispatchListeners, throwNotificationErrors } from './notifications.js';
-import { invalidateOwnership } from './ownershipRevision.js';
+import { type OwnershipWatch, OwnershipWatchSlot } from './ownershipWatch.js';
 import type {
   PlaybackLifecycleEvent,
   PlaybackLifecycleOptions,
@@ -126,6 +126,7 @@ export class AnimationPlayer {
   private speed = 1;
   private paused = false;
   private disposed = false;
+  private readonly ownershipWatch = new OwnershipWatchSlot();
   private previewMode = false;
   private previewRootMotion = false;
   private clipRig: Rig;
@@ -261,6 +262,10 @@ export class AnimationPlayer {
   }
   get isDisposed(): boolean {
     return this.disposed;
+  }
+  /** @internal Report ownership-changing commands to one scene owner until the returned release runs. */
+  attachOwnershipWatch(watch: OwnershipWatch): () => void {
+    return this.ownershipWatch.attach(watch);
   }
   get playbackSpeed(): number {
     return this.speed;
@@ -404,7 +409,7 @@ export class AnimationPlayer {
         const lifecycle: PlaybackLifecycleEvent[] = [];
         this.finishPlayback(selected.state, selected.layer, 'stopped', lifecycle);
         layer.stopped = true;
-        invalidateOwnership();
+        this.ownershipWatch.invalidate();
         this.dispatchNotifications([], [], lifecycle);
       };
       const abort = (): void => {
@@ -554,7 +559,7 @@ export class AnimationPlayer {
         }
       : undefined;
     layer.stopped = false;
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     select?.(layer.state, layerName);
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
@@ -601,7 +606,7 @@ export class AnimationPlayer {
     const lifecycle: PlaybackLifecycleEvent[] = [];
     if (layer?.state) this.finishPlayback(layer.state, 'base', 'stopped', lifecycle);
     if (layer) layer.stopped = true;
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.dispatchNotifications([], [], lifecycle);
   }
 
@@ -690,7 +695,7 @@ export class AnimationPlayer {
       if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
       layer.stopped = true;
     }
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.dispatchNotifications([], [], lifecycle);
   }
   /** Restart every selected layer together, preserving speeds, masks, weights, and pause state. */
@@ -732,7 +737,7 @@ export class AnimationPlayer {
       layer.transition = undefined;
       layer.stopped = false;
     }
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
@@ -747,14 +752,14 @@ export class AnimationPlayer {
     this.assertActive();
     if (this.paused) return;
     this.paused = true;
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.notifyPauseChange('paused');
   }
   resume(): void {
     this.assertActive();
     if (!this.paused) return;
     this.paused = false;
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.notifyPauseChange('resumed');
   }
   setSpeed(speed: number): void {
@@ -811,7 +816,7 @@ export class AnimationPlayer {
     if (layer?.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
     if (layer) this.poseEvaluator.resetLayerProperties(layer);
     this.layers.delete(name);
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.poseEvaluator.invalidate();
     this.finishPoseChange(
       () => {
@@ -831,7 +836,7 @@ export class AnimationPlayer {
       if (layer.state) this.finishPlayback(layer.state, name, 'stopped', lifecycle);
     }
     this.layers.clear();
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.layers.set('base', { weight: 1, transition: undefined, stopped: false });
     this.poseEvaluator.ikEvaluator.clear();
     this.poseEvaluator.deformation = emptyMeshDeformation;
@@ -1173,7 +1178,7 @@ export class AnimationPlayer {
     if (this.disposed) return;
     this.disposed = true;
     this.dialogueIdle = undefined;
-    invalidateOwnership();
+    this.ownershipWatch.invalidate();
     this.discardQueue();
     const lifecycle: PlaybackLifecycleEvent[] = [];
     for (const [name, layer] of this.layers) {

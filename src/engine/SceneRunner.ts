@@ -7,7 +7,7 @@ import {
   type CinematicCameraState,
 } from './cinematicCamera.js';
 import { throwNotificationErrors } from './notifications.js';
-import { getOwnershipRevision } from './ownershipRevision.js';
+import { createOwnershipWatch } from './ownershipWatch.js';
 import { freezeData, type DeepReadonly } from './readonlyData.js';
 import { SceneAudioController, type SceneAudioOptions } from './SceneAudioController.js';
 import {
@@ -95,6 +95,7 @@ export class SceneRunner implements ScenePlayback {
   private readonly rootMotionActors = new Set<string>();
   private readonly ownedAnimations = new Map<string, number>();
   private readonly activeMoves = new Map<string, { actionId: string; requestId: number }>();
+  private readonly ownershipWatch = createOwnershipWatch();
   private checkedOwnershipRevision = -1;
   private generation = 0;
   private ownCommand = false;
@@ -477,6 +478,7 @@ export class SceneRunner implements ScenePlayback {
           throw new Error(`Scene Actor "${data.id}" must be a fresh, live, owned instance with the authored ID.`);
         }
         this.instances.set(data.id, actor);
+        this.releases.push(actor.attachOwnershipWatch(this.ownershipWatch));
         if (data.dialogueIdle && !actor.puppet.hasAnimation(data.dialogueIdle.animation))
           throw new Error(`Actor "${data.id}": unknown dialogue idle animation "${data.dialogueIdle.animation}".`);
         actor.puppet.container.setVisible(sceneLayer(this.definition, 'actors').visible);
@@ -618,7 +620,7 @@ export class SceneRunner implements ScenePlayback {
     }
   }
   private checkOwnership(): void {
-    const revision = getOwnershipRevision();
+    const revision = this.ownershipWatch.revision;
     if (revision === this.checkedOwnershipRevision) return;
     this.checkedOwnershipRevision = revision;
     // Non-looping animations may finish before their authored window. Preserve the scene's

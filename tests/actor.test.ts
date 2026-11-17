@@ -3,6 +3,7 @@ import type Phaser from 'phaser';
 import { afterEach, assert, expect, test, vi } from 'vitest';
 import { Actor, type ActorOptions } from '../src/engine/Actor.js';
 import { CharacterDefinition } from '../src/engine/CharacterDefinition.js';
+import { createOwnershipWatch } from '../src/engine/ownershipWatch.js';
 import { Puppet } from '../src/engine/Puppet.js';
 import { PuppetDebug } from '../src/engine/PuppetDebug.js';
 import { puppetScene } from './helpers/puppetScene.js';
@@ -394,4 +395,45 @@ test('cleanup failures still dispose Actors, settle waits and prohibit a second 
   assert.isTrue(actor.isDisposed);
   assert.isTrue(puppet.container.isDestroyed);
   assert.doesNotThrow(() => actor.dispose());
+});
+
+test('ownership commands report only to the currently attached watch', async () => {
+  const { actor } = fixture();
+  const first = createOwnershipWatch();
+  const second = createOwnershipWatch();
+  const releaseFirst = actor.attachOwnershipWatch(first);
+  actor.play('wave');
+  assert.isAbove(first.revision, 0);
+  const firstSeen = first.revision;
+
+  const releaseSecond = actor.attachOwnershipWatch(second);
+  actor.stop();
+  void actor.moveTo(50, 0);
+  assert.equal(first.revision, firstSeen);
+  const secondSeen = second.revision;
+  assert.isAbove(secondSeen, 0);
+
+  // A stale release must not detach the newer owner.
+  releaseFirst();
+  actor.cancelMovement();
+  assert.isAbove(second.revision, secondSeen);
+
+  releaseSecond();
+  const released = second.revision;
+  actor.play('wave');
+  actor.dispose();
+  await Promise.resolve();
+  assert.equal(second.revision, released);
+  assert.equal(first.revision, firstSeen);
+});
+
+test('clock advances and natural completions do not invalidate ownership', () => {
+  const { actor, puppet } = fixture();
+  const watch = createOwnershipWatch();
+  actor.play('wave');
+  actor.attachOwnershipWatch(watch);
+  puppet.update(50);
+  puppet.update(200);
+  assert.equal(puppet.getPlaybackStatus()?.status, 'completed');
+  assert.equal(watch.revision, 0);
 });

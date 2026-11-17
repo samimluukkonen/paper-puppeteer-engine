@@ -15,6 +15,7 @@ import {
   type AnimationStateControllerOptions,
   type SetAnimationStateOptions,
 } from './AnimationStateController.js';
+import type { OwnershipWatch } from './ownershipWatch.js';
 import type { PlaybackWaitResult } from './PlaybackLifecycle.js';
 import type { Puppet } from './Puppet.js';
 import { assertFinite, type Facing } from './types.js';
@@ -255,6 +256,16 @@ export class Actor {
     this.assertActive();
     this.puppet.clearAttachment(slot);
     return this;
+  }
+
+  /** @internal Report playback and movement ownership changes to one scene owner until released. */
+  attachOwnershipWatch(watch: OwnershipWatch): () => void {
+    const releasePlayback = this.puppet.posePipeline.player.attachOwnershipWatch(watch);
+    const releaseMovement = this.movement.attachOwnershipWatch(watch);
+    return () => {
+      releasePlayback();
+      releaseMovement();
+    };
   }
 
   /** Release movement, state policy and waits; destroy owned Puppets once. */
