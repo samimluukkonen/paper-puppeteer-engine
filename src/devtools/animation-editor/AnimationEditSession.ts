@@ -30,19 +30,21 @@ export interface AnimationEditCommitOptions extends AnimationEditInstallOptions 
 /**
  * The one shared actions shape handed to every command module. The session implements
  * the transaction core; the facade supplies the selection/drag primitives as dependencies.
+ *
+ * Command modules get transaction operations only: they cannot pause, end scrubbing or
+ * install a snapshot directly, so the ordering cannot be restated outside the session.
+ * `cancelActiveDrags` and `updateTime*` stay because selection clears and live drag
+ * previews need them on their own, outside any transaction.
  */
 export interface AnimationEditActions {
   batch<Result>(command: () => Result): Result;
   notify(): void;
   cancelActiveDrags(): boolean;
-  pause(): void;
-  endScrub(): void;
   stopPlayback(): void;
   beginGesture(): void;
   updateTime(time: Seconds): boolean;
   updateTimeMilliseconds(time: Milliseconds): boolean;
   clearTransformDraft(): boolean;
-  install(next: ReadonlyAnimation, opts?: AnimationEditInstallOptions): boolean;
   commit(edit: AnimationEdit, opts?: AnimationEditCommitOptions): boolean;
   selectKeyframe(key: KeyframeSelection, modifiers?: KeyframeSelectionModifiers): boolean;
   selectEvent(ref: AnimationEventRef): boolean;
@@ -138,12 +140,6 @@ export class AnimationEditSession implements AnimationEditActions {
   cancelActiveDrags(): boolean {
     return this.deps.cancelActiveDrags();
   }
-  pause(): void {
-    this.deps.pausePlayback();
-  }
-  endScrub(): void {
-    this.deps.endScrub();
-  }
   /** Stop the editor clock for authoring: pause playback, then release any scrub. */
   stopPlayback(): void {
     this.deps.pausePlayback();
@@ -217,7 +213,11 @@ export class AnimationEditSession implements AnimationEditActions {
     });
   }
 
-  /** Authored edit boundary: validate atomically, own a fresh frozen copy, record one history entry. */
+  /**
+   * Facade-only install for snapshots the facade validated itself (pose apply, interpolation,
+   * inspected input, library edits). Not on `AnimationEditActions`: command modules install
+   * through `commit`.
+   */
   install(next: ReadonlyAnimation, opts: AnimationEditInstallOptions = {}): boolean {
     if (!this.deps.authoringEnabled()) return false;
     this.cancelActiveDrags();

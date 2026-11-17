@@ -51,6 +51,6 @@ export class AnimationEditorPlaybackCommands {
       this.session.notify();
       return false;
     }
-    return this.session.install(next);
+    return this.session.commit(() => next, { pause: false });
   }
 }

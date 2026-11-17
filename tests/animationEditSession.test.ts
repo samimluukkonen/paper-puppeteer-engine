@@ -5,6 +5,7 @@ import {
 } from '../src/devtools/animation-editor/AnimationEditorDocument.js';
 import {
   AnimationEditSession,
+  type AnimationEditActions,
   type AnimationEditSessionDeps,
 } from '../src/devtools/animation-editor/AnimationEditSession.js';
 import { setBonePropertyKeyframe } from '../src/devtools/animation-editor/keyframeEdits.js';
@@ -346,4 +347,18 @@ test('commit stops the clock through the same pause-then-end-scrub step as gestu
   assert.isAbove(pause, calls.indexOf('cancelActiveDrags'));
   assert.equal(calls[pause + 1], 'endScrub');
   assert.isBelow(pause, calls.indexOf('install'));
+});
+
+test('command modules reach only transaction operations through AnimationEditActions', () => {
+  const { deps, calls } = mockDeps();
+  const actions: AnimationEditActions = new AnimationEditSession(deps);
+  // Compile-time guard (npm run typecheck): the raw steps are not on the shared shape.
+  // @ts-expect-error pause is reachable only through stopPlayback, beginGesture or commit.
+  assert.isUndefined(actions.pause);
+  // @ts-expect-error endScrub is reachable only through stopPlayback, beginGesture or commit.
+  assert.isUndefined(actions.endScrub);
+  // @ts-expect-error command modules install through commit.
+  assert.isFunction(actions.install);
+  actions.beginGesture();
+  assert.deepEqual(calls, ['cancelActiveDrags', 'pause', 'endScrub']);
 });

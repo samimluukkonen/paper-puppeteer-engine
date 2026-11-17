@@ -10,6 +10,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 - Route every remaining drag-begin, select-at-time and preview-start path in the animation editor through two new `AnimationEditSession` steps, `stopPlayback()` (pause, then end scrub) and `beginGesture()` (cancel active drags, then stop playback), so command modules no longer pause or end scrubbing by hand. Graph-gesture and preview starts now also release an active scrub, matching every other gesture.
 
+- Remove `pause`, `endScrub` and `install` from the shared `AnimationEditActions` shape, so animation editor command modules can only stop playback, begin gestures and install snapshots through `AnimationEditSession` transactions. Authored playback-mode changes now install through `commit`; editor behavior is unchanged.
+
 - Add matching Lucide icons to Animation Editor timeline tabs and an icon-only Graph / Timeline toggle. Switch the toggle icon, hover text and accessible label with its destination, leaving more room for duration controls.
 
 - Add matching Lucide icons to Scene Editor Edit-row buttons, inspector tabs and timeline tabs, preserving visible labels and keyboard controls.

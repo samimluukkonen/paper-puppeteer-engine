@@ -72,7 +72,9 @@ Small behaviour alignments this causes, all where a site skipped a step the othe
 
 ### Follow-up 2 — Stop exposing the steps on the shared interface
 
-After follow-up 1, remove `pause`, `endScrub`, `updateTime`, `updateTimeMilliseconds`, `install` and `cancelActiveDrags` from `AnimationEditActions`. Command modules get only transaction operations (`commit`, `beginGesture`, `seekTo`, `batch`, `notify`, selection helpers). The facade keeps raw access through `AnimationEditSessionDeps`.
+After follow-up 1, remove `pause`, `endScrub` and `install` from `AnimationEditActions`. Command modules get only transaction operations (`commit`, `beginGesture`, `stopPlayback`, `batch`, `notify`, selection helpers). The facade keeps raw access through `AnimationEditSessionDeps` and the concrete session's `install`.
+
+As built, `cancelActiveDrags`, `updateTime` and `updateTimeMilliseconds` stay on the interface, unlike the original proposal. Clearing a selection cancels drags without touching the clock, and live drag previews (keyframe, event) seek on every pointer move without pausing. Neither is the transaction ordering. `AnimationEditorPlaybackCommands` now installs through `commit(…, { pause: false })`. A `@ts-expect-error` test in `tests/animationEditSession.test.ts` makes `npm run typecheck` fail if the raw steps come back.
 
 Acceptance (grep check):
 
