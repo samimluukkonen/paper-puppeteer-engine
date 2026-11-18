@@ -58,7 +58,7 @@ function numberRows<Scope extends keyof ScopeFields>(
     .map(({ field, label, fallback, degrees }) => {
       const value = values[field];
       const displayed = value ?? (fallback === 'Auto' ? '' : fallback);
-      const input = `<label class="property"><span>${escapeHtml(label)}</span><input type="number" step="any" value="${displayed}" data-scope="${scope}" data-field="${field}" placeholder="${fallback}" title="Clear to remove this override"></label>`;
+      const input = `<label class="property"><span>${escapeHtml(label)}</span><input type="number" step="any" value="${escapeHtml(displayed)}" data-scope="${escapeHtml(scope)}" data-field="${escapeHtml(field)}" placeholder="${escapeHtml(fallback)}" title="Clear to remove this override"></label>`;
       return degrees
         ? input +
             `<div class="property"><span>rotation (deg)</span><strong data-derived="rotation-degrees">${format(((value ?? 0) * 180) / Math.PI)}°</strong></div>`

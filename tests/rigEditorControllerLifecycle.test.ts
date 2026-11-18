@@ -281,3 +281,29 @@ test('rig reload/import protects pending artwork proposals even when the rig is 
   assert.equal(scene.reloadOriginal.mock.calls.length, 1);
   controller.dispose();
 });
+
+test('inspector escapes non-numeric field values instead of rendering them as markup', () => {
+  const query = stubRigEditorDom();
+  const host = query('#inspector');
+  const current = editor();
+  current.state.selectBone('root');
+  const payload = '"><img src=x onerror=alert(1)>';
+  const bone = current.state.getBone('root');
+  // Bypass rig validation: a draft path that skipped the schema could hand the inspector a string.
+  vi.spyOn(current.state, 'getBone').mockReturnValue({ ...bone, x: payload as unknown as number });
+  const controller = createInspectorController(host as unknown as HTMLElement, vi.fn());
+  controller.render(current.runtime);
+
+  const markup = host.innerHTML;
+  // Well-formed double-quoted attribute values cannot contain `"`, so anything left after removing them is markup.
+  assert.notMatch(markup.replace(/="[^"]*"/g, '=""'), /<img\b/i);
+  const value = /<input\b[^>]*\bvalue="([^"]*)"[^>]*\bdata-field="x"/.exec(markup)?.[1];
+  const decoded = value
+    ?.replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+  assert.equal(decoded, payload);
+  controller.dispose();
+});
