@@ -145,10 +145,10 @@ test('direct reuse and editor preview retain IDs, source snapshots, authored key
   const json = state.exportJson();
   const history = state.historyLength;
   assert.isTrue(controller.select('sword-cut', true));
-  state.advancePlayback(0.25);
-  state.setPreviewLoop(true);
-  state.pause();
-  state.restart();
+  state.playback.advancePlayback(0.25);
+  state.playback.setPreviewLoop(true);
+  state.playback.pause();
+  state.playback.restart();
   assert.equal(state.exportJson(), json);
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, history);
@@ -163,9 +163,9 @@ test('library notifications and inventory work stay independent of playback tick
   controller.subscribe(listener);
   const inventory = vi.spyOn(state, 'packageAnimations');
   const before = controller.getSnapshot();
-  state.play();
-  for (let index = 0; index < 5; index++) state.advancePlayback(0.01);
-  state.pause();
+  state.playback.play();
+  for (let index = 0; index < 5; index++) state.playback.advancePlayback(0.01);
+  state.playback.pause();
   assert.strictEqual(controller.getSnapshot(), before);
   assert.equal(listener.mock.calls.length, 0);
   assert.equal(inventory.mock.calls.length, 0);

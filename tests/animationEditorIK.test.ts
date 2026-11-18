@@ -177,12 +177,12 @@ test('numeric edits hold playback; commits create/update independent channels wi
   const working = state.workingAnimation!;
   state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.5);
-  state.play();
+  state.playback.play();
   state.ik.beginIKEdit();
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   for (const value of [1, 12, 120]) state.ik.setTemporaryIKProperty('x', value);
   state.ik.setTemporaryIKProperty('y', 35);
-  state.advancePlayback(1);
+  state.playback.advancePlayback(1);
   assert.equal(state.currentTime, 0.5);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
@@ -196,7 +196,7 @@ test('numeric edits hold playback; commits create/update independent channels wi
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm, [{ time: 500, x: 60, mix: 0.7 }]);
   assert.equal(state.historyLength, 3);
   assert.isTrue(state.dirty);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.strictEqual(state.workingAnimation!.tracks, working.tracks);
   assert.strictEqual(state.workingAnimation!.events, working.events);
   assert.strictEqual(state.workingAnimation!.ikTracks!.other, working.ikTracks!.other);
@@ -278,11 +278,11 @@ test('navigation, playback, animation changes and history cancel IK numeric draf
   for (const cancel of [
     () => state.setCurrentTime(0),
     () => state.undo(),
-    () => state.play(),
+    () => state.playback.play(),
     () => state.selectBone('arm'),
     () => state.selectAnimation('second'),
   ]) {
-    state.pause();
+    state.playback.pause();
     state.ik.selectIKConstraint('arm');
     state.ik.setTemporaryIKProperty('x', 77);
     cancel();
@@ -294,11 +294,11 @@ test('navigation, playback, animation changes and history cancel IK numeric draf
 
 test('IK commands notify once after coordinating playback, selection and history', () => {
   const { state } = fixture({ ikTracks: {} });
-  state.play();
+  state.playback.play();
   const observations: { playing: boolean; selected: string | null; x: number | undefined; history: number }[] = [];
   state.subscribe(() =>
     observations.push({
-      playing: state.isPlaying,
+      playing: state.playback.isPlaying,
       selected: state.ik.selectedIKConstraintId,
       x: state.workingAnimation?.ikTracks?.arm?.[0]?.x,
       history: state.historyLength,
@@ -394,9 +394,9 @@ test('React adapter caches snapshots, validates text, synchronizes edits and rel
   state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.5);
   assert.equal(controller.getSnapshot().fields[0]!.text, '15');
-  state.play();
+  state.playback.play();
   controller.beginEdit();
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   controller.edit('x', '70.0');
   assert.equal(controller.getSnapshot().fields[0]!.text, '70.0');
   controller.edit('mix', '2');
@@ -475,11 +475,11 @@ test('committed IK authoring immediately refreshes the existing puppet/solver an
     check(x!, y!);
     assert.strictEqual(puppet.getIK('arm'), constraint);
   }
-  state.restart();
-  state.play();
-  state.advancePlayback(0.5);
+  state.playback.restart();
+  state.playback.play();
+  state.playback.advancePlayback(0.5);
   check(30, 85);
-  state.pause();
+  state.playback.pause();
   state.setCurrentTime(1);
   state.ik.deleteIKPropertyKey('x');
   check(30, 75);

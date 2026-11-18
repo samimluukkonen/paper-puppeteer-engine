@@ -169,14 +169,14 @@ test('resize retains center time and zoom; playback follows only when enabled an
   state.setCurrentTime(9);
   controller.render();
   assert.equal(query('.timeline-inset').scrollLeft, scroll);
-  state.play();
+  state.playback.play();
   query('#timeline-follow').checked = false;
   controller.render();
   assert.equal(query('.timeline-inset').scrollLeft, scroll);
   query('#timeline-follow').checked = true;
   controller.render();
   assert.isAbove(query('.timeline-inset').scrollLeft, scroll);
-  state.pause();
+  state.playback.pause();
   state.clearTimelineSelection();
   controller.render();
   assert.isTrue(query('#timeline-fit-selection').disabled);

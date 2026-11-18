@@ -165,8 +165,8 @@ test('dedicated marker model stably sorts authored events, preserves duplicates 
       [0, width / 4, width / 4, width / 4, width],
     );
   state.setCurrentTime(1.3);
-  state.play();
-  state.advancePlayback(0.2);
+  state.playback.play();
+  state.playback.advancePlayback(0.2);
   assert.strictEqual(state.events.eventTimelineTrack, track);
   state.keyframes.setBonePropertyKeyframe('root', 'y', 3);
   assert.strictEqual(state.events.eventTimelineTrack, track, 'unrelated key edits share the event model');
@@ -184,16 +184,16 @@ test('event selection atomically pauses, ends scrubbing, clears keys/drafts and 
   const working = state.workingAnimation;
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
   state.setTemporaryBoneProperty('y', 7);
-  state.play();
-  state.beginScrub();
+  state.playback.play();
+  state.playback.beginScrub();
   const ref = state.events.eventTimelineTrack.markers[2]!.ref;
   const observations: unknown[] = [];
   state.subscribe(() =>
-    observations.push([state.selectedEvent, state.selectedKeys.length, state.currentTime, state.isPlaying]),
+    observations.push([state.selectedEvent, state.selectedKeys.length, state.currentTime, state.playback.isPlaying]),
   );
   assert.isTrue(state.events.selectAnimationEvent(ref));
   assert.deepEqual(observations, [[ref, 0, 0.5, false]]);
-  assert.isFalse(state.isScrubbing);
+  assert.isFalse(state.playback.isScrubbing);
   assert.isFalse(state.hasTemporaryTransform);
   assert.isNull(state.selectedBoneId);
   assert.isNull(state.selectedTimelineProperty);
@@ -203,10 +203,10 @@ test('event selection atomically pauses, ends scrubbing, clears keys/drafts and 
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.equal(JSON.stringify(input), before);
-  state.play();
+  state.playback.play();
   assert.isFalse(state.events.selectAnimationEvent(getAnimationEventReferences(clip())[0]!));
   assert.strictEqual(state.selectedEvent, ref);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   state.setCurrentTime(1.25);
   assert.strictEqual(state.selectedEvent, ref, 'navigation retains selection without forcing the clock');
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 2 });

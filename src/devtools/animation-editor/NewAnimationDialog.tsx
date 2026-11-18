@@ -1,7 +1,7 @@
 import Plus from 'lucide-react/icons/plus';
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
-import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackCommands.js';
+import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackController.js';
 import type { NewAnimationController } from './NewAnimationController.js';
 
 export function NewAnimationDialog({ controller }: { controller: NewAnimationController }) {

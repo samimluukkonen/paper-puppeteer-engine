@@ -59,10 +59,10 @@ export class AnimationLibraryController {
     const state = this.state;
     if (!state || this.snapshot.reason || !state.animationIds.includes(name)) return false;
     if (state.selectedAnimationId !== name && !state.selectAnimation(name, { keepChanges: true })) return false;
-    state.pause();
+    state.playback.pause();
     if (preview) {
-      state.restart();
-      state.play();
+      state.playback.restart();
+      state.playback.play();
     }
     return true;
   }

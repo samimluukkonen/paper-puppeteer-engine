@@ -13,7 +13,7 @@ type PreviewState = Pick<
   | 'animationAuthoringEnabled'
   | 'hasPendingAnimationEdits'
   | 'rootMotion'
-  | 'isPlaying'
+  | 'playback'
   | 'currentTimeMilliseconds'
   | 'poseLibrary'
 >;
@@ -263,7 +263,7 @@ export class AnimationEditorPreviewCommands {
       (!this.cleanupPreviewActive ||
         !this.state.animationAuthoringEnabled ||
         this.state.hasPendingAnimationEdits ||
-        this.state.isPlaying)
+        this.state.playback.isPlaying)
     )
       this.cleanupPreview = null;
     if (
@@ -272,7 +272,7 @@ export class AnimationEditorPreviewCommands {
         this.variationPreview.rig !== this.document.rig ||
         !this.state.animationAuthoringEnabled ||
         this.state.hasPendingAnimationEdits ||
-        this.state.isPlaying)
+        this.state.playback.isPlaying)
     )
       this.variationPreview = null;
     if (
@@ -281,7 +281,7 @@ export class AnimationEditorPreviewCommands {
         this.posePreview.rig !== this.document.rig ||
         !this.state.animationAuthoringEnabled ||
         this.state.hasPendingAnimationEdits ||
-        this.state.isPlaying)
+        this.state.playback.isPlaying)
     )
       this.posePreview = null;
   }

@@ -56,7 +56,7 @@ function fixture() {
         { time: 500, offsetX: 45, offsetY: -80 },
       ],
     });
-    state.setPreviewLoop(true);
+    state.playback.setPreviewLoop(true);
   };
   const dispose = () => {
     binding.dispose();
@@ -76,7 +76,7 @@ test('shared settings and per-clip motion/loop survive project ZIPs with identic
     const cut = f.motion.getSnapshot().settings;
     f.state.selectAnimation('jump');
     assert.isFalse(f.motion.getSnapshot().settings.enabled);
-    assert.isFalse(f.state.previewLoop);
+    assert.isFalse(f.state.playback.previewLoop);
     f.motion.update({
       enabled: true,
       interpolation: 'stepped',
@@ -84,10 +84,10 @@ test('shared settings and per-clip motion/loop survive project ZIPs with identic
     });
     f.state.selectAnimation('idle');
     assert.isFalse(f.motion.getSnapshot().settings.enabled);
-    assert.isFalse(f.state.previewLoop);
+    assert.isFalse(f.state.playback.previewLoop);
     f.state.selectAnimation('cut');
     assert.deepEqual(f.motion.getSnapshot().settings, cut);
-    assert.isTrue(f.state.previewLoop);
+    assert.isTrue(f.state.playback.previewLoop);
     assert.strictEqual(f.state.workingAnimation, original);
     assert.equal(f.state.historyLength, history);
     assert.deepEqual(await buildCharacterPackage(f.packageSnapshot()), before);
@@ -150,7 +150,7 @@ test('standalone local draft capture includes preview-only edits and detached im
         other.changed,
       );
       assert.deepEqual(binding.preferences, saved);
-      assert.isTrue(other.state.previewLoop);
+      assert.isTrue(other.state.playback.previewLoop);
       assert.isFalse(other.ground.getSnapshot().canUndo);
       binding.dispose();
     } finally {
@@ -168,9 +168,9 @@ test('playback and repeated seeks cause no preference writes; teardown releases 
     f.changed.mockClear();
     const animation = f.state.workingAnimation;
     const history = f.state.historyLength;
-    f.state.play();
-    for (let index = 0; index < 100; index++) f.state.advancePlayback(0.01);
-    f.state.pause();
+    f.state.playback.play();
+    for (let index = 0; index < 100; index++) f.state.playback.advancePlayback(0.01);
+    f.state.playback.pause();
     for (const time of [0.5, 0, 0.8, 0.2, 0.5]) f.state.setCurrentTime(time);
     assert.equal(f.changed.mock.calls.length, 0);
     assert.strictEqual(f.state.workingAnimation, animation);
@@ -318,10 +318,10 @@ test('exclusive modes and root loop behavior survive clip switches and metadata 
       'legacy enabled trajectories never add authored root travel',
     );
     assert.equal(f.state.rootMotion.rootLoopMode, 'reset');
-    assert.isTrue(f.state.previewLoop);
+    assert.isTrue(f.state.playback.previewLoop);
     const capture = f.motion.capturePreferences();
-    f.state.play();
-    f.state.advancePlayback(3.5);
+    f.state.playback.play();
+    f.state.playback.advancePlayback(3.5);
     assert.deepEqual(f.motion.capturePreferences(), capture, 'frame-clock updates do not edit saved preferences');
     assert.strictEqual(f.state.workingAnimation, original);
     assert.equal(f.state.historyLength, 0);

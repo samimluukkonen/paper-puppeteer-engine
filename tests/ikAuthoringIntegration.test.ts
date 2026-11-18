@@ -70,7 +70,7 @@ test('root-only character → rig IK → animation → bake → package → Char
     assert.deepEqual(editor.state.getIKConstraint('tipIK').target, { x: 20, y: 60 });
     animation.setEditorMode('animation');
     assert.isTrue(animation.createAnimation({ name: 'reach', loop: false }));
-    animation.setAuthoredPlaybackMode('smooth');
+    animation.playback.setAuthoredPlaybackMode('smooth');
     assert.isTrue(animation.timelineTracks.some((row) => row.kind === 'ik' && row.constraintId === 'tipIK'));
     assert.isTrue(animation.ik.selectIKConstraint('tipIK'));
     const rigHistory = editor.state.historyLength;

@@ -75,9 +75,9 @@ test('new workspace → rig/artwork/default skin → first clips → ZIP → rel
   const preview = new AnimationEditorPreview(animation, previewPuppet);
   animation.setCurrentTime(0.5);
   assert.closeTo(previewPuppet.getBone('head').pose.rotation, Math.PI / 2, 1e-10);
-  animation.play();
-  animation.advancePlayback(0.1);
-  animation.pause();
+  animation.playback.play();
+  animation.playback.advancePlayback(0.1);
+  animation.playback.pause();
   preview.dispose();
   preview.dispose();
   previewPuppet.destroy();

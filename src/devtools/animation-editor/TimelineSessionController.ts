@@ -101,22 +101,30 @@ export class TimelineSessionController {
       },
       options,
     );
-    this.reset.addEventListener('click', () => this.state.restart(), options);
-    this.playPause.addEventListener('click', () => this.state.togglePlayback(), options);
-    this.loop.addEventListener('click', () => this.state.setPreviewLoop(!this.state.previewLoop), options);
-    this.speed.addEventListener('change', () => this.state.setPlaybackSpeed(Number(this.speed.value)), options);
+    this.reset.addEventListener('click', () => this.state.playback.restart(), options);
+    this.playPause.addEventListener('click', () => this.state.playback.togglePlayback(), options);
+    this.loop.addEventListener(
+      'click',
+      () => this.state.playback.setPreviewLoop(!this.state.playback.previewLoop),
+      options,
+    );
+    this.speed.addEventListener(
+      'change',
+      () => this.state.playback.setPlaybackSpeed(Number(this.speed.value)),
+      options,
+    );
     this.mode.addEventListener(
       'change',
       () => {
         const mode = this.mode.value;
-        if (mode === 'smooth' || mode === 'stepped') this.state.setAuthoredPlaybackMode(mode);
+        if (mode === 'smooth' || mode === 'stepped') this.state.playback.setAuthoredPlaybackMode(mode);
       },
       options,
     );
     this.fps.addEventListener(
       'change',
       () => {
-        this.state.setAuthoredFPS(this.fps.valueAsNumber);
+        this.state.playback.setAuthoredFPS(this.fps.valueAsNumber);
         // Rejected input restores the held authored value; the status retains the validation error.
         this.fps.value = this.authoredFPS;
       },
@@ -190,14 +198,14 @@ export class TimelineSessionController {
     for (const { setting, input } of this.snap) input.checked = state.timelineSnapSettings[setting];
     const selectedId = state.selectedAnimationId ?? '';
     if (this.selection.value !== selectedId) this.selection.value = selectedId;
-    const playbackLabel = state.isPlaying ? 'Pause' : 'Play';
+    const playbackLabel = state.playback.isPlaying ? 'Pause' : 'Play';
     setText(this.playPause.querySelector?.<HTMLElement>('[data-control-label]') ?? this.playPause, playbackLabel);
     setAttribute(this.playPause, 'aria-label', playbackLabel);
     setAttribute(this.playPause, 'title', `${playbackLabel} (Space)`);
-    setAttribute(this.loop, 'aria-pressed', String(state.previewLoop));
+    setAttribute(this.loop, 'aria-pressed', String(state.playback.previewLoop));
     setText(this.timeDisplay, `${state.currentTime.toFixed(3)} / ${state.duration.toFixed(3)} s`);
     const playback = animation?.playback;
-    const speed = String(state.playbackSpeed);
+    const speed = String(state.playback.playbackSpeed);
     if (this.speed.value !== speed) this.speed.value = speed;
     const mode = playback?.mode ?? 'smooth';
     if (this.mode.value !== mode) this.mode.value = mode;
@@ -217,7 +225,7 @@ export class TimelineSessionController {
     setText(
       this.metadata,
       animation
-        ? `Mode: ${mode} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.previewLoop ? 'loop' : 'once'} · Speed: ${speed}× · ${state.isScrubbing ? 'Scrubbing' : state.isPlaying ? 'Playing' : 'Paused'}`
+        ? `Mode: ${mode} · FPS: ${playback?.mode === 'stepped' ? playback.fps : 'continuous'} · Authored loop: ${state.loop ? 'on' : 'off'} · Playback: ${state.playback.previewLoop ? 'loop' : 'once'} · Speed: ${speed}× · ${state.playback.isScrubbing ? 'Scrubbing' : state.playback.isPlaying ? 'Playing' : 'Paused'}`
         : 'Select an animation to preview its pose.',
     );
     // Only time-dependent controls above need work during clock-only notifications.

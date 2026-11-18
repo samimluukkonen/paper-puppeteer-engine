@@ -83,7 +83,7 @@ test('restart preserves authored data, drafts, history and playback; prerequisit
     history: animation.historyLength,
     draft: animation.boneTransformDraft,
     time: animation.currentTime,
-    playing: animation.isPlaying,
+    playing: animation.playback.isPlaying,
   };
   launcher.controller.next();
   assert.isTrue(launcher.controller.restart().ok);
@@ -92,7 +92,7 @@ test('restart preserves authored data, drafts, history and playback; prerequisit
   assert.equal(animation.historyLength, before.history);
   assert.strictEqual(animation.boneTransformDraft, before.draft);
   assert.equal(animation.currentTime, before.time);
-  assert.equal(animation.isPlaying, before.playing);
+  assert.equal(animation.playback.isPlaying, before.playing);
   launcher.controller.exit();
   assert.isFalse(launcher.controller.restart().ok);
   assert.equal(launcher.getPrerequisiteGuide('animation-keyframe-editing')?.id, 'animation-first-keyframe');

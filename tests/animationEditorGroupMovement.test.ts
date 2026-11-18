@@ -108,9 +108,9 @@ test.each([400, -150])('all eight selected properties preserve spacing and value
   const { state, input } = session();
   const source = JSON.stringify(input);
   const before = state.workingAnimation;
-  state.play();
+  state.playback.play();
   assert.isTrue(state.keyframes.beginKeyframeDrag(group[0]!));
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   state.keyframes.previewKeyframeDrag((200 + deltaMs) / 1000);
   assert.deepEqual(state.keyframes.keyframeDrag?.originalKeys, group);
   assert.approximately(state.keyframes.keyframeDrag!.previewDelta, deltaMs / 1000, 1e-12);
@@ -134,7 +134,7 @@ test.each([400, -150])('all eight selected properties preserve spacing and value
   assert.isFalse(state.dirty);
   state.redo();
   assert.strictEqual(state.workingAnimation, moved);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
 });
 
 test.each([-10, 10])('one boundary constraint preserves the whole group at target %s seconds', (time) => {
@@ -288,8 +288,8 @@ test('cancel restores the original set and primary, with no authored/history/dir
   const before = state.workingAnimation;
   state.keyframes.beginKeyframeDrag(group[5]!);
   state.keyframes.previewKeyframeDrag(1.1);
-  state.play();
-  assert.isFalse(state.isPlaying);
+  state.playback.play();
+  assert.isFalse(state.playback.isPlaying);
   state.keyframes.cancelKeyframeDrag();
   assert.strictEqual(state.workingAnimation, before);
   assert.deepEqual(state.selectedKeys, group);
@@ -315,8 +315,8 @@ test('group arrow nudge uses frame/small/large steps and one snapshot per change
   state.selectKeyframes(shifted(group, 10));
   state.nudgeSelectedKeyframe(-1, true);
   assert.deepEqual(state.selectedKeys, shifted(group, -90));
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(20);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(20);
   state.setKeyframeSnapMode('frame');
   state.nudgeSelectedKeyframe(1);
   assert.deepEqual(state.selectedKeys, shifted(group, -50)); // 0.11 anchor + frame snaps to 0.15.

@@ -9,6 +9,9 @@ export interface GraphGestureContext {
   readonly animationAuthoringEnabled: boolean;
 }
 
+/** The public `state.graph` domain handle; only the facade reads the provisional curve preview. */
+export type AnimationEditorGraphHandle = Omit<AnimationEditorGraphGestures, 'previewAnimation'>;
+
 /** Own a detached curve gesture; the session owns the commit ordering, history and cross-channel selection. */
 export class AnimationEditorGraphGestures {
   constructor(

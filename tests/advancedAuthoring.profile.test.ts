@@ -63,20 +63,20 @@ test.skipIf(import.meta.env.VITE_PROFILE !== '1')(
         sampleGraph(state.workingAnimation!, keys, view.start + (pixel / 640) * (view.end - view.start));
     });
     const ref = { channel, time: 0 };
-    state.beginGraphEdit(ref);
+    state.graph.beginGraphEdit(ref);
     measure('validated curve drag proposal', 10, (i) =>
-      state.previewGraphEdit({ curve: { ...DEFAULT_GRAPH_CURVE, control1: { x: 0.2, y: i / 20 } } }),
+      state.graph.previewGraphEdit({ curve: { ...DEFAULT_GRAPH_CURVE, control1: { x: 0.2, y: i / 20 } } }),
     );
-    state.cancelGraphEdit();
+    state.graph.cancelGraphEdit();
     measure('animation switching', 10, (i) => {
       state.selectAnimation(i % 2 ? 'dense' : 'other', { keepChanges: true });
     });
     measure('manual diagnostics (8448 property keys)', 1, () => {
       assert.isTrue(diagnostics.run());
     });
-    state.play();
-    measure('timeline clock update with tools bound', 120, () => state.advancePlayback(1 / 60));
-    state.pause();
+    state.playback.play();
+    measure('timeline clock update with tools bound', 120, () => state.playback.advancePlayback(1 / 60));
+    state.playback.pause();
     diagnostics.dispose();
     library.dispose();
   },

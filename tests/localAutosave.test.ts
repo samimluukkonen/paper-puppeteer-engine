@@ -572,12 +572,12 @@ test('actual animation playback and scrubbing preserve authored data, dirty stat
   const before = JSON.stringify(animation.packageAnimations());
   const dirty = animation.dirty;
   const history = animation.historyLength;
-  animation.play();
-  for (let frame = 0; frame < 180; frame++) animation.advancePlayback(1 / 60);
-  animation.beginScrub();
+  animation.playback.play();
+  for (let frame = 0; frame < 180; frame++) animation.playback.advancePlayback(1 / 60);
+  animation.playback.beginScrub();
   animation.setCurrentTime(0.5);
-  animation.endScrub();
-  animation.pause();
+  animation.playback.endScrub();
+  animation.playback.pause();
   assert.equal(JSON.stringify(animation.packageAnimations()), before);
   assert.equal(animation.historyLength, history);
   assert.equal(animation.dirty, dirty);

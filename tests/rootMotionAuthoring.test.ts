@@ -70,10 +70,10 @@ test('root and graph owners hand off previews and publish committed selection wi
   state.rootMotion.beginRootMotionDrag();
   state.rootMotion.previewRootMotionDrag({ x: 15, y: 20 });
   assert.notStrictEqual(state.previewAnimation, base);
-  state.beginGraphEdit({ channel: x, time: 0 });
+  state.graph.beginGraphEdit({ channel: x, time: 0 });
   assert.isFalse(state.rootMotion.rootMotionDragActive);
   assert.strictEqual(state.previewAnimation, base, 'graph begins from authored data, discarding the XY proposal');
-  state.previewGraphEdit({ time: 0.25, value: 30 });
+  state.graph.previewGraphEdit({ time: 0.25, value: 30 });
   const observations: unknown[] = [];
   const unsubscribe = state.subscribe(() =>
     observations.push({
@@ -83,7 +83,7 @@ test('root and graph owners hand off previews and publish committed selection wi
       preview: state.previewAnimation === state.workingAnimation,
     }),
   );
-  assert.isTrue(state.commitGraphEdit());
+  assert.isTrue(state.graph.commitGraphEdit());
   assert.deepEqual(observations, [
     { active: false, selected: { property: 'x', time: 0.25 }, time: 250, preview: true },
   ]);
@@ -116,7 +116,7 @@ test('root selection, numeric XY, retiming, duplication and sparse-axis deletion
   state.rootMotion.setRootPosition({ x: 40, y: -20 }, 0.5);
   state.rootMotion.selectRootMotion('x', 0.5);
   assert.equal(state.currentTime, 0.5);
-  state.editGraphKey({ channel: x, time: 0.5 }, { time: 0.6, value: 55 });
+  state.graph.editGraphKey({ channel: x, time: 0.5 }, { time: 0.6, value: 55 });
   assert.deepEqual(state.rootMotion.selectedRootKey, { property: 'x', time: 0.6 });
   assert.deepEqual(
     rootKeys(state.workingAnimation!, 'y').map((key) => key.time),
@@ -138,8 +138,8 @@ test.each([{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GR
     const state = fixture();
     state.rootMotion.selectRootMotion('x', 0);
     const base = state.workingAnimation!;
-    state.beginGraphEdit({ channel: x, time: 0 });
-    for (let i = 0; i < 20; i++) state.previewGraphEdit({ curve });
+    state.graph.beginGraphEdit({ channel: x, time: 0 });
+    for (let i = 0; i < 20; i++) state.graph.previewGraphEdit({ curve });
     assert.strictEqual(state.workingAnimation, base);
     assert.equal(state.historyLength, 0);
     const preview = state.previewAnimation!;
@@ -149,7 +149,7 @@ test.each([{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GR
         sampleRootMotion(preview, seconds * 1000).x,
         1e-10,
       );
-    state.commitGraphEdit();
+    state.graph.commitGraphEdit();
     assert.equal(state.historyLength, 1);
     assert.deepEqual(rootKeys(state.workingAnimation!, 'x')[0]!.curve, curve);
     state.rootMotion.duplicateRootKey(0.25);
@@ -165,10 +165,10 @@ test('graph collision, invalid values and terminal interpolation fail without ch
   state.rootMotion.setRootPosition({ x: 40 }, 0.5);
   const before = state.workingAnimation;
   for (const edit of [{ time: 1 }, { time: -1 }, { value: NaN }, { value: Infinity }])
-    assert.throws(() => state.editGraphKey({ channel: x, time: 0.5 }, edit));
-  assert.throws(() => state.editGraphKey({ channel: x, time: 1 }, { curve: DEFAULT_GRAPH_CURVE }));
+    assert.throws(() => state.graph.editGraphKey({ channel: x, time: 0.5 }, edit));
+  assert.throws(() => state.graph.editGraphKey({ channel: x, time: 1 }, { curve: DEFAULT_GRAPH_CURVE }));
   assert.strictEqual(state.workingAnimation, before);
-  assert.isFalse(state.graphEditActive);
+  assert.isFalse(state.graph.graphEditActive);
   assert.throws(() => state.rootMotion.setRootPosition({ y: Infinity }));
   assert.strictEqual(state.workingAnimation, before);
 });
@@ -271,8 +271,8 @@ test.each(['right', 'left'] as const)(
       assert.equal(state.historyLength, 0);
       assert.closeTo(puppet.container.x, root.x + (facing === 'left' ? -80 : 80), 1e-9);
       assert.closeTo(puppet.getBone('pelvis').pose.y, -5, 1e-9);
-      state.play();
-      state.advancePlayback(1);
+      state.playback.play();
+      state.playback.advancePlayback(1);
       assert.equal(state.currentTime, 0.5);
       input.emit('pointerupoutside', f.pointer(root.x + (facing === 'left' ? -80 : 80), root.y - 40));
       assert.equal(state.historyLength, 1);
@@ -330,8 +330,8 @@ test('scrubs, stepped frames, loop playback and visibility toggles use absolute 
   const f = viewport();
   try {
     const { state, puppet } = f;
-    state.setAuthoredPlaybackMode('stepped');
-    state.setAuthoredFPS(4);
+    state.playback.setAuthoredPlaybackMode('stepped');
+    state.playback.setAuthoredFPS(4);
     for (const time of [0.8, 0.3, 1, 0, 0.3]) {
       state.setCurrentTime(time);
       assert.closeTo(puppet.container.x, 100 + (time === 1 ? 80 : Math.floor(time * 4) * 20), 1e-9);
@@ -342,10 +342,10 @@ test('scrubs, stepped frames, loop playback and visibility toggles use absolute 
     state.rootMotion.setRootMotionView({ visible: true, trajectory: false });
     assert.equal(puppet.container.x, 120);
     assert.equal(state.historyLength, history);
-    state.setPreviewLoop(true);
-    state.restart();
-    state.play();
-    state.advancePlayback(1.3);
+    state.playback.setPreviewLoop(true);
+    state.playback.restart();
+    state.playback.play();
+    state.playback.advancePlayback(1.3);
     assert.closeTo(state.currentTime, 0.3, 1e-9);
     assert.equal(puppet.container.x, 120);
   } finally {

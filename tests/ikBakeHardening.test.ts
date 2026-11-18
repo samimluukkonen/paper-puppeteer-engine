@@ -297,7 +297,7 @@ test('onion poses refresh after bake/edit/undo; mirroring preserves IK tracks an
   state.selectAnimation('reach');
   state.setCurrentTime(0.5);
   const event = vi.fn();
-  state.onAnimationEvent(event);
+  state.playback.onAnimationEvent(event);
   const before = state.sampleGhostPose(0.4)!.get('leftForearm')!.rotation;
   const plan = generateBakedBoneKeys(sampleIKBake(source, rig, ['left']), rig, {
     animation: source,

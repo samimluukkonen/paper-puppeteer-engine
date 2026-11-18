@@ -90,12 +90,12 @@ function session() {
 test('normal selection replaces the set; additive toggles preserve primary/time with deterministic fallback', () => {
   const { state } = session();
   const working = state.workingAnimation;
-  state.play();
+  state.playback.play();
   state.selectKeyframe(key(0.5));
   assert.deepEqual(state.selectedKeys, [key(0.5)]);
   assert.deepEqual(state.primaryKey, key(0.5));
   assert.strictEqual(state.selectedKeyframe, state.primaryKey);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   state.selectKeyframe(key(0.75, 'rotation', 'arm'), { additive: true });
   assert.deepEqual(state.selectedKeys, [key(0.5), key(0.75, 'rotation', 'arm')]);
   assert.deepEqual(state.primaryKey, key(0.5));

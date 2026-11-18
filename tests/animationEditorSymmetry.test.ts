@@ -35,7 +35,7 @@ test('mapping preferences preserve authored data, preview, clock, selection, pla
   state.selectBone('leftArm');
   state.setCurrentTime(0.25);
   state.setTemporaryBoneProperty('x', 12);
-  state.play();
+  state.playback.play();
   const source = state.sourceAnimation;
   const working = state.workingAnimation;
   const json = state.exportJson();
@@ -43,7 +43,7 @@ test('mapping preferences preserve authored data, preview, clock, selection, pla
   const pose = state.getEvaluatedBoneTransform('leftArm');
   const events = vi.fn();
   const subscriber = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   state.subscribe(subscriber);
   assert.isNull(state.getMirroredBoneId('leftArm'));
   assert.isTrue(state.setSymmetryMapping(acceptedMapping()));
@@ -58,7 +58,7 @@ test('mapping preferences preserve authored data, preview, clock, selection, pla
   assert.deepEqual(state.boneTransformDraft, draft);
   assert.equal(state.currentTime, 0.25);
   assert.equal(state.selectedBoneId, 'leftArm');
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.equal(events.mock.calls.length, 0);

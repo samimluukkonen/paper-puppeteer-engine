@@ -60,9 +60,9 @@ test('temporary edit pauses at the held time and explicit property commit create
   const working = state.workingAnimation!;
   const before = JSON.stringify(clip);
   state.selectBone('forearm');
-  state.play();
+  state.playback.play();
   state.beginTransformEdit();
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.currentTime, 0.5);
   state.setTemporaryBoneProperty('rotation', 0.6);
   state.setTemporaryBoneProperty('x', 7);
@@ -147,10 +147,10 @@ test.each(['time', 'bone', 'animation', 'cancel', 'play', 'mode', 'undo', 'redo'
         state.cancelTransformEdit();
         break;
       case 'play':
-        state.play();
+        state.playback.play();
         break;
       case 'mode':
-        state.setAuthoredPlaybackMode('stepped');
+        state.playback.setAuthoredPlaybackMode('stepped');
         break;
       case 'undo':
         state.undo();

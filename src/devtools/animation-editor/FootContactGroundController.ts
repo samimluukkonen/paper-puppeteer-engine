@@ -106,7 +106,7 @@ export class FootContactGroundController {
       active || this.feedback ? state?.currentTimeMilliseconds : undefined,
       state?.sessionRevision,
       state?.editorMode,
-      state?.isPlaying,
+      state?.playback.isPlaying,
       state?.ik.selectedIKConstraintId,
       state?.ik.ikTargetDraft,
       state?.boneTransformDraft,
@@ -137,7 +137,7 @@ export class FootContactGroundController {
       state?.workingAnimation,
       this.puppet,
       state?.editorMode,
-      state?.isPlaying,
+      state?.playback.isPlaying,
       active ? this.disabledReason : undefined,
       this.markerId,
       this.constraintId,
@@ -212,8 +212,8 @@ export class FootContactGroundController {
       return false;
     }
     const state = this.state!;
-    state.pause();
-    state.endScrub();
+    state.playback.pause();
+    state.playback.endScrub();
     this.refresh(true);
     try {
       // Pose presets and external edits are not clip data. Refuse a mismatched preview context.

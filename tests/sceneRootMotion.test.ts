@@ -316,7 +316,7 @@ test('portable scene exports retain root tracks, policy, evaluated travel and as
   editor.rootMotion.setRootPosition({ x: 0, y: 0 }, 0.25);
   editor.rootMotion.setRootPosition({ x: 80, y: 0 }, 0.6);
   editor.rootMotion.setRootPosition({ x: 80, y: 0 }, 1);
-  editor.editGraphKey(
+  editor.graph.editGraphKey(
     { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.25 },
     {
       curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } },

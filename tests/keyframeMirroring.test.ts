@@ -382,9 +382,9 @@ test('failed commands retain drafts, gestures, playback, selection, history and 
   assert.equal(state.currentTime, 0.6);
   state.keyframes.cancelKeyframeDrag();
   state.selectBone('leftArm');
-  state.play();
+  state.playback.play();
   assert.isFalse(state.keyframes.mirrorCurrentPoseToKeys('right-to-left'));
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
 });
 
 test('invalid mapping, direction, target property and current time fail atomically', () => {

@@ -58,7 +58,7 @@ export class AnimationEditorGroundHandle {
       this.state.ik.ikTargetDrag ||
       this.state.keyframes.keyframeDrag ||
       this.state.events.eventDrag ||
-      this.state.isScrubbing
+      this.state.playback.isScrubbing
     )
       return false;
     const world = this.world(pointer);

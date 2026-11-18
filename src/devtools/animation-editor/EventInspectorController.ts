@@ -7,7 +7,7 @@ import { toSeconds } from './timeUnits.js';
 /** The inspector edits through the events handle and reads the clip and its issues. */
 type EventInspectorState = Pick<
   AnimationEditorState,
-  'events' | 'selectedEvent' | 'duration' | 'validationIssues' | 'workingAnimation' | 'pause'
+  'events' | 'selectedEvent' | 'duration' | 'validationIssues' | 'workingAnimation' | 'playback'
 >;
 
 /** Local text drafts commit once on blur/Enter; authored snapshots remain authoritative. */
@@ -61,7 +61,7 @@ export class EventInspectorController {
       options,
     );
     for (const field of [this.time, this.name, this.data]) {
-      field.addEventListener('focus', () => this.getState().pause(), options);
+      field.addEventListener('focus', () => this.getState().playback.pause(), options);
       field.addEventListener('blur', () => this.commit(field), options);
       field.addEventListener(
         'keydown',

@@ -247,7 +247,7 @@ test('preview scrubs the real canvas evaluator without authored clocks, event de
     json = state.exportJson(),
     pose = puppet.getBone('root').pose.x;
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   assert.equal(controller.begin(), 'attack-basic-variation');
   assert.equal(controller.preview({ name: 'heavy', timeScale: 2 }, 0.75), '');
   assert.equal(state.previews.previewTimeMilliseconds, 1500);
@@ -323,7 +323,7 @@ test('variations retain independent Graph Editor, Pose Library, mirroring, IK an
   const baseline = state.workingAnimation!;
   const ref = { channel: { kind: 'bone' as const, id: 'arm_L', property: 'rotation' as const }, time: 0 };
   assert.lengthOf(graphKeys(baseline, ref.channel), 3);
-  assert.isTrue(state.editGraphKey(ref, { value: 45, curve: { mode: 'linear' } }));
+  assert.isTrue(state.graph.editGraphKey(ref, { value: 45, curve: { mode: 'linear' } }));
   const edited = state.workingAnimation;
   assert.isTrue(state.undo());
   assert.deepEqual(state.workingAnimation, baseline);

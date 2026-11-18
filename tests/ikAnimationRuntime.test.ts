@@ -567,9 +567,9 @@ test.each([{ mode: 'smooth' } as const, { mode: 'stepped', fps: 10 } as const])(
     state.setCurrentTime(0.5);
     puppet.setFacing('left');
     reaches(puppet, { x: 30, y: 80 });
-    state.restart();
-    state.play();
-    state.advancePlayback(0.5);
+    state.playback.restart();
+    state.playback.play();
+    state.playback.advancePlayback(0.5);
     reaches(puppet, { x: 30, y: 80 });
     assert.equal(event.mock.calls.length, 0);
     assert.equal(playerEvent.mock.calls.length, 0);

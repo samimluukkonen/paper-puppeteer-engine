@@ -87,7 +87,7 @@ test.each([0.5, 1, 2, 4])(
     try {
       const before = f.state.packageAnimations();
       const rig = JSON.stringify(f.rig);
-      f.state.play();
+      f.state.playback.play();
       const start = f.labelPointer();
       const writes = f.storage.setItem.mock.calls.length;
       assert.isTrue(f.handle.pointerDown(start));
@@ -95,14 +95,14 @@ test.each([0.5, 1, 2, 4])(
       assert.equal(f.workspace.getSnapshot().guide.y, 500);
       f.input.emit('pointermove', { x: start.x, y: start.y + 40 * zoom, id: start.id });
       assert.equal(f.workspace.getSnapshot().guide.y, 540);
-      assert.isTrue(f.state.isPlaying);
-      f.state.advancePlayback(0.6);
-      f.state.advancePlayback(0.7);
-      f.state.pause();
-      f.state.beginScrub();
+      assert.isTrue(f.state.playback.isPlaying);
+      f.state.playback.advancePlayback(0.6);
+      f.state.playback.advancePlayback(0.7);
+      f.state.playback.pause();
+      f.state.playback.beginScrub();
       f.state.setCurrentTime(0.8);
       f.state.setCurrentTime(0.2);
-      f.state.endScrub();
+      f.state.playback.endScrub();
       f.camera.scrollY += 10;
       f.input.emit('pointerupoutside', { x: start.x, y: start.y + 40 * zoom, id: start.id });
       assert.equal(f.workspace.getSnapshot().guide.y, 550);

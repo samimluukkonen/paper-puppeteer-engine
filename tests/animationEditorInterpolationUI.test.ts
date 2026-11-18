@@ -214,8 +214,8 @@ test('playback-only notifications reuse selection queries; selection and history
   state.selectKeyframe(key());
   assert.equal(query.mock.calls.length, 1);
   state.setCurrentTime(0.1);
-  state.play();
-  state.advancePlayback(0.1);
+  state.playback.play();
+  state.playback.advancePlayback(0.1);
   assert.equal(query.mock.calls.length, 1);
   state.setAuthoredInterpolation('linear');
   assert.equal(query.mock.calls.length, 2);

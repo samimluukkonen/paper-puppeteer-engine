@@ -33,7 +33,7 @@ function fixture() {
   vi.stubGlobal('window', { confirm });
   vi.stubGlobal('Option', EditorElement);
   const controller = new TimelineSessionController(query('#editor-app') as unknown as HTMLElement, () => state, {
-    endScrub: () => state.endScrub(),
+    endScrub: () => state.playback.endScrub(),
   });
   controller.bind('test');
   const release = state.subscribe(() => controller.render());
@@ -125,12 +125,12 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
       state.events.previewEventDrag(0.4);
     }
     if (kind === 'scrub') {
-      state.play();
-      state.beginScrub();
+      state.playback.play();
+      state.playback.beginScrub();
     }
     if (kind === 'draft') state.setTemporaryBoneProperty('y', 33);
     const fired = vi.fn();
-    state.onAnimationEvent(fired);
+    state.playback.onAnimationEvent(fired);
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
     const notified = vi.fn();
@@ -141,8 +141,8 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.equal(fetcher.mock.calls.length, 0);
     assert.strictEqual(state.sourceAnimation, source);
     assert.strictEqual(state.timelineClipboard, clipboard);
-    assert.isFalse(state.isPlaying);
-    assert.isFalse(state.isScrubbing);
+    assert.isFalse(state.playback.isPlaying);
+    assert.isFalse(state.playback.isScrubbing);
     assert.isFalse(state.hasTemporaryTransform);
     assert.isNull(state.selectedBoneId);
     assert.isNull(state.selectedEvent);
@@ -162,7 +162,7 @@ test('clip navigation keeps pending edits and history without a discard dialog',
   const { state, query, confirm, dispose } = fixture();
   state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   state.setCurrentTime(0.4);
-  state.play();
+  state.playback.play();
   const before = state.workingAnimation;
   query('#animation-selection').value = 'idle';
   await query('#animation-selection').dispatch('change');
@@ -170,7 +170,7 @@ test('clip navigation keeps pending edits and history without a discard dialog',
   assert.equal(state.selectedAnimationId, 'idle');
   assert.isFalse(state.dirty);
   assert.isTrue(state.hasUnsavedChanges);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   query('#animation-selection').value = 'walk';
   await query('#animation-selection').dispatch('change');
   assert.strictEqual(state.workingAnimation, before);
@@ -229,17 +229,17 @@ test('clock-only updates skip file controls while edits, history, and imports re
   const lookups = vi.spyOn(app, 'querySelector');
   const ids = state.animationIds;
   state.selectTimelineProperty('root', 'x');
-  state.play();
+  state.playback.play();
   lookups.mockClear();
-  state.advancePlayback(0.25);
-  state.advancePlayback(0.25);
+  state.playback.advancePlayback(0.25);
+  state.playback.advancePlayback(0.25);
   assert.equal(query('#current-time').textContent, '0.500 / 1.000 s');
   assert.isFalse(query('#timeline-previous-key').disabled);
   assert.isFalse(query('#timeline-next-key').disabled);
   assert.equal(lookups.mock.calls.length, 0);
   assert.strictEqual(state.animationIds, ids);
   assert.isTrue(Object.isFrozen(ids));
-  state.pause();
+  state.playback.pause();
   state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   assert.isTrue(lookups.mock.calls.length > 0);
   assert.isFalse(query('#animation-undo').disabled);

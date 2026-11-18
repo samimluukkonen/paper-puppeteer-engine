@@ -200,8 +200,8 @@ test('apply overwrites relevant keys at exact milliseconds as one Undo/Redo edit
 
 test('stepped FK capture samples held frames; apply preserves the precise endpoint time', () => {
   const { state } = fixture();
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(10);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(10);
   state.setCurrentTime(0.375);
   const id = state.saveCurrentPose('Stepped', ['arm']);
   assert.approximately(state.poseLibrary.get(id).pose.bones.arm!.rotation!, 0.1 + (0.8 * 300) / 1050, 1e-12);

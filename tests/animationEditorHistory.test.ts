@@ -105,7 +105,7 @@ test.each(['scrub', 'same time', 'clamped endpoint', 'restart', 'empty undo', 'e
   (action) => {
     const { state } = session();
     if (action === 'clamped endpoint') state.setCurrentTime(state.duration);
-    if (action === 'restart') state.restart();
+    if (action === 'restart') state.playback.restart();
     const heldTime = state.currentTime;
     const held = state.workingAnimation;
     state.setTemporaryBoneProperty('x', 99);
@@ -113,7 +113,7 @@ test.each(['scrub', 'same time', 'clamped endpoint', 'restart', 'empty undo', 'e
     state.subscribe(listener);
     switch (action) {
       case 'scrub':
-        state.beginScrub();
+        state.playback.beginScrub();
         break;
       case 'same time':
         state.setCurrentTime(heldTime);
@@ -122,7 +122,7 @@ test.each(['scrub', 'same time', 'clamped endpoint', 'restart', 'empty undo', 'e
         state.setCurrentTime(99);
         break;
       case 'restart':
-        state.restart();
+        state.playback.restart();
         break;
       case 'empty undo':
         assert.isFalse(state.undo());

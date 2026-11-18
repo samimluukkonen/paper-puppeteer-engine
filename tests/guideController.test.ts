@@ -244,7 +244,7 @@ test.each([false, true])(
       rigState.editBone('root', 'x', 8);
       animation.keyframes.setBonePropertyKeyframe('root', 'x', 9);
     }
-    animation.play();
+    animation.playback.play();
     const rigData = rigState.workingCopy;
     const animationData = animation.workingAnimation;
     const rigJson = JSON.stringify(rigData);
@@ -252,9 +252,9 @@ test.each([false, true])(
     const rigHistory = rigState.historyLength;
     const animationHistory = animation.historyLength;
     const time = animation.currentTime;
-    const playing = animation.isPlaying;
+    const playing = animation.playback.isPlaying;
     const event = vi.fn();
-    animation.onAnimationEvent(event);
+    animation.playback.onAnimationEvent(event);
     const stateChanged = vi.fn();
     animation.subscribe(stateChanged);
     const controller = new GuideController(context);
@@ -284,7 +284,7 @@ test.each([false, true])(
     assert.equal(rigState.historyLength, rigHistory);
     assert.equal(animation.historyLength, animationHistory);
     assert.equal(animation.currentTime, time);
-    assert.equal(animation.isPlaying, playing);
+    assert.equal(animation.playback.isPlaying, playing);
     assert.lengthOf(event.mock.calls, 0);
     assert.lengthOf(stateChanged.mock.calls, 0);
   },

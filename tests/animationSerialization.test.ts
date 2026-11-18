@@ -223,8 +223,8 @@ test('export does not mutate source, working copy, input or any editor session s
   state.selectKeyframe({ boneId: 'arm', property: 'rotation', time: 0.25 });
   state.keyframes.copySelectedKeyframes();
   state.setTemporaryBoneProperty('y', 99);
-  state.setPreviewLoop(false);
-  state.setPlaybackSpeed(2);
+  state.playback.setPreviewLoop(false);
+  state.playback.setPlaybackSpeed(2);
   const source = state.sourceAnimation;
   const working = state.workingAnimation;
   const workingData = structuredClone(working);
@@ -236,7 +236,7 @@ test('export does not mutate source, working copy, input or any editor session s
     clipboard: state.timelineClipboard,
     draft: state.boneTransformDraft,
     issues: state.validationIssues,
-    playing: state.isPlaying,
+    playing: state.playback.isPlaying,
   };
   const notify = vi.fn();
   state.subscribe(notify);
@@ -258,13 +258,13 @@ test('export does not mutate source, working copy, input or any editor session s
       clipboard: state.timelineClipboard,
       draft: state.boneTransformDraft,
       issues: state.validationIssues,
-      playing: state.isPlaying,
+      playing: state.playback.isPlaying,
     },
     baseline,
   );
   assert.equal(notify.mock.calls.length, 0);
-  assert.equal(state.playbackSpeed, 2);
-  assert.isFalse(state.previewLoop);
+  assert.equal(state.playback.playbackSpeed, 2);
+  assert.isFalse(state.playback.previewLoop);
   assert.deepEqual(Object.keys(JSON.parse(result.json) as object), Object.keys(file()));
   result.data.tracks = {};
   assert.strictEqual(state.workingAnimation, working);

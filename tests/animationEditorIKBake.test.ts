@@ -135,7 +135,7 @@ test('preview samples the actual commit result at the shared playhead without au
   const sourceBefore = structuredClone(source);
   const original = state.workingAnimation!;
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   controller.setConstraint('arm', true);
   await waitForIKBake(controller);
   const plan = controller.getSnapshot().plan;
@@ -145,9 +145,9 @@ test('preview samples the actual commit result at the shared playhead without au
   const sampler = new IsolatedIKSampler(rig);
   const clip = compileClip(candidate.animation, rig);
   state.setCurrentTime(0.25);
-  state.play();
+  state.playback.play();
   controller.togglePreview();
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.deepEqual(show.mock.lastCall![0], new Map(sampler.sample(clip, 250).pose));
   const changed = vi.fn();
   controller.subscribe(changed);
@@ -174,12 +174,12 @@ test('commit invokes the existing command once, pauses, installs bone tracks and
   const plan = controller.getSnapshot().plan;
   const commit = vi.spyOn(state, 'replaceWorkingAnimation');
   state.setCurrentTime(0.4);
-  state.play();
+  state.playback.play();
   assert.isTrue(controller.commit());
   assert.equal(commit.mock.calls.length, 1);
   if (!plan?.success) throw new Error('Missing plan');
   assert.isTrue(Object.hasOwn(commit.mock.calls[0]![0] as object, 'tracks'));
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.historyLength, 1);
   assert.isTrue(state.dirty);
   assert.equal(state.workingAnimation!.tracks.upper!.length, 11);

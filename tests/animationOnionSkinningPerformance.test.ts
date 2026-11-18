@@ -74,11 +74,11 @@ for (const count of [1, 3]) {
           layer.updateFrame(() => state.setCurrentTime(1 + ((index * 0.137) % 58)));
         const scrubMs = (performance.now() - started) / 240;
         state.setCurrentTime(30);
-        state.play();
+        state.playback.play();
         const playbackStart = performance.now();
-        for (let index = 0; index < 240; ++index) layer.updateFrame(() => state.advancePlayback(1 / 60));
+        for (let index = 0; index < 240; ++index) layer.updateFrame(() => state.playback.advancePlayback(1 / 60));
         const playbackMs = (performance.now() - playbackStart) / 240;
-        state.pause();
+        state.playback.pause();
         for (let index = 0; index < 20; ++index) {
           layer.setEnabled(false);
           layer.setEnabled(true);

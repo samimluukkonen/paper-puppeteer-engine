@@ -245,8 +245,8 @@ test('clock notifications retain panel snapshots, avoid hidden IK sampling and d
   });
   const snapshots = [ik.getSnapshot(), retime.getSnapshot(), mirror.getSnapshot(), bake.getSnapshot()];
   const sample = vi.spyOn(state.ik, 'selectedIKTargetValues', 'get');
-  state.play();
-  for (let index = 0; index < 30; ++index) state.advancePlayback(1 / 60);
+  state.playback.play();
+  for (let index = 0; index < 30; ++index) state.playback.advancePlayback(1 / 60);
   assert.equal(sample.mock.calls.length, 0);
   assert.deepEqual(
     listeners.map((listener) => listener.mock.calls.length),

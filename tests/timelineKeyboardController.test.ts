@@ -140,9 +140,9 @@ test('navigation follows replacement sessions and disposal releases global, trac
   fixtureState.replace();
   const current = fixtureState.state;
   browser.dispatchEvent(key(' ', { code: 'Space' }));
-  assert.isTrue(current.isPlaying);
-  assert.isFalse(previous.isPlaying);
-  current.pause();
+  assert.isTrue(current.playback.isPlaying);
+  assert.isFalse(previous.playback.isPlaying);
+  current.playback.pause();
   timeline.dispatchEvent(key('ArrowRight'));
   assert.closeTo(current.currentTime, 0.01, 1e-9);
   ruler.dispatchEvent(key('End'));
@@ -155,7 +155,7 @@ test('navigation follows replacement sessions and disposal releases global, trac
   browser.dispatchEvent(global);
   timeline.dispatchEvent(track);
   ruler.dispatchEvent(slider);
-  assert.isFalse(current.isPlaying);
+  assert.isFalse(current.playback.isPlaying);
   assert.equal(current.currentTime, 1);
   assert.isFalse(global.defaultPrevented || track.defaultPrevented || slider.defaultPrevented);
 });

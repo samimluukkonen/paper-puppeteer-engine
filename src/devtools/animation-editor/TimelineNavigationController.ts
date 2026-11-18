@@ -250,7 +250,7 @@ export class TimelineNavigationController {
       this.inset.scrollLeft = 0;
       this.renderTime(true);
     }
-    if (state.isPlaying && this.follow.checked)
+    if (state.playback.isPlaying && this.follow.checked)
       this.inset.scrollLeft = followTimelineTime(this.view, state.currentTime);
     this.renderTime();
     const hasSelection = !!state.ik.selectedIKKeyframe || !!state.selectedEvent || state.selectedKeys.length > 0;

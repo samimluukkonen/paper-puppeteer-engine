@@ -141,7 +141,7 @@ test.each(['handIK', 'footIK'])(
     try {
       const { state, handles, input, puppet, inspector } = f;
       state.setCurrentTime(0.5);
-      state.play();
+      state.playback.play();
       const working = state.workingAnimation!;
       const source = state.sourceAnimation;
       const handle = handles.getHandles().find((entry) => entry.id === id)!;
@@ -149,12 +149,12 @@ test.each(['handIK', 'footIK'])(
       assert.equal(state.ik.selectedIKConstraintId, id);
       assert.isNull(state.selectedBoneId);
       assert.isTrue(state.ik.isTimelineIKExpanded(id));
-      assert.isFalse(state.isPlaying);
+      assert.isFalse(state.playback.isPlaying);
       assert.equal(inspector.getSnapshot().constraintId, id);
       const target = id === 'handIK' ? { x: 30, y: 80 } : { x: 175, y: 75 };
       for (let i = 0; i < 15; i++) input.emit('pointermove', f.localPointer(target));
-      state.play(); // An active gesture keeps ownership of the stationary playhead.
-      state.advancePlayback(2);
+      state.playback.play(); // An active gesture keeps ownership of the stationary playhead.
+      state.playback.advancePlayback(2);
       assert.equal(state.currentTime, 0.5);
       close(
         puppet.getBone(id === 'handIK' ? 'hand' : 'foot').getWorldPosition(),

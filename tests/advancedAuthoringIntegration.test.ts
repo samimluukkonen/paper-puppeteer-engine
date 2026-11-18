@@ -62,7 +62,7 @@ test('pose, variation and cleanup previews hand off one canvas clock and playbac
   state.setCurrentTime(0.25);
   const authored = state.workingAnimation;
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   state.previews.previewVariation({ name: 'temporary', timeScale: 2 }, 0.75);
   assert.equal(state.previews.previewTimeMilliseconds, 1500);
   assert.isTrue(state.previews.previewLibraryPose(pose));
@@ -75,12 +75,12 @@ test('pose, variation and cleanup previews hand off one canvas clock and playbac
   state.previews.previewVariation({ name: 'temporary' }, 0.75);
   assert.isNull(diagnostics.getSnapshot().preview);
   assert.isTrue(state.previews.previewLibraryPose(pose));
-  state.play();
+  state.playback.play();
   assert.isNull(state.previews.previewedPose, 'playback must show authored motion instead of a held library pose');
   assert.equal(puppet.getBone('free').pose.x, 2.5);
-  state.advancePlayback(0.25);
+  state.playback.advancePlayback(0.25);
   assert.equal(puppet.getBone('free').pose.x, 5);
-  state.pause();
+  state.playback.pause();
   assert.strictEqual(state.workingAnimation, authored);
   assert.isFalse(state.canUndo);
   assert.lengthOf(events.mock.calls, 0);
@@ -225,10 +225,10 @@ test('pose → graph → independent variation → cleanup → package/Character
   assert.deepEqual(state.workingAnimation, applied);
   const ref = { channel: { kind: 'bone', id: 'root', property: 'x' } as const, time: 0 };
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
-  state.beginGraphEdit(ref);
-  state.previewGraphEdit({ curve: DEFAULT_GRAPH_CURVE });
+  state.graph.beginGraphEdit(ref);
+  state.graph.previewGraphEdit({ curve: DEFAULT_GRAPH_CURVE });
   assert.isUndefined(state.workingAnimation!.tracks.root![0]!.curves);
-  assert.isTrue(state.commitGraphEdit());
+  assert.isTrue(state.graph.commitGraphEdit());
   const source = state.workingAnimation!;
   state.createVariation({ name: 'variant', timeScale: 2 });
   state.keyframes.setBonePropertyKeyframe('root', 'y', 7, 0);

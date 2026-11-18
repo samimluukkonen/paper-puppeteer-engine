@@ -109,12 +109,12 @@ test.each([false, true])(
     );
     const state = new AnimationEditorState(rig);
     const fired = vi.fn<(event: FiredAnimationEvent) => void>();
-    state.onAnimationEvent(fired);
+    state.playback.onAnimationEvent(fired);
     state.importJson(result.json);
-    state.setPreviewLoop(loop);
+    state.playback.setPreviewLoop(loop);
     assert.equal(fired.mock.calls.length, 0);
-    state.play();
-    state.advancePlayback(1.033);
+    state.playback.play();
+    state.playback.advancePlayback(1.033);
     assert.deepEqual(
       fired.mock.calls.map(([event]) => event),
       [...collectAnimationStartEvents(after, 'base'), ...collectAnimationEvents(after, 0, 1033, 'base')],

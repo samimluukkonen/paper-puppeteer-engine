@@ -110,15 +110,15 @@ function reference(scene: Phaser.Scene, rig: Rig, state: AnimationEditorState, t
 test('unchanged paused and stepped frames skip appearance copies and affine projection', () => {
   const f = fixture();
   try {
-    f.state.setAuthoredPlaybackMode('stepped');
-    f.state.setAuthoredFPS(10);
+    f.state.playback.setAuthoredPlaybackMode('stepped');
+    f.state.playback.setAuthoredFPS(10);
     f.state.setCurrentTime(0.52);
     f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
     const copies = vi.spyOn(f.puppet, 'copyAppearanceTo');
     const projections = [...f.ghosts.values()].map((ghost) => vi.spyOn(ghost.renderer, 'sync'));
     for (let frame = 0; frame < 60; ++frame) f.layer.updateFrame(() => {});
-    f.state.play();
-    f.layer.updateFrame(() => f.state.advancePlayback(0.01));
+    f.state.playback.play();
+    f.layer.updateFrame(() => f.state.playback.advancePlayback(0.01));
     assert.equal(copies.mock.calls.length, 0);
     for (const projection of projections) assert.equal(projection.mock.calls.length, 0);
     f.layer.updateFrame(() => f.puppet.container.setPosition(33, 44).setAlpha(0.5));
@@ -128,7 +128,7 @@ test('unchanged paused and stepped frames skip appearance copies and affine proj
       assert.equal(ghost.container.alpha, 0.11);
     }
     for (const projection of projections) assert.equal(projection.mock.calls.length, 0);
-    f.layer.updateFrame(() => f.state.advancePlayback(0.1));
+    f.layer.updateFrame(() => f.state.playback.advancePlayback(0.1));
     assert.equal(copies.mock.calls.length, 0);
     for (const projection of projections) assert.equal(projection.mock.calls.length, 1);
   } finally {
@@ -291,8 +291,8 @@ test('all pooled ghosts follow working key movement, history, interpolation, FPS
     verify();
     f.state.redo();
     verify();
-    f.state.setAuthoredPlaybackMode('stepped');
-    f.state.setAuthoredFPS(12);
+    f.state.playback.setAuthoredPlaybackMode('stepped');
+    f.state.playback.setAuthoredFPS(12);
     verify();
     f.state.setAuthoredInterpolation('linear');
     verify();
@@ -467,20 +467,20 @@ test('scrubs/playback/working edits refresh authored ghosts while idle selection
     f.state.selectBone('leg');
     f.layer.sync();
     assert.equal(sample.mock.calls.length, 0);
-    f.state.beginScrub();
+    f.state.playback.beginScrub();
     f.state.setCurrentTime(0.7);
-    f.state.endScrub();
+    f.state.playback.endScrub();
     assert.approximately(ghost.bones.get('root')!.pose.x, 64, 1e-10);
-    f.state.play();
-    f.state.advancePlayback(0.05);
-    f.state.pause();
+    f.state.playback.play();
+    f.state.playback.advancePlayback(0.05);
+    f.state.playback.pause();
     assert.approximately(ghost.bones.get('root')!.pose.x, 68.5, 1e-10);
     f.state.keyframes.setBonePropertyKeyframe('root', 'x', 200, 0.65);
     assert.approximately(ghost.bones.get('root')!.pose.x, 200, 1e-10);
     f.state.undo();
     assert.approximately(ghost.bones.get('root')!.pose.x, 68.5, 1e-10);
-    f.state.setAuthoredPlaybackMode('stepped');
-    f.state.setAuthoredFPS(5);
+    f.state.playback.setAuthoredPlaybackMode('stepped');
+    f.state.playback.setAuthoredFPS(5);
     const expected = f.state.sampleGhostPoses().find((entry) => entry.direction === 'previous')!;
     assert.deepEqual(ghost.bones.get('root')!.pose, expected.pose.get('root'));
     f.state.setAuthoredInterpolation('linear');
@@ -500,7 +500,7 @@ test('ghost rendering leaves active pose, IK, events, clock, history and authore
     const authored = JSON.stringify(f.state.workingAnimation);
     const clock = f.state.currentTime;
     const events = vi.fn();
-    const unsubscribe = f.state.onAnimationEvent(events);
+    const unsubscribe = f.state.playback.onAnimationEvent(events);
     const prepare = vi.spyOn(f.puppet.posePipeline, 'preparePose');
     const sync = vi.spyOn(f.puppet.posePipeline, 'syncPose');
     try {
@@ -545,12 +545,12 @@ test('scene frames project each ghost once while paused edits still refresh imme
     const next = f.ghosts.get('next-1')!;
     const previousSync = vi.spyOn(previous.renderer, 'sync');
     const nextSync = vi.spyOn(next.renderer, 'sync');
-    f.state.play();
+    f.state.playback.play();
     previousSync.mockClear();
     nextSync.mockClear();
     for (const spy of allSyncs) spy.mockClear();
     f.layer.updateFrame(() => {
-      f.state.advancePlayback(0.05);
+      f.state.playback.advancePlayback(0.05);
       f.puppet.setSkin('red');
     });
     assert.equal(previousSync.mock.calls.length, 1);
@@ -559,7 +559,7 @@ test('scene frames project each ghost once while paused edits still refresh imme
     assert.approximately(previous.bones.get('root')!.pose.x, 50.5, 1e-10);
     assert.equal(previous.renderer.getSlotImage('glove')!.texture.key, 'glove2');
 
-    f.state.pause();
+    f.state.playback.pause();
     previousSync.mockClear();
     f.state.setCurrentTime(0.7);
     assert.equal(previousSync.mock.calls.length, 1);
@@ -587,7 +587,7 @@ test('scene frames project each ghost once while paused edits still refresh imme
 test('every authoring transaction, import and revert immediately renders the current working copy and stays event-silent', () => {
   const f = fixture();
   const events = vi.fn();
-  const release = f.state.onAnimationEvent(events);
+  const release = f.state.playback.onAnimationEvent(events);
   try {
     f.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
     const source = JSON.stringify(f.state.sourceAnimation);
@@ -639,8 +639,8 @@ test('every authoring transaction, import and revert immediately renders the cur
     verify();
     assert.isTrue(f.state.setAuthoredInterpolation('linear'));
     verify();
-    assert.isTrue(f.state.setAuthoredPlaybackMode('stepped'));
-    assert.isTrue(f.state.setAuthoredFPS(12));
+    assert.isTrue(f.state.playback.setAuthoredPlaybackMode('stepped'));
+    assert.isTrue(f.state.playback.setAuthoredFPS(12));
     verify();
     for (let index = 0; index < 4; ++index) {
       assert.isTrue(f.state.undo());
@@ -679,12 +679,15 @@ test('onion visibility preserves speed, restart, loops, snapping and active play
   const disabled = fixture();
   const withGhosts = vi.fn();
   const withoutGhosts = vi.fn();
-  const releases = [enabled.state.onAnimationEvent(withGhosts), disabled.state.onAnimationEvent(withoutGhosts)];
+  const releases = [
+    enabled.state.playback.onAnimationEvent(withGhosts),
+    disabled.state.playback.onAnimationEvent(withoutGhosts),
+  ];
   try {
     enabled.layer.setSettings({ enabled: true, previousCount: 3, nextCount: 3 });
     const compare = () => {
       assert.equal(enabled.state.currentTime, disabled.state.currentTime);
-      assert.equal(enabled.state.isPlaying, disabled.state.isPlaying);
+      assert.equal(enabled.state.playback.isPlaying, disabled.state.playback.isPlaying);
       assert.deepEqual(withGhosts.mock.calls, withoutGhosts.mock.calls);
       for (const bone of enabled.rig.bones)
         assert.deepEqual(enabled.puppet.getBone(bone.id).pose, disabled.puppet.getBone(bone.id).pose);
@@ -692,15 +695,15 @@ test('onion visibility preserves speed, restart, loops, snapping and active play
     };
     for (const f of [enabled, disabled]) {
       f.state.setKeyframeSnapMode('frame');
-      f.state.setPlaybackSpeed(2);
-      f.state.setPreviewLoop(true);
-      f.state.restart();
-      f.state.play();
+      f.state.playback.setPlaybackSpeed(2);
+      f.state.playback.setPreviewLoop(true);
+      f.state.playback.restart();
+      f.state.playback.play();
     }
     compare();
     for (const delta of [0.2, 0.2, 0.3, 1.7, 0.016]) {
-      enabled.layer.updateFrame(() => enabled.state.advancePlayback(delta));
-      disabled.layer.updateFrame(() => disabled.state.advancePlayback(delta));
+      enabled.layer.updateFrame(() => enabled.state.playback.advancePlayback(delta));
+      disabled.layer.updateFrame(() => disabled.state.playback.advancePlayback(delta));
       compare();
       const held = enabled.state.currentTime;
       enabled.layer.setEnabled(false);
@@ -709,11 +712,11 @@ test('onion visibility preserves speed, restart, loops, snapping and active play
     }
     assert.isTrue(withGhosts.mock.calls.length > 0);
     for (const f of [enabled, disabled]) {
-      f.state.beginScrub();
+      f.state.playback.beginScrub();
       f.state.setCurrentTime(0.537);
-      f.state.endScrub();
-      f.state.pause();
-      f.state.restart();
+      f.state.playback.endScrub();
+      f.state.playback.pause();
+      f.state.playback.restart();
     }
     compare();
   } finally {

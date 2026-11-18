@@ -582,7 +582,7 @@ const unmount = mountView(
       },
       suspend: () => {
         rendererActive = false;
-        stateOwner?.pause();
+        stateOwner?.playback.pause();
         packages.closePreview();
         game.loop.stop();
       },

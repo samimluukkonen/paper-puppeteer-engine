@@ -75,14 +75,15 @@ export class MotionPreviewController {
           this.clips.set(clipId, next);
           this.publish({ settings: next });
         }
-        if (clipId && state.previewLoop !== this.observedLoop) {
-          this.observedLoop = state.previewLoop;
-          this.loops.set(clipId, state.previewLoop);
+        if (clipId && state.playback.previewLoop !== this.observedLoop) {
+          this.observedLoop = state.playback.previewLoop;
+          this.loops.set(clipId, state.playback.previewLoop);
           this.publish({});
         }
         return;
       }
-      const loop = clipId !== this.snapshot.clipId ? (clipId && this.loops.get(clipId)) || false : state.previewLoop;
+      const loop =
+        clipId !== this.snapshot.clipId ? (clipId && this.loops.get(clipId)) || false : state.playback.previewLoop;
       this.observedLoop = loop;
       const settings = (clipId && this.clips.get(clipId)) || DEFAULT_MOTION_PREVIEW;
       this.applyView(settings);
@@ -93,7 +94,7 @@ export class MotionPreviewController {
         settings,
         message: '',
       });
-      if (loop !== state.previewLoop) state.setPreviewLoop(loop);
+      if (loop !== state.playback.previewLoop) state.playback.setPreviewLoop(loop);
     };
     this.release = state.subscribe(sync);
     sync();
@@ -198,7 +199,8 @@ export class MotionPreviewController {
     const settings = (id && this.clips.get(id)) || DEFAULT_MOTION_PREVIEW;
     this.applyView(settings);
     this.publish({ settings });
-    if (this.state && this.state.previewLoop !== this.observedLoop) this.state.setPreviewLoop(this.observedLoop);
+    if (this.state && this.state.playback.previewLoop !== this.observedLoop)
+      this.state.playback.setPreviewLoop(this.observedLoop);
   }
   update(patch: Partial<MotionPreviewSettings>): boolean {
     this.cancelCopy();

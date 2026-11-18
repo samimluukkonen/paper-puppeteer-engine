@@ -52,12 +52,12 @@ test('playback, preview and key readiness construct edited tracks only when a mi
   const { state, controller, preview } = fixture();
   try {
     const original = state.workingAnimation;
-    state.play();
-    for (let frame = 0; frame < 30; ++frame) state.advancePlayback(1 / 60);
+    state.playback.play();
+    for (let frame = 0; frame < 30; ++frame) state.playback.advancePlayback(1 / 60);
     assert.isFalse(controller.getSnapshot().preview);
     assert.isNull(preview.mock.lastCall![0]);
     controller.togglePreview();
-    for (let frame = 0; frame < 15; ++frame) state.advancePlayback(1 / 60);
+    for (let frame = 0; frame < 15; ++frame) state.playback.advancePlayback(1 / 60);
     assert.isNotNull(preview.mock.lastCall![0]);
     controller.hidePreview();
     state.selectKeyframe({ boneId: 'leftArm', property: 'rotation', time: 0 });
@@ -94,8 +94,8 @@ test('playback reuses rig and pair presentation data; changing pairs invalidates
   const validate = vi.spyOn(boneSymmetry, 'validateBoneSymmetryMapping');
   try {
     const before = controller.getSnapshot();
-    state.play();
-    for (let frame = 0; frame < 30; ++frame) state.advancePlayback(1 / 60);
+    state.playback.play();
+    for (let frame = 0; frame < 30; ++frame) state.playback.advancePlayback(1 / 60);
     assert.strictEqual(controller.getSnapshot(), before);
     assert.equal(validate.mock.calls.filter(([, data]) => data.pairs === before.pairs).length, 0);
     assert.isTrue(Object.isFrozen(before.boneIds));
@@ -192,7 +192,7 @@ test('all preview directions remain immutable, event silent, and follow working 
   const { state, controller, preview } = fixture();
   state.setCurrentTime(0.25);
   state.setTemporaryBoneProperty('rotation', 9);
-  state.play();
+  state.playback.play();
   const working = state.workingAnimation;
   const source = state.sourceAnimation;
   const exportJson = state.exportJson();
@@ -201,7 +201,7 @@ test('all preview directions remain immutable, event silent, and follow working 
   const subscriber = vi.fn();
   const events = vi.fn();
   state.subscribe(subscriber);
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   for (const direction of ['left-to-right', 'right-to-left', 'swap'] as const) {
     controller.setDirection(direction);
     if (!controller.getSnapshot().preview) controller.togglePreview();
@@ -216,7 +216,7 @@ test('all preview directions remain immutable, event silent, and follow working 
   assert.strictEqual(state.boneTransformDraft, draft);
   assert.equal(state.exportJson(), exportJson);
   assert.equal(state.currentTime, 0.25);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.equal(subscriber.mock.calls.length, 0);
@@ -237,10 +237,10 @@ test('current-pose commit invokes existing command, pauses and updates history, 
   const originalLeft = state.workingAnimation!.tracks.leftArm;
   const command = vi.spyOn(state.keyframes, 'mirrorCurrentPoseToKeys');
   controller.togglePreview();
-  state.play();
+  state.playback.play();
   assert.isTrue(controller.commitPose());
   assert.deepEqual(command.mock.calls[0], ['left-to-right']);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.currentTime, 0.25);
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
@@ -332,8 +332,8 @@ test('unsupported transforms and storage failure give actionable feedback and di
 
 test('stepped preview projects the commit values at the continuous playhead, without resampling past the proposed key', () => {
   const { state, controller, preview } = fixture();
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(10);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(10);
   state.selectBone('leftArm');
   state.setCurrentTime(0.25);
   const history = state.historyLength;

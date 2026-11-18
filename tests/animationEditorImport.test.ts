@@ -90,8 +90,8 @@ function snapshot(state: AnimationEditorState) {
     undo: state.canUndo,
     redo: state.canRedo,
     time: state.currentTime,
-    playing: state.isPlaying,
-    scrubbing: state.isScrubbing,
+    playing: state.playback.isPlaying,
+    scrubbing: state.playback.isScrubbing,
     keys: state.selectedKeys,
     primary: state.primaryKey,
     event: state.selectedEvent,
@@ -124,7 +124,7 @@ test('compact imports exceeding formatted export capacity retain the active sess
   assert.isBelow(json.length, 100_000);
   const state = session();
   state.keyframes.setBonePropertyKeyframe('root', 'x', 99);
-  state.play();
+  state.playback.play();
   const before = snapshot(state);
   const confirmDiscard = vi.fn(() => true);
   assert.isFalse(state.importJson(json, { confirmDiscard }));
@@ -168,11 +168,11 @@ for (const [label, json, message] of invalid) {
     state.keyframes.copySelectedKeyframes();
     state.setTemporaryBoneProperty('x', 44);
     state.setCurrentTime(0.4);
-    state.play();
-    state.beginScrub();
+    state.playback.play();
+    state.playback.beginScrub();
     // Retain a transform draft alongside active scrub intent for the failure boundary.
     state.setTemporaryBoneProperty('x', 44);
-    state.play();
+    state.playback.play();
     const before = snapshot(state);
     assert.isFalse(state.importJson(json()));
     assert.deepEqual(snapshot(state), before);
@@ -206,8 +206,8 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
   'successful import resets %s transient state with one final notification and no events',
   (kind) => {
     const state = session();
-    state.setPreviewLoop(true);
-    state.setPlaybackSpeed(2);
+    state.playback.setPreviewLoop(true);
+    state.playback.setPlaybackSpeed(2);
     state.setKeyframeSnapMode('frame');
     state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
     state.keyframes.copySelectedKeyframes();
@@ -221,25 +221,25 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
       state.events.previewEventDrag(0.6);
     } else if (kind === 'scrub') {
       state.setCurrentTime(1.2);
-      state.play();
-      state.beginScrub();
+      state.playback.play();
+      state.playback.beginScrub();
     } else state.setTemporaryBoneProperty('y', 50);
     const notified = vi.fn(() => {
       assert.equal(state.selectedAnimationId, 'imported');
       assert.equal(state.currentTime, 0);
-      assert.isFalse(state.isPlaying);
+      assert.isFalse(state.playback.isPlaying);
       assert.isFalse(state.dirty);
     });
     const fired = vi.fn();
     state.subscribe(notified);
-    state.onAnimationEvent(fired);
+    state.playback.onAnimationEvent(fired);
     assert.isTrue(state.importJson(JSON.stringify(file())));
     assert.equal(notified.mock.calls.length, 1);
     assert.equal(fired.mock.calls.length, 0);
     assert.isFalse(state.canUndo);
     assert.isFalse(state.canRedo);
     assert.equal(state.historyLength, 0);
-    assert.isFalse(state.isScrubbing);
+    assert.isFalse(state.playback.isScrubbing);
     assert.isNull(state.keyframes.keyframeDrag);
     assert.isNull(state.events.eventDrag);
     assert.deepEqual(state.selectedKeys, []);
@@ -249,8 +249,8 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.isNull(state.selectedTimelineProperty);
     assert.isFalse(state.hasTemporaryTransform);
     assert.strictEqual(state.timelineClipboard, clipboard);
-    assert.isTrue(state.previewLoop);
-    assert.equal(state.playbackSpeed, 2);
+    assert.isTrue(state.playback.previewLoop);
+    assert.equal(state.playback.playbackSpeed, 2);
     assert.equal(state.keyframes.keyframeSnapMode, 'frame');
     assert.deepEqual(state.workingAnimation, file());
     assert.deepEqual(state.sourceAnimation, file());
@@ -341,7 +341,7 @@ test('reload current export normalizes committed data, discards drafts and reset
   state.selectBone('root');
   state.setTemporaryBoneProperty('x', 99);
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   assert.isTrue(state.reloadCurrentExport());
   assert.equal(state.exportJson(), json);
   assert.isFalse(state.hasTemporaryTransform);
@@ -358,7 +358,7 @@ test('preview immediately samples the imported clip through the runtime evaluato
   const syncPose = vi.spyOn(puppet.posePipeline, 'syncPose');
   const preview = new AnimationEditorPreview(state, puppet);
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   state.importJson(JSON.stringify(file()));
   assert.equal(joints.get('root')!.pose.x, 3);
   assert.equal(joints.get('arm')!.pose.rotation, -0.2);

@@ -62,13 +62,13 @@ test('event commands publish one complete selection and playhead state', () => {
 test('creation uses currentTime, selects its identity, pauses and records one reversible owned snapshot', () => {
   const { state, source, input, before } = session();
   state.setCurrentTime(0.75);
-  state.play();
+  state.playback.play();
   assert.isTrue(state.events.createAnimationEvent());
   const ref = state.selectedEvent!;
   assert.deepEqual(state.events.selectedEventData, { time: 750, name: 'event' });
   assert.equal(state.historyLength, 1);
   assert.isTrue(state.dirty);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   const authored = state.workingAnimation;
   assert.isTrue(state.undo());
   assert.isUndefined(findAnimationEvent(state.workingAnimation, ref));
@@ -195,10 +195,10 @@ test('many drag previews are provisional, playhead follows, same-time events sur
   const [ref, other] = getAnimationEventReferences(state.workingAnimation);
   const original = state.workingAnimation;
   const event = original!.events![0]!;
-  state.play();
+  state.playback.play();
   assert.isTrue(state.events.beginEventDrag(ref!));
-  state.play();
-  assert.isFalse(state.isPlaying);
+  state.playback.play();
+  assert.isFalse(state.playback.isPlaying);
   for (const time of [0.6, 0.7, 0.8, 1]) {
     assert.isTrue(state.events.previewEventDrag(time));
     assert.equal(state.currentTime, time);
@@ -227,8 +227,8 @@ test('event movement shares snapping and nudging policy, clamps endpoints and ke
   const { state } = session();
   const ref = getAnimationEventReferences(state.workingAnimation)[0]!;
   state.events.selectAnimationEvent(ref);
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(24);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(24);
   state.setKeyframeSnapMode('frame');
   state.events.beginEventDrag(ref);
   state.events.previewEventDrag(0.73);
@@ -266,7 +266,7 @@ test('navigation, selection, history and authored changes cancel event previews 
     (s: AnimationEditorState) => s.clearTimelineSelection(),
     (s: AnimationEditorState) => s.undo(),
     (s: AnimationEditorState) => s.selectAnimation('move'),
-    (s: AnimationEditorState) => s.setAuthoredPlaybackMode('stepped'),
+    (s: AnimationEditorState) => s.playback.setAuthoredPlaybackMode('stepped'),
   ]) {
     const { state } = session();
     const ref = getAnimationEventReferences(state.workingAnimation)[0]!;

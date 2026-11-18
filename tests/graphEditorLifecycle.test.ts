@@ -80,17 +80,17 @@ test('controller teardown cancels graph proposals, disconnects resize and remove
     },
   );
   const first = create();
-  state.beginGraphEdit(ref);
-  state.previewGraphEdit({ value: 0.5 });
+  state.graph.beginGraphEdit(ref);
+  state.graph.previewGraphEdit({ value: 0.5 });
   first.dispose();
-  assert.isFalse(state.graphEditActive);
+  assert.isFalse(state.graph.graphEditActive);
   assert.equal(disconnect.mock.calls.length, 1);
-  state.beginGraphEdit(ref);
+  state.graph.beginGraphEdit(ref);
   browser.dispatchEvent(new Event('blur'));
-  assert.isTrue(state.graphEditActive);
+  assert.isTrue(state.graph.graphEditActive);
   const second = create();
   browser.dispatchEvent(new Event('blur'));
-  assert.isFalse(state.graphEditActive);
+  assert.isFalse(state.graph.graphEditActive);
   second.dispose();
   assert.equal(disconnect.mock.calls.length, 2);
   assert.equal(state.historyLength, 0);

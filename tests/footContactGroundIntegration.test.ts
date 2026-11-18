@@ -147,8 +147,8 @@ test.each(['left', 'right'] as const)(
         priorY = f.contacts.contacts[0]!.world.y;
         assert.equal(f.guide.getSnapshot().guide.y, groundY);
       }
-      f.state.play();
-      f.state.advancePlayback(0.25);
+      f.state.playback.play();
+      f.state.playback.advancePlayback(0.25);
       f.contacts.sync(f.puppet);
       assert.isAbove(f.contacts.contacts.length, 0);
       f.guide.update({ y: -10 });

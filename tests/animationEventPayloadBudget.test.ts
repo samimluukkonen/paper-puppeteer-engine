@@ -117,22 +117,22 @@ test('restart budgets time-zero payloads across layers before resetting playback
 test('editor payload rejection preserves its clock, authored edits, history and event delivery', () => {
   const state = new AnimationEditorState(rig, [payloadClip()]);
   state.selectAnimation('payload');
-  state.setPreviewLoop(true);
+  state.playback.setPreviewLoop(true);
   const listener = vi.fn();
-  state.onAnimationEvent(listener);
+  state.playback.onAnimationEvent(listener);
   state.selectBone('root');
   state.keyframes.setBonePropertyKeyframe('root', 'x', 123);
-  state.play();
+  state.playback.play();
   const working = state.workingAnimation;
   const history = state.historyLength;
-  state.advancePlayback(1);
+  state.playback.advancePlayback(1);
   assert.match(state.validationIssues[0]!.message, /payload copy budget/);
   assert.equal(state.currentTime, 0);
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.historyLength, history);
   assert.isTrue(state.dirty);
   assert.equal(listener.mock.calls.length, 0);
-  state.advancePlayback(0.001);
+  state.playback.advancePlayback(0.001);
   assert.equal(listener.mock.calls.length, 1);
 });
 
@@ -153,9 +153,9 @@ test('editor time-zero payload rejection leaves playback stopped and temporary e
   state.selectAnimation('payload');
   state.selectBone('root');
   state.setTemporaryBoneProperty('x', 123);
-  state.play();
+  state.playback.play();
   assert.match(state.validationIssues[0]!.message, /start.*payload copy budget/);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.currentTime, 0);
   assert.equal(state.boneTransformDraft.x, 123);
 });

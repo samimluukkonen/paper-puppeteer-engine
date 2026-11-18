@@ -135,7 +135,7 @@ test.each([false, true])(
       animationHistory: animation.historyLength,
       animationDirty: animation.dirty,
       time: animation.currentTime,
-      playing: animation.isPlaying,
+      playing: animation.playback.isPlaying,
     };
     const authored = vi.fn();
     animation.subscribe(authored);
@@ -172,7 +172,7 @@ test.each([false, true])(
     assert.equal(animation.historyLength, before.animationHistory);
     assert.equal(animation.dirty, before.animationDirty);
     assert.equal(animation.currentTime, before.time);
-    assert.equal(animation.isPlaying, before.playing);
+    assert.equal(animation.playback.isPlaying, before.playing);
     assert.lengthOf(authored.mock.calls, 0);
   },
 );

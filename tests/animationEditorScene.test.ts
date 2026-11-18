@@ -360,17 +360,17 @@ test('scene converts Phaser milliseconds to seconds and shutdown pauses and rele
     puppet,
     ghosts: { updateFrame: (update: () => void) => update(), dispose: disposeGhosts },
   });
-  state.play();
+  state.playback.play();
   scene.update(12345, 250);
   assert.equal(state.currentTime, 0.25);
   scene.update(99999, 125);
   assert.equal(state.currentTime, 0.375);
-  state.beginScrub();
+  state.playback.beginScrub();
   scene.events.emit('shutdown');
-  assert.isFalse(state.isPlaying);
-  assert.isFalse(state.isScrubbing);
-  state.endScrub();
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
+  assert.isFalse(state.playback.isScrubbing);
+  state.playback.endScrub();
+  assert.isFalse(state.playback.isPlaying);
   assert.isUndefined(Reflect.get(scene, 'state'));
   assert.equal(dispose.mock.calls.length, 1);
   assert.equal(disposeGhosts.mock.calls.length, 1);
@@ -395,7 +395,7 @@ test('scene skips inactive contact synchronization and constraint collection unt
   const sync = vi.spyOn(scene.footContacts, 'sync');
   const constraints = vi.spyOn(scene, 'getBakeRuntimeConstraints');
   try {
-    state.play();
+    state.playback.play();
     for (let frame = 0; frame < 60; frame++) scene.update(frame * 16, 16);
     assert.equal(sync.mock.calls.length, 0);
     assert.equal(constraints.mock.calls.length, 0);
@@ -678,7 +678,7 @@ test('mirror commits refresh active/previous/next authored poses while arm and l
     const targets = constraints.map((constraint) => Reflect.get(constraint, 'provider') as unknown);
     const original = state.workingAnimation;
     const events = vi.fn();
-    state.onAnimationEvent(events);
+    state.playback.onAnimationEvent(events);
     const instances = Reflect.get(ghosts, 'instances') as Map<
       string,
       import('../src/devtools/animation-editor/AnimationEditorGhostLayer.js').AnimationPoseOverlay
@@ -989,7 +989,7 @@ test('environment preview preserves the authoritative Puppet, poses, IK, skins, 
     for (const clip of state.animationIds) {
       state.selectAnimation(clip);
       state.setCurrentTime(0.3);
-      state.play();
+      state.playback.play();
       const snapshot = () =>
         JSON.stringify(
           puppet.rig.bones.map((bone) => ({
@@ -1006,13 +1006,13 @@ test('environment preview preserves the authoritative Puppet, poses, IK, skins, 
         assert.equal(snapshot(), pose);
         assert.equal(puppet.facingDirection, 'left');
         assert.isTrue(puppet.getIK('arm').enabled);
-        assert.isTrue(state.isPlaying);
+        assert.isTrue(state.playback.isPlaying);
         assert.equal(state.currentTime, time);
         assert.isFalse(state.dirty);
         assert.equal(state.historyLength, 0);
         assert.equal(JSON.stringify(scene.packageSnapshot()), original);
       }
-      state.pause();
+      state.playback.pause();
     }
     assert.deepEqual(error.mock.calls, []);
   } finally {

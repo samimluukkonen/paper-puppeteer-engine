@@ -241,7 +241,7 @@ test('authored FPS drives neighbors; preview rate changes sampling but does not 
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.approximately(state.sampleGhostPoses({ fps: 10 })[0]!.time, 0.437, 1e-15);
-  state.setAuthoredPlaybackMode('smooth');
+  state.playback.setAuthoredPlaybackMode('smooth');
   assert.approximately(state.sampleGhostPoses()[0]!.pose.get('root')!.x!, 43.7, 1e-12);
 });
 
@@ -330,11 +330,11 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     state.undo();
     state.selectBone('upper');
     state.setTemporaryBoneProperty('rotation', 0.6);
-    state.setPreviewLoop(true);
-    state.setPlaybackSpeed(2);
+    state.playback.setPreviewLoop(true);
+    state.playback.setPlaybackSpeed(2);
     state.setCurrentTime(0.5);
-    if (mode !== 'paused') state.play();
-    if (mode === 'scrubbing') state.beginScrub();
+    if (mode !== 'paused') state.playback.play();
+    if (mode === 'scrubbing') state.playback.beginScrub();
     if (mode !== 'playing') state.setTemporaryBoneProperty('rotation', 0.6);
     const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
     const constraint = puppet.addIK({ name: 'arm', rootBone: 'upper', middleBone: 'lower', endBone: 'hand', mix: 1 });
@@ -343,14 +343,14 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const preview = new AnimationEditorPreview(state, puppet);
     const snapshot = () => ({
       currentTime: state.currentTime,
-      playing: state.isPlaying,
-      scrubbing: state.isScrubbing,
+      playing: state.playback.isPlaying,
+      scrubbing: state.playback.isScrubbing,
       dirty: state.dirty,
       history: state.historyLength,
       undo: state.canUndo,
       redo: state.canRedo,
-      loop: state.previewLoop,
-      speed: state.playbackSpeed,
+      loop: state.playback.previewLoop,
+      speed: state.playback.playbackSpeed,
       selectedBone: state.selectedBoneId,
       draft: state.boneTransformDraft,
       issues: state.validationIssues,
@@ -368,7 +368,7 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const prepare = vi.spyOn(puppet.posePipeline, 'preparePose');
     target.mockClear();
     const release = state.subscribe(notify);
-    const releaseEvents = state.onAnimationEvent(events);
+    const releaseEvents = state.playback.onAnimationEvent(events);
     try {
       const settings = { previousCount: 3, nextCount: 3, frameSpacing: 1 };
       const expected = state.sampleGhostPoses(settings);
@@ -397,11 +397,11 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
       );
       expected[0]!.pose.get('root')!.y = 999;
       assert.equal(state.sampleGhostPoses()[0]!.pose.get('root')!.y, 88);
-      state.pause();
-      state.endScrub();
-      state.restart();
-      state.play();
-      state.advancePlayback(0.35);
+      state.playback.pause();
+      state.playback.endScrub();
+      state.playback.restart();
+      state.playback.play();
+      state.playback.advancePlayback(0.35);
       assert.equal(
         events.mock.calls.filter(([event]) => event.name === 'start').length,
         1,

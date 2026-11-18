@@ -76,10 +76,15 @@ test('key selection atomically selects bone/property, cancels drafts, pauses and
   const source = state.sourceAnimation;
   const working = state.workingAnimation;
   state.selectBone('root');
-  state.play();
+  state.playback.play();
   const observations: unknown[] = [];
   state.subscribe(() =>
-    observations.push([state.selectedBoneId, state.selectedTimelineProperty, state.currentTime, state.isPlaying]),
+    observations.push([
+      state.selectedBoneId,
+      state.selectedTimelineProperty,
+      state.currentTime,
+      state.playback.isPlaying,
+    ]),
   );
   assert.isTrue(state.selectKeyframe({ boneId: 'arm', property: 'rotation', time: 0.75 }));
   assert.deepEqual(observations, [['arm', 'rotation', 0.75, false]]);
@@ -141,7 +146,7 @@ test('invalid key targets preserve held selection, time, playback and history', 
   const { state } = session();
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
   const selected = state.selectedKeyframe;
-  state.play();
+  state.playback.play();
   for (const target of [
     { boneId: 'missing', property: 'x' as const, time: 0.5 },
     { boneId: 'root', property: 'rotation' as const, time: 0.5 },
@@ -152,7 +157,7 @@ test('invalid key targets preserve held selection, time, playback and history', 
     assert.isFalse(state.selectKeyframe(target));
   assert.strictEqual(state.selectedKeyframe, selected);
   assert.equal(state.currentTime, 0.5);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.equal(state.historyLength, 0);
 });
 
@@ -284,24 +289,24 @@ test('playback and scrubbing retain selection and stationary markers without for
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
   const selected = state.selectedKeyframe;
   const rows = state.timelineTracks;
-  state.play();
-  state.advancePlayback(0.2);
+  state.playback.play();
+  state.playback.advancePlayback(0.2);
   assert.equal(state.currentTime, 0.7);
-  state.beginScrub();
+  state.playback.beginScrub();
   state.setCurrentTime(1.3);
-  state.advancePlayback(0.4);
+  state.playback.advancePlayback(0.4);
   assert.equal(state.currentTime, 1.3);
-  state.endScrub();
-  state.advancePlayback(0.2);
+  state.playback.endScrub();
+  state.playback.advancePlayback(0.2);
   assert.equal(state.currentTime, 1.5);
   assert.strictEqual(state.selectedKeyframe, selected);
   assert.strictEqual(state.timelineTracks, rows);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
-  state.beginScrub();
+  state.playback.beginScrub();
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
-  assert.isFalse(state.isPlaying);
-  assert.isFalse(state.isScrubbing);
+  assert.isFalse(state.playback.isPlaying);
+  assert.isFalse(state.playback.isScrubbing);
 });
 
 test('adjacent navigation stays on the selected property and skips the current key using tolerance', () => {
@@ -309,10 +314,10 @@ test('adjacent navigation stays on the selected property and skips the current k
   assert.isFalse(state.selectAdjacentKeyframe(1));
   state.selectTimelineProperty('root', 'x');
   assert.isUndefined(state.getAdjacentKeyframe(-1));
-  state.play();
+  state.playback.play();
   assert.isTrue(state.selectAdjacentKeyframe(1));
   assert.equal(state.currentTime, 0.5);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   state.setCurrentTime(0.5 + KEYFRAME_TIME_TOLERANCE_MS / 2000);
   assert.equal(state.getAdjacentKeyframe(1)?.time, 2);
   assert.equal(state.getAdjacentKeyframe(-1)?.time, 0);

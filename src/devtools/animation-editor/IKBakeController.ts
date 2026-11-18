@@ -106,7 +106,7 @@ export class IKBakeController {
     this.state?.cancelTransformEdit();
     this.state?.ik.cancelIKEdit();
     this.preview = true;
-    this.state?.pause();
+    this.state?.playback.pause();
     this.previewTime = undefined;
     this.refresh();
   }
@@ -133,7 +133,7 @@ export class IKBakeController {
     const source = this.candidateSource;
     const revision = this.planningRevision;
     this.hidePreview();
-    state.pause();
+    state.playback.pause();
     this.refresh();
     if (this.state !== state || state.workingAnimation !== source || revision !== this.planningRevision) return false;
     // The worker already ran the engine's complete commit verification. Installing

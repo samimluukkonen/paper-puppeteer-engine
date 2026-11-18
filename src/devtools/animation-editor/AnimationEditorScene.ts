@@ -201,8 +201,8 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.footContacts.unbind();
       this.contactOverlay?.destroy();
       this.contactOverlay = undefined;
-      this.state?.pause();
-      this.state?.endScrub();
+      this.state?.playback.pause();
+      this.state?.playback.endScrub();
       this.rootHandle?.dispose();
       this.rootHandle = undefined;
       this.ikHandles?.dispose();
@@ -238,7 +238,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.state?.rootMotion.rootMotionEditing) this.environmentCamera?.render();
-    const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
+    const advance = (): void => this.state?.playback.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.motionLayer?.render();
@@ -809,7 +809,7 @@ export class AnimationEditorScene extends Phaser.Scene {
       puppet?.destroy();
       this.preview = undefined;
       this.puppet = undefined;
-      this.state?.pause();
+      this.state?.playback.pause();
       this.state = undefined;
       if (session === this.loadSession && this.sys.isActive()) this.onError(String(error));
     }

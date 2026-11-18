@@ -221,7 +221,7 @@ export class TimelineController {
   bind(state: AnimationEditorState, characterId?: string): void {
     this.graph.cancelGesture();
     this.input.cancelGesture();
-    this.state.pause();
+    this.state.playback.pause();
     this.unsubscribe?.();
     this.state = state;
     this.session.bind(characterId);
@@ -361,7 +361,7 @@ export class TimelineController {
   dispose(): void {
     this.graph.cancelGesture();
     this.input.cancelGesture();
-    this.state.pause();
+    this.state.playback.pause();
     this.input.dispose();
     this.session.dispose();
     this.navigation.dispose();

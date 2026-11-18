@@ -172,12 +172,12 @@ test.each(['field', 'graph', 'root-graph', 'root-handle'] as const)(
       const state = new AnimationEditorState(rig, animations);
       state.selectAnimation('clip');
       controller.bind(state, 'hero');
-      state.setAuthoredPlaybackMode('stepped');
-      state.setAuthoredFPS(17);
+      state.playback.setAuthoredPlaybackMode('stepped');
+      state.playback.setAuthoredFPS(17);
       if (preview.startsWith('root-')) {
         state.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
         state.rootMotion.setRootPosition({ x: 80, y: -20 }, 1);
-        state.editGraphKey(
+        state.graph.editGraphKey(
           { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0 },
           { curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } } },
         );
@@ -195,8 +195,8 @@ test.each(['field', 'graph', 'root-graph', 'root-handle'] as const)(
           preview === 'root-graph'
             ? { kind: 'root' as const, id: 'Root Motion' as const, property: 'x' as const }
             : { kind: 'bone' as const, id: 'root', property: 'x' as const };
-        state.beginGraphEdit({ channel, time: 0 });
-        state.previewGraphEdit({ value: 123 });
+        state.graph.beginGraphEdit({ channel, time: 0 });
+        state.graph.previewGraphEdit({ value: 123 });
       }
       assert.isTrue(state.hasPendingAnimationEdits);
       assert.isEmpty(stored);

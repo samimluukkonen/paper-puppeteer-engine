@@ -326,13 +326,13 @@ test('bone mirroring retains IK tracks, and ghost refresh never solves or change
     const containers = vi.spyOn(scene.add, 'container');
     const exported = state.exportJson();
     for (const speed of [0.25, 1, 2]) {
-      state.setPlaybackSpeed(speed);
+      state.playback.setPlaybackSpeed(speed);
       for (let frame = 0; frame < 40; ++frame)
         ghosts.updateFrame(() => state.setCurrentTime(0.1 + (frame % 30) * 0.025));
       state.setCurrentTime(0.4);
-      state.play();
-      for (let frame = 0; frame < 10; ++frame) ghosts.updateFrame(() => state.advancePlayback(1 / 120));
-      state.pause();
+      state.playback.play();
+      for (let frame = 0; frame < 10; ++frame) ghosts.updateFrame(() => state.playback.advancePlayback(1 / 120));
+      state.playback.pause();
     }
     assert.equal(images.mock.calls.length, 0);
     assert.equal(containers.mock.calls.length, 0);

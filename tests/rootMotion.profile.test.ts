@@ -116,9 +116,9 @@ for (const workload of ['scrub', 'graph'] as const) {
         () => {
           if (workload === 'scrub') state.setCurrentTime(((index++ * 137) % 1000) / 1000);
           else {
-            state.beginGraphEdit({ channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.5 });
-            state.previewGraphEdit({ value: 41 + (index++ % 2) });
-            state.commitGraphEdit();
+            state.graph.beginGraphEdit({ channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.5 });
+            state.graph.previewGraphEdit({ value: 41 + (index++ % 2) });
+            state.graph.commitGraphEdit();
             state.undo();
           }
         },

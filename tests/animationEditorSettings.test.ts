@@ -34,10 +34,10 @@ function session(): AnimationEditorState {
 test.each(PREVIEW_PLAYBACK_SPEEDS)('%s× scales elapsed time independently of render rate', (speed) => {
   for (const renderFPS of [30, 60, 120]) {
     const state = session();
-    assert.equal(state.playbackSpeed, 1);
-    state.setPlaybackSpeed(speed);
-    state.play();
-    for (let frame = 0; frame < renderFPS / 2; frame += 1) state.advancePlayback(1 / renderFPS);
+    assert.equal(state.playback.playbackSpeed, 1);
+    state.playback.setPlaybackSpeed(speed);
+    state.playback.play();
+    for (let frame = 0; frame < renderFPS / 2; frame += 1) state.playback.advancePlayback(1 / renderFPS);
     assert.approximately(state.currentTime, 0.5 * speed, 1e-12);
   }
 });
@@ -45,16 +45,16 @@ test.each(PREVIEW_PLAYBACK_SPEEDS)('%s× scales elapsed time independently of re
 test.each([false, true])('speed changes preserve caller/source/working data, history and dirty=%s', (dirty) => {
   const state = session();
   const before = JSON.stringify(clip);
-  if (dirty) state.setAuthoredFPS(20);
+  if (dirty) state.playback.setAuthoredFPS(20);
   const source = state.sourceAnimation;
   const working = state.workingAnimation;
   const snapshot = JSON.stringify(working);
   const history = state.historyLength;
   for (const speed of PREVIEW_PLAYBACK_SPEEDS) {
-    state.setPlaybackSpeed(speed);
-    state.play();
-    state.advancePlayback(0.01);
-    state.pause();
+    state.playback.setPlaybackSpeed(speed);
+    state.playback.play();
+    state.playback.advancePlayback(0.01);
+    state.playback.pause();
     assert.equal(state.dirty, dirty);
     assert.equal(state.historyLength, history);
     assert.strictEqual(state.sourceAnimation, source);
@@ -68,12 +68,12 @@ test.each([NaN, Infinity, -Infinity, -1, 0, 0.1, 3])(
   'unsupported speed %s is rejected without notification',
   (speed) => {
     const state = session();
-    state.setPlaybackSpeed(0.5);
+    state.playback.setPlaybackSpeed(0.5);
     const listener = vi.fn();
     state.subscribe(listener);
-    assert.isFalse(state.setPlaybackSpeed(speed));
-    assert.equal(state.playbackSpeed, 0.5);
-    assert.isTrue(state.setPlaybackSpeed(0.5));
+    assert.isFalse(state.playback.setPlaybackSpeed(speed));
+    assert.equal(state.playback.playbackSpeed, 0.5);
+    assert.isTrue(state.playback.setPlaybackSpeed(0.5));
     assert.equal(listener.mock.calls.length, 0);
     assert.isFalse(state.dirty);
   },
@@ -81,56 +81,56 @@ test.each([NaN, Infinity, -Infinity, -1, 0, 0.1, 3])(
 
 test('speed changes during playback and scrubbing take effect without resetting time or intent', () => {
   const state = session();
-  state.play();
-  state.advancePlayback(0.2);
-  state.setPlaybackSpeed(0.5);
+  state.playback.play();
+  state.playback.advancePlayback(0.2);
+  state.playback.setPlaybackSpeed(0.5);
   assert.equal(state.currentTime, 0.2);
-  assert.isTrue(state.isPlaying);
-  state.advancePlayback(0.4);
+  assert.isTrue(state.playback.isPlaying);
+  state.playback.advancePlayback(0.4);
   assert.equal(state.currentTime, 0.4);
-  state.beginScrub();
-  state.setPlaybackSpeed(2);
+  state.playback.beginScrub();
+  state.playback.setPlaybackSpeed(2);
   state.setCurrentTime(0.74212345);
-  state.advancePlayback(1);
+  state.playback.advancePlayback(1);
   assert.equal(state.currentTime, 0.74212345);
-  state.endScrub();
-  state.advancePlayback(0.1);
+  state.playback.endScrub();
+  state.playback.advancePlayback(0.1);
   assert.approximately(state.currentTime, 0.94212345, 1e-12);
   state.selectAnimation('other');
-  assert.equal(state.playbackSpeed, 2);
+  assert.equal(state.playback.playbackSpeed, 2);
   assert.equal(state.currentTime, 0);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
 });
 
 test.each(PREVIEW_PLAYBACK_SPEEDS)('%s× preserves loop overshoot and stops at a non-loop endpoint', (speed) => {
   const state = session();
-  state.setPlaybackSpeed(speed);
-  state.setPreviewLoop(true);
+  state.playback.setPlaybackSpeed(speed);
+  state.playback.setPreviewLoop(true);
   state.setCurrentTime(1.75);
-  state.play();
-  state.advancePlayback(4.5 / speed);
+  state.playback.play();
+  state.playback.advancePlayback(4.5 / speed);
   assert.equal(state.currentTime, 0.25);
-  assert.isTrue(state.isPlaying);
-  state.setPreviewLoop(false);
-  state.advancePlayback(4 / speed);
+  assert.isTrue(state.playback.isPlaying);
+  state.playback.setPreviewLoop(false);
+  state.playback.advancePlayback(4 / speed);
   assert.equal(state.currentTime, 2);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
 });
 
 test.each([1.5, 2])('overflowing scaled delta is finite for looping and non-looping at %s×', (speed) => {
   const state = new AnimationEditorState(rig, [{ ...clip, duration: speed * 1000, tracks: {}, events: [] }]);
   state.selectAnimation('move');
-  state.setPlaybackSpeed(speed);
+  state.playback.setPlaybackSpeed(speed);
   state.setCurrentTime(0.25);
-  state.setPreviewLoop(true);
-  state.play();
-  state.advancePlayback(Number.MAX_VALUE);
+  state.playback.setPreviewLoop(true);
+  state.playback.play();
+  state.playback.advancePlayback(Number.MAX_VALUE);
   assert.equal(state.currentTime, 0.25);
-  assert.isTrue(state.isPlaying);
-  state.setPreviewLoop(false);
-  state.advancePlayback(Number.MAX_VALUE);
+  assert.isTrue(state.playback.isPlaying);
+  state.playback.setPreviewLoop(false);
+  state.playback.advancePlayback(Number.MAX_VALUE);
   assert.equal(state.currentTime, speed);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
 });
 
 test.each([AUTHORED_FPS_MIN, 12.5, AUTHORED_FPS_MAX])('FPS %s edits only the working copy without retiming', (fps) => {
@@ -138,7 +138,7 @@ test.each([AUTHORED_FPS_MIN, 12.5, AUTHORED_FPS_MAX])('FPS %s edits only the wor
   const source = state.sourceAnimation;
   const before = JSON.stringify(clip);
   state.setCurrentTime(0.74212345);
-  assert.isTrue(state.setAuthoredFPS(fps));
+  assert.isTrue(state.playback.setAuthoredFPS(fps));
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'stepped', fps });
   assert.strictEqual(state.sourceAnimation, source);
   assert.equal(JSON.stringify(clip), before);
@@ -150,11 +150,11 @@ test.each([AUTHORED_FPS_MIN, 12.5, AUTHORED_FPS_MAX])('FPS %s edits only the wor
   assert.equal(state.currentTime, 0.74212345);
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
-  state.setPlaybackSpeed(2);
+  state.playback.setPlaybackSpeed(2);
   state.undo();
   assert.isFalse(state.dirty);
   assert.deepEqual(state.workingAnimation!.playback, source!.playback);
-  assert.equal(state.playbackSpeed, 2);
+  assert.equal(state.playback.playbackSpeed, 2);
   state.redo();
   assert.isTrue(state.dirty);
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'stepped', fps });
@@ -163,16 +163,16 @@ test.each([AUTHORED_FPS_MIN, 12.5, AUTHORED_FPS_MAX])('FPS %s edits only the wor
 test.each([NaN, Infinity, -Infinity, -10, 0, 0.5, 241])('invalid FPS %s preserves data, time and history', (fps) => {
   const state = session();
   const working = state.workingAnimation;
-  state.play();
-  state.advancePlayback(0.25);
-  assert.isFalse(state.setAuthoredFPS(fps));
+  state.playback.play();
+  state.playback.advancePlayback(0.25);
+  assert.isFalse(state.playback.setAuthoredFPS(fps));
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.currentTime, 0.25);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.equal(state.validationIssues[0]!.path, 'playback.fps');
-  assert.isTrue(state.setAuthoredFPS(10));
+  assert.isTrue(state.playback.setAuthoredFPS(10));
   assert.lengthOf(state.validationIssues, 0);
   assert.equal(state.historyLength, 0);
 });
@@ -181,15 +181,15 @@ test('mode edits use the schema union, preserve source and undo/redo the authore
   const state = session();
   const before = JSON.stringify(clip);
   state.setCurrentTime(0.15);
-  state.play();
-  assert.isTrue(state.setAuthoredPlaybackMode('smooth'));
+  state.playback.play();
+  assert.isTrue(state.playback.setAuthoredPlaybackMode('smooth'));
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'smooth' });
-  assert.isFalse(state.setAuthoredFPS(20));
+  assert.isFalse(state.playback.setAuthoredFPS(20));
   assert.isTrue(state.dirty);
   assert.equal(state.currentTime, 0.15);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.equal(JSON.stringify(clip), before);
-  assert.isTrue(state.setAuthoredPlaybackMode('stepped'));
+  assert.isTrue(state.playback.setAuthoredPlaybackMode('stepped'));
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'stepped', fps: 10 });
   assert.isFalse(state.dirty);
   state.undo();
@@ -203,15 +203,15 @@ test('mode edits use the schema union, preserve source and undo/redo the authore
 test('implicit smooth mode stays implicit until edited; setting controls are safe without selection', () => {
   const smooth: AnimationClip = { name: 'smooth', duration: 1000, loop: false, tracks: {} };
   const state = new AnimationEditorState(rig, [smooth]);
-  assert.isFalse(state.setAuthoredFPS(20));
-  assert.isFalse(state.setAuthoredPlaybackMode('stepped'));
+  assert.isFalse(state.playback.setAuthoredFPS(20));
+  assert.isFalse(state.playback.setAuthoredPlaybackMode('stepped'));
   state.selectAnimation('smooth');
   const working = state.workingAnimation;
-  assert.isTrue(state.setAuthoredPlaybackMode('smooth'));
+  assert.isTrue(state.playback.setAuthoredPlaybackMode('smooth'));
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.historyLength, 0);
-  assert.isFalse(state.setAuthoredFPS(20));
-  assert.isTrue(state.setAuthoredPlaybackMode('stepped'));
+  assert.isFalse(state.playback.setAuthoredFPS(20));
+  assert.isTrue(state.playback.setAuthoredPlaybackMode('stepped'));
   assert.deepEqual(state.workingAnimation!.playback, { mode: 'stepped', fps: 10 });
   assert.isUndefined(state.sourceAnimation!.playback);
   assert.isTrue(state.dirty);
@@ -227,9 +227,9 @@ test('FPS and mode edits validate metadata once and reuse unchanged tracks, even
   const parse = vi.spyOn(externalData, 'parseAnimationClip');
   try {
     for (const edit of [
-      () => state.setAuthoredFPS(25),
-      () => state.setAuthoredPlaybackMode('smooth'),
-      () => state.setAuthoredPlaybackMode('stepped'),
+      () => state.playback.setAuthoredFPS(25),
+      () => state.playback.setAuthoredPlaybackMode('smooth'),
+      () => state.playback.setAuthoredPlaybackMode('stepped'),
     ]) {
       parse.mockClear();
       assert.isTrue(edit());

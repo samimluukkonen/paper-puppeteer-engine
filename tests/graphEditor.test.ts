@@ -84,7 +84,7 @@ test('property selection exposes exactly supported channels and follows the shar
 test('graph samples use the runtime evaluator for every supported outgoing mode', () => {
   for (const curve of [{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GRAPH_CURVE]) {
     const state = fixture();
-    state.editGraphKey(ref, { curve });
+    state.graph.editGraphKey(ref, { curve });
     const animation = state.workingAnimation!;
     const keys = graphDisplayKeys(animation, x);
     const clip = compileClip(animation, rig);
@@ -94,8 +94,8 @@ test('graph samples use the runtime evaluator for every supported outgoing mode'
 });
 test('graph respects authored frame holds and exact clip endpoint', () => {
   const state = fixture();
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(2);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(2);
   const animation = state.workingAnimation!;
   const keys = graphDisplayKeys(animation, x);
   assert.equal(sampleGraph(animation, keys, 0.49), -10);
@@ -119,7 +119,7 @@ test('rotation graph unwraps degrees without changing authored radians or shorte
 });
 test('sparse key movement preserves sibling values, controls and unrelated branches', () => {
   const state = fixture();
-  state.editGraphKey(ref, { curve: DEFAULT_GRAPH_CURVE });
+  state.graph.editGraphKey(ref, { curve: DEFAULT_GRAPH_CURVE });
   const before = state.workingAnimation!;
   const next = editGraphKey(before, rig, ref, { time: 0.2, value: -4 });
   assert.strictEqual(before.ikTracks, next.ikTracks);
@@ -133,9 +133,9 @@ test('sparse key movement preserves sibling values, controls and unrelated branc
 test.each([-0.1, 0.5, 0.75, NaN, Infinity])('reject moving a key outside its neighbor boundaries (%s)', (time) => {
   const state = fixture();
   const before = state.workingAnimation;
-  assert.throws(() => state.editGraphKey(ref, { time }));
+  assert.throws(() => state.graph.editGraphKey(ref, { time }));
   assert.strictEqual(state.workingAnimation, before);
-  assert.isFalse(state.graphEditActive);
+  assert.isFalse(state.graph.graphEditActive);
   assert.equal(state.historyLength, 0);
 });
 test('handle constraints clamp normalized time, progress and crossing controls before preview validation', () => {
@@ -151,26 +151,26 @@ test('handle constraints clamp normalized time, progress and crossing controls b
 });
 test('invalid precision handles and bounded IK values never publish invalid previews', () => {
   const state = fixture();
-  state.beginGraphEdit(ref);
+  state.graph.beginGraphEdit(ref);
   const before = state.previewAnimation;
   assert.throws(() =>
-    state.previewGraphEdit({ curve: { mode: 'bezier', control1: { x: 0.9, y: 0 }, control2: { x: 0.1, y: 1 } } }),
+    state.graph.previewGraphEdit({ curve: { mode: 'bezier', control1: { x: 0.9, y: 0 }, control2: { x: 0.1, y: 1 } } }),
   );
   assert.strictEqual(state.previewAnimation, before);
-  state.cancelGraphEdit();
-  assert.throws(() => state.editGraphKey({ channel: mix, time: 0 }, { value: 2 }));
+  state.graph.cancelGraphEdit();
+  assert.throws(() => state.graph.editGraphKey({ channel: mix, time: 0 }, { value: 2 }));
   assert.equal(state.historyLength, 0);
 });
 test('completed drag is one Undo, shares timeline selection, and exports only committed curves', () => {
   const state = fixture();
   const before = state.workingAnimation;
-  state.beginGraphEdit(ref);
-  for (let i = 1; i < 5; i++) state.previewGraphEdit({ time: i / 20, value: i });
+  state.graph.beginGraphEdit(ref);
+  for (let i = 1; i < 5; i++) state.graph.previewGraphEdit({ time: i / 20, value: i });
   assert.strictEqual(state.workingAnimation, before);
   assert.equal((JSON.parse(state.exportJson()) as { tracks: { root: { x: number }[] } }).tracks.root[0]!.x, -10);
   assert.isTrue(state.hasPendingAnimationEdits);
   assert.equal(state.historyLength, 0);
-  assert.isTrue(state.commitGraphEdit());
+  assert.isTrue(state.graph.commitGraphEdit());
   assert.equal(state.historyLength, 1);
   assert.deepEqual(state.selectedKeyframe, { boneId: 'root', property: 'x', time: 0.2 });
   assert.equal(state.timelineTracks.find((row) => row.kind === 'property' && row.property === 'x')?.kind, 'property');
@@ -185,15 +185,15 @@ test.each(['cancel', 'seek', 'selection', 'undo', 'mode', 'session'] as const)(
   (action) => {
     const state = fixture();
     const before = state.workingAnimation;
-    state.beginGraphEdit(ref);
-    state.previewGraphEdit({ curve: DEFAULT_GRAPH_CURVE });
-    if (action === 'cancel') state.cancelGraphEdit();
+    state.graph.beginGraphEdit(ref);
+    state.graph.previewGraphEdit({ curve: DEFAULT_GRAPH_CURVE });
+    if (action === 'cancel') state.graph.cancelGraphEdit();
     if (action === 'seek') state.setCurrentTime(0.2);
     if (action === 'selection') state.selectTimelineProperty('root', 'y');
     if (action === 'undo') state.undo();
     if (action === 'mode') state.setEditorMode('rig');
     if (action === 'session') state.selectAnimation('graph', { keepChanges: true });
-    assert.isFalse(state.graphEditActive);
+    assert.isFalse(state.graph.graphEditActive);
     assert.strictEqual(state.previewAnimation, before);
     assert.equal(state.historyLength, 0);
   },
@@ -205,15 +205,15 @@ test('Bézier preview updates actual puppet pose immediately and cancel restores
   try {
     state.setCurrentTime(0.125);
     const before = puppet.getBone('root').pose.x;
-    state.beginGraphEdit(ref);
-    state.previewGraphEdit({ curve: { mode: 'stepped' } });
+    state.graph.beginGraphEdit(ref);
+    state.graph.previewGraphEdit({ curve: { mode: 'stepped' } });
     assert.equal(puppet.getBone('root').pose.x, -10);
     assert.notEqual(before, -10);
-    state.cancelGraphEdit();
+    state.graph.cancelGraphEdit();
     assert.equal(puppet.getBone('root').pose.x, before);
-    state.editGraphKey(ref, { curve: { mode: 'stepped' } });
-    state.play();
-    state.advancePlayback(0.1);
+    state.graph.editGraphKey(ref, { curve: { mode: 'stepped' } });
+    state.playback.play();
+    state.playback.advancePlayback(0.1);
     assert.equal(puppet.getBone('root').pose.x, -10);
     state.undo();
     assert.notEqual(puppet.getBone('root').pose.x, -10);
@@ -226,10 +226,10 @@ test('IK outgoing controls share history, selection, evaluator and serialization
   const state = fixture();
   state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'mix', time: 0 });
   state.setCurrentTime(0.25);
-  state.beginGraphEdit({ channel: mix, time: 0 });
-  state.previewGraphEdit({ curve: { mode: 'stepped' } });
+  state.graph.beginGraphEdit({ channel: mix, time: 0 });
+  state.graph.previewGraphEdit({ curve: { mode: 'stepped' } });
   assert.equal(state.ik.selectedIKTargetValues?.mix, 0);
-  state.commitGraphEdit();
+  state.graph.commitGraphEdit();
   const animation = state.workingAnimation!;
   assert.equal(evaluateIKClip(compileClip(animation, rig), 250).get('arm')!.mix!.value, 0);
   const json = state.exportJson();
@@ -239,10 +239,10 @@ test('IK outgoing controls share history, selection, evaluator and serialization
 });
 test('terminal keys reject curve edits; Auto removes only the selected property override', () => {
   const state = fixture();
-  state.editGraphKey(ref, { curve: DEFAULT_GRAPH_CURVE });
-  state.editGraphKey(ref, { curve: null });
+  state.graph.editGraphKey(ref, { curve: DEFAULT_GRAPH_CURVE });
+  state.graph.editGraphKey(ref, { curve: null });
   assert.isUndefined(graphKeys(state.workingAnimation!, x)[0]!.curve);
-  assert.throws(() => state.editGraphKey({ channel: x, time: 1 }, { curve: DEFAULT_GRAPH_CURVE }));
+  assert.throws(() => state.graph.editGraphKey({ channel: x, time: 1 }, { curve: DEFAULT_GRAPH_CURVE }));
 });
 test.each([
   [-0.00001, 0.00002],
@@ -250,8 +250,8 @@ test.each([
   [-10, -10],
 ])('coordinates round-trip negative, small, large and flat ranges (%s, %s)', (min, max) => {
   const state = fixture();
-  state.editGraphKey(ref, { value: min });
-  state.editGraphKey({ channel: x, time: 1 }, { value: max });
+  state.graph.editGraphKey(ref, { value: min });
+  state.graph.editGraphKey({ channel: x, time: 1 }, { value: max });
   const history = state.historyLength;
   const view = fitGraph(state.workingAnimation!, x);
   for (const [width, height] of [
@@ -272,7 +272,7 @@ test.each([
 test('curve edits detach caller handles without freezing them', () => {
   const state = fixture();
   const curve = { mode: 'bezier' as const, control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } };
-  state.editGraphKey(ref, { curve });
+  state.graph.editGraphKey(ref, { curve });
   assert.isFalse(Object.isFrozen(curve.control1));
   curve.control1.x = 0.4;
   const held = graphKeys(state.workingAnimation!, x)[0]!.curve;
@@ -281,8 +281,8 @@ test('curve edits detach caller handles without freezing them', () => {
 });
 test('tiny property ranges fit without a fixed minimum padding dwarfing the curve', () => {
   const state = fixture();
-  state.editGraphKey(ref, { value: -1e-12 });
-  state.editGraphKey({ channel: x, time: 1 }, { value: 1e-12 });
+  state.graph.editGraphKey(ref, { value: -1e-12 });
+  state.graph.editGraphKey({ channel: x, time: 1 }, { value: 1e-12 });
   const view = fitGraph(state.workingAnimation!, x);
   assert.closeTo(view.max - view.min, 2.6e-12, 1e-24);
 });

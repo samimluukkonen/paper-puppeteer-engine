@@ -109,7 +109,7 @@ test('paste anchors at the held clock, extends duration, selects all five keys a
   const { state, input, rig } = session();
   const source = state.sourceAnimation;
   state.keyframes.copySelectedKeyframes();
-  state.play();
+  state.playback.play();
   state.setTemporaryBoneProperty('x', 500);
   state.setCurrentTime(2);
   const installed: AnimationClip[] = [];
@@ -124,7 +124,7 @@ test('paste anchors at the held clock, extends duration, selects all five keys a
   assert.equal(installed.length, 1);
   assert.equal(state.currentTime, 2);
   assert.equal(state.duration, 2.7);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.isFalse(state.hasTemporaryTransform);
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
@@ -276,9 +276,9 @@ test('clipboard survives selection, playback, key edits, history and animation s
   state.keyframes.copySelectedKeyframes();
   const clipboard = state.keyframes.keyframeClipboard;
   state.clearKeyframeSelection();
-  state.play();
-  state.advancePlayback(0.4);
-  state.pause();
+  state.playback.play();
+  state.playback.advancePlayback(0.4);
+  state.playback.pause();
   state.keyframes.setBonePropertyKeyframe('torso', 'x', 900, 0.5);
   state.undo();
   assert.isTrue(state.canRedo);

@@ -458,7 +458,7 @@ test('state no-op and invalid edits preserve working data, playback, history, an
   const state = new AnimationEditorState(rig, [clip({ tracks: { root: [{ time: 500, x: 4 }] } })]);
   state.selectAnimation('move');
   state.setCurrentTime(0.5);
-  state.play();
+  state.playback.play();
   state.keyframes.setBonePropertyKeyframe('root', 'x', 5);
   state.undo();
   const working = state.workingAnimation;
@@ -478,14 +478,14 @@ test('state no-op and invalid edits preserve working data, playback, history, an
     assert.isFalse(state.dirty);
     assert.isTrue(state.canRedo);
     assert.isFalse(state.canUndo);
-    assert.isTrue(state.isPlaying);
+    assert.isTrue(state.playback.isPlaying);
     assert.equal(state.currentTime, 0.5);
   }
   assert.isTrue(state.redo());
   assert.isTrue(state.dirty);
   assert.equal(state.currentTime, 0.5);
-  assert.isTrue(state.isPlaying);
-  state.advancePlayback(0.25);
+  assert.isTrue(state.playback.isPlaying);
+  state.playback.advancePlayback(0.25);
   assert.equal(state.currentTime, 0.75);
 });
 
@@ -673,13 +673,13 @@ test('mode and FPS edits reuse tracks/events, clear prior errors, and undo to th
   const state = new AnimationEditorState(rig, [clip({ tracks: { root: [{ time: 0, x: 1 }] } })]);
   state.selectAnimation('move');
   const baseline = state.workingAnimation!;
-  state.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredPlaybackMode('stepped');
   const stepped = state.workingAnimation!;
   assert.strictEqual(stepped.tracks, baseline.tracks);
   assert.strictEqual(stepped.events, baseline.events);
-  assert.isFalse(state.setAuthoredFPS(NaN));
+  assert.isFalse(state.playback.setAuthoredFPS(NaN));
   assert.isNotEmpty(state.validationIssues);
-  assert.isTrue(state.setAuthoredFPS(20));
+  assert.isTrue(state.playback.setAuthoredFPS(20));
   const faster = state.workingAnimation!;
   assert.isEmpty(state.validationIssues);
   assert.strictEqual(faster.tracks, baseline.tracks);

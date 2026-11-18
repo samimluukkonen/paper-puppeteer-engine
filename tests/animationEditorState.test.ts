@@ -89,9 +89,9 @@ test('multiple subscriber failures are aggregated after the remaining subscriber
     throw new Error('Second view failed');
   });
   state.subscribe(reached);
-  assert.throws(() => state.setPreviewLoop(true), AggregateError);
+  assert.throws(() => state.playback.setPreviewLoop(true), AggregateError);
   assert.equal(reached.mock.calls.length, 1);
-  assert.isTrue(state.previewLoop);
+  assert.isTrue(state.playback.previewLoop);
 });
 
 test('export filenames preserve owned manifest paths and fall back to sanitized clip names', () => {
@@ -118,8 +118,8 @@ test('animation export round-trips authored data without saving drafts or changi
   state.setCurrentTime(0.5);
   state.keyframes.setBonePropertyKeyframe('root', 'y', 17);
   state.setTemporaryBoneProperty('x', 99);
-  state.setPreviewLoop(true);
-  state.setPlaybackSpeed(2);
+  state.playback.setPreviewLoop(true);
+  state.playback.setPlaybackSpeed(2);
   const working = state.workingAnimation;
   const history = state.historyLength;
   const notification = vi.fn();
@@ -176,7 +176,7 @@ test('selection resets continuous time, duration, working copy, playback metadat
   assert.equal(state.duration, demoAnimations.find((animation) => animation.name === 'walk')!.duration / 1000);
   assert.notStrictEqual(state.workingAnimation, previous);
   assert.isTrue(state.loop);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.isFalse(state.dirty);
   state.selectAnimation('idle');
   assert.strictEqual(state.workingAnimation, previous);
@@ -220,7 +220,7 @@ test.each(['other', 'renamed'])('replacement name %s cannot change selection or 
   state.replaceWorkingAnimation(file(clip({ duration: 3000 })));
   state.undo();
   state.setCurrentTime(0.5);
-  state.play();
+  state.playback.play();
   const working = state.workingAnimation;
   const source = state.sourceAnimation;
   const listener = vi.fn();
@@ -232,7 +232,7 @@ test.each(['other', 'renamed'])('replacement name %s cannot change selection or 
   assert.equal(state.selectedAnimationId, 'move');
   assert.deepEqual(state.animationIds, ['move', 'other']);
   assert.equal(state.currentTime, 0.5);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.isFalse(state.dirty);
   assert.isFalse(state.canUndo);
   assert.isTrue(state.canRedo);

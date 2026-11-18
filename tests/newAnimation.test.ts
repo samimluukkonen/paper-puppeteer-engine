@@ -81,8 +81,8 @@ test.each([{ clips: [] }, { clips: [existing, { ...existing, name: 'other' }] }]
       assert.equal(puppet.getBone('head').pose.rotation, 0.3);
       assert.equal(puppet.getBone('root').pose.x, 15);
     }
-    state.play();
-    state.advancePlayback(0.2);
+    state.playback.play();
+    state.playback.advancePlayback(0.2);
     assert.equal(puppet.getBone('head').pose.rotation, 0.3);
     preview.dispose();
     puppet.destroy();
@@ -98,12 +98,12 @@ test('creation resets session atomically and preserves earlier work and independ
   const previous = state.workingAnimation;
   state.selectKeyframe({ boneId: 'head', property: 'rotation', time: 0 });
   state.setCurrentTime(0.5);
-  state.play();
+  state.playback.play();
   const revision = state.sessionRevision;
   const listener = vi.fn(() => {
     assert.equal(state.selectedAnimationId, 'idle');
     assert.equal(state.currentTime, 0);
-    assert.isFalse(state.isPlaying);
+    assert.isFalse(state.playback.isPlaying);
     assert.isNull(state.selectedBoneId);
     assert.lengthOf(state.selectedKeys, 0);
     assert.isNull(state.selectedEvent);
@@ -171,7 +171,7 @@ test.each(invalid)('invalid input leaves registration, selection, clock and hist
   state.selectBone('head');
   state.commitBoneProperty('rotation');
   state.setCurrentTime(0.5);
-  state.play();
+  state.playback.play();
   const held = state.workingAnimation,
     ids = state.animationIds,
     revision = state.sessionRevision;
@@ -181,7 +181,7 @@ test.each(invalid)('invalid input leaves registration, selection, clock and hist
   assert.equal(state.sessionRevision, revision);
   assert.equal(state.selectedAnimationId, 'existing');
   assert.equal(state.currentTime, 0.5);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.equal(state.historyLength, 1);
   assert.isNotEmpty(state.validationIssues);
 });
@@ -209,15 +209,15 @@ test.each(['bone draft', 'key drag', 'event drag', 'IK drag', 'scrub'])(
         state.ik.previewIKTargetDrag({ x: 15, y: 25 });
         break;
       case 'scrub':
-        state.play();
-        state.beginScrub();
+        state.playback.play();
+        state.playback.beginScrub();
         state.setCurrentTime(0.7);
         break;
     }
     assert.isTrue(state.createAnimation({ name: 'idle' }));
     assert.isFalse(state.hasPendingAnimationEdits);
-    assert.isFalse(state.isScrubbing);
-    assert.isFalse(state.isPlaying);
+    assert.isFalse(state.playback.isScrubbing);
+    assert.isFalse(state.playback.isPlaying);
     assert.equal(state.currentTime, 0);
     assert.isNull(state.selectedEvent);
     assert.isNull(state.ik.selectedIKConstraintId);

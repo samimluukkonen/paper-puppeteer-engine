@@ -30,7 +30,7 @@ export function evaluateWorldDisplacement(
     root = { x: state.rootMotion.rootPosition.x - initial.x, y: state.rootMotion.rootPosition.y - initial.y };
   } else if (
     state.rootMotion.rootLoopMode === 'continuous' &&
-    state.previewLoop &&
+    state.playback.previewLoop &&
     !state.rootMotion.rootMotionEditing
   ) {
     // Keep the pose clock's exact held phase: summing unwrapped floating-point time can otherwise

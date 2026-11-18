@@ -27,20 +27,20 @@ function session(input = clip) {
   const state = new AnimationEditorState(rig, [input]);
   state.selectAnimation(input.name);
   const events: FiredAnimationEvent[] = [];
-  state.onAnimationEvent((event) => events.push(event));
+  state.playback.onAnimationEvent((event) => events.push(event));
   return { state, events, names: () => events.map(({ name }) => name) };
 }
 
 test.each([false, true])('editor and runtime deliver identical forward/loop/large-delta events, loop=%s', (loop) => {
   const { state, events } = session();
-  state.setPreviewLoop(loop);
+  state.playback.setPreviewLoop(loop);
   const player = new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [
     compileClip({ ...clip, loop }, rig),
   ]);
   const runtime: FiredAnimationEvent[] = [];
   player.onAnimationEvent((event) => runtime.push(event));
   player.play('events');
-  state.play();
+  state.playback.play();
   for (const [delta, speed] of [
     [0.1, 1],
     [0.15, 1],
@@ -50,9 +50,9 @@ test.each([false, true])('editor and runtime deliver identical forward/loop/larg
     [5.2, 1.5],
     [0.02, 1],
   ] as const) {
-    state.setPlaybackSpeed(speed);
+    state.playback.setPlaybackSpeed(speed);
     player.setSpeed(speed);
-    state.advancePlayback(delta);
+    state.playback.advancePlayback(delta);
     player.update(delta * 1000);
     assert.deepEqual(events, runtime);
     assert.approximately(state.currentTime * 1000, player.elapsedTime, 1e-8);
@@ -63,7 +63,7 @@ test.each([false, true])('editor and runtime deliver identical forward/loop/larg
 test('navigation across all markers, key/event selection, editing and Undo/Redo cause no event side effects', () => {
   const { state, events } = session();
   for (const time of [0, 1, 2, 0.5, 0]) state.setCurrentTime(time);
-  state.restart();
+  state.playback.restart();
   for (const marker of state.events.eventTimelineTrack.markers) state.events.selectAnimationEvent(marker.ref);
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
   state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
@@ -78,18 +78,18 @@ test('navigation across all markers, key/event selection, editing and Undo/Redo 
   state.undo();
   state.redo();
   assert.deepEqual(events, []);
-  state.play();
+  state.playback.play();
   events.length = 0;
-  state.beginScrub();
+  state.playback.beginScrub();
   for (const time of [2, 0, 1.95, 0.05, 0.5, 0]) {
     state.setCurrentTime(time);
-    state.advancePlayback(10);
+    state.playback.advancePlayback(10);
   }
-  state.endScrub();
+  state.playback.endScrub();
   assert.deepEqual(events, []);
-  state.advancePlayback(0.05);
+  state.playback.advancePlayback(0.05);
   assert.deepEqual(events, [], 'scrub release at zero does not restart start events');
-  state.advancePlayback(0.1);
+  state.playback.advancePlayback(0.1);
   assert.deepEqual(
     events.map(({ name }) => name),
     ['early'],
@@ -99,64 +99,64 @@ test('navigation across all markers, key/event selection, editing and Undo/Redo 
 test('crossings exclude the previous time, include the end, and dispatch all same-time markers once', () => {
   const { state, events, names } = session();
   state.setCurrentTime(0.1);
-  state.play();
-  state.advancePlayback(0.4);
+  state.playback.play();
+  state.playback.advancePlayback(0.4);
   assert.deepEqual(names(), ['left', 'right', 'cloth']);
-  state.advancePlayback(0);
-  state.advancePlayback(0.000001);
+  state.playback.advancePlayback(0);
+  state.playback.advancePlayback(0.000001);
   assert.deepEqual(names(), ['left', 'right', 'cloth']);
   events.length = 0;
-  state.advancePlayback(0.4);
+  state.playback.advancePlayback(0.4);
   assert.deepEqual(names(), ['impact']);
 });
 
 test('wrap crosses the tail, endpoint/start boundary, and head in runtime order', () => {
   const { state, names } = session();
-  state.setPreviewLoop(true);
+  state.playback.setPreviewLoop(true);
   state.setCurrentTime(1.8);
-  state.play();
-  state.advancePlayback(0.4);
+  state.playback.play();
+  state.playback.advancePlayback(0.4);
   assert.deepEqual(names(), ['near-end', 'start', 'end', 'early']);
   assert.approximately(state.currentTime, 0.2, 1e-12);
 });
 
 test('whole-cycle updates dispatch events even when wrapped currentTime is unchanged', () => {
   const { state, events, names } = session();
-  state.setPreviewLoop(true);
-  state.play();
+  state.playback.setPreviewLoop(true);
+  state.playback.play();
   events.length = 0;
-  state.advancePlayback(6);
+  state.playback.advancePlayback(6);
   const cycle = ['early', 'left', 'right', 'cloth', 'impact', 'near-end', 'start', 'end'];
   assert.deepEqual(names(), [...cycle, ...cycle, ...cycle]);
   assert.equal(state.currentTime, 0);
-  state.pause();
-  state.play();
+  state.playback.pause();
+  state.playback.play();
   assert.equal(events.length, 24, 'resume at a wrapped zero cannot replay start events');
 });
 
 test('initial play, endpoint replay and playing restart fire start once; paused restart waits for play', () => {
   const { state, events, names } = session({ ...clip, loop: false });
-  state.restart();
+  state.playback.restart();
   assert.deepEqual(events, []);
-  state.play();
-  state.play();
+  state.playback.play();
+  state.playback.play();
   assert.deepEqual(names(), ['start']);
-  state.pause();
-  state.play();
+  state.playback.pause();
+  state.playback.play();
   assert.deepEqual(names(), ['start']);
-  state.restart();
+  state.playback.restart();
   assert.deepEqual(names(), ['start', 'start']);
-  state.advancePlayback(10);
-  assert.isFalse(state.isPlaying);
+  state.playback.advancePlayback(10);
+  assert.isFalse(state.playback.isPlaying);
   events.length = 0;
-  state.play();
+  state.playback.play();
   assert.deepEqual(names(), ['start']);
-  state.advancePlayback(0.1);
+  state.playback.advancePlayback(0.1);
   assert.deepEqual(names(), ['start', 'early']);
-  state.pause();
-  state.restart();
+  state.playback.pause();
+  state.playback.restart();
   assert.deepEqual(names(), ['start', 'early']);
-  state.play();
+  state.playback.play();
   assert.deepEqual(names(), ['start', 'early', 'start']);
 });
 
@@ -169,23 +169,23 @@ test('editor start and restart budgets preserve clocks, drafts and authored hist
   state.selectBone('root');
   state.setTemporaryBoneProperty('x', 123);
   const working = state.workingAnimation;
-  state.play();
-  assert.isFalse(state.isPlaying);
+  state.playback.play();
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.currentTime, 0);
   assert.equal(state.boneTransformDraft.x, 123);
   assert.isEmpty(events);
   assert.match(state.validationIssues[0]!.message, /exceeds 10000 events/);
   state.setCurrentTime(0.25);
-  state.play();
-  assert.isTrue(state.isPlaying, 'resuming after zero does not emit start events');
-  state.restart();
+  state.playback.play();
+  assert.isTrue(state.playback.isPlaying, 'resuming after zero does not emit start events');
+  state.playback.restart();
   assert.equal(state.currentTime, 0.25);
-  assert.isTrue(state.isPlaying);
+  assert.isTrue(state.playback.isPlaying);
   assert.isEmpty(events);
   state.setCurrentTime(2);
-  state.play();
+  state.playback.play();
   assert.equal(state.currentTime, 2);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
@@ -195,14 +195,14 @@ test.each([10000, 2_000_000.5, Number.MAX_VALUE])(
   'unbounded catch-up %s is rejected atomically using runtime limits',
   (delta) => {
     const { state, events } = session();
-    state.setPreviewLoop(true);
+    state.playback.setPreviewLoop(true);
     state.setCurrentTime(0.25);
-    state.play();
+    state.playback.play();
     const working = state.workingAnimation;
-    state.advancePlayback(delta);
+    state.playback.advancePlayback(delta);
     assert.equal(state.currentTime, 0.25);
     assert.deepEqual(events, []);
-    assert.isTrue(state.isPlaying);
+    assert.isTrue(state.playback.isPlaying);
     assert.strictEqual(state.workingAnimation, working);
     assert.isFalse(state.dirty);
     assert.equal(state.historyLength, 0);
@@ -212,16 +212,16 @@ test.each([10000, 2_000_000.5, Number.MAX_VALUE])(
 
 test('bounded multi-loop catch-up and huge nonlooping deltas retain every relevant event', () => {
   const { state, events } = session();
-  state.setPreviewLoop(true);
+  state.playback.setPreviewLoop(true);
   state.setCurrentTime(0.25);
-  state.play();
-  state.advancePlayback(100);
+  state.playback.play();
+  state.playback.advancePlayback(100);
   assert.equal(events.length, 400);
   assert.approximately(state.currentTime, 0.25, 1e-12);
   events.length = 0;
-  state.setPreviewLoop(false);
-  state.setPlaybackSpeed(2);
-  state.advancePlayback(Number.MAX_VALUE);
+  state.playback.setPreviewLoop(false);
+  state.playback.setPlaybackSpeed(2);
+  state.playback.advancePlayback(Number.MAX_VALUE);
   assert.deepEqual(
     events.map(({ name }) => name),
     ['right', 'cloth', 'impact', 'near-end', 'end'],
@@ -233,25 +233,25 @@ test('dispatch uses runtime payload ownership, listener snapshots and failure is
   const { state } = session();
   const synchronized = vi.fn();
   state.subscribe(synchronized);
-  state.onAnimationEvent((event) => {
+  state.playback.onAnimationEvent((event) => {
     assert.isTrue(synchronized.mock.calls.length > 0);
     if (event.name === 'start') (event.data as { nested: number[] }).nested.push(2);
     throw new Error('listener failed');
   });
   const healthy = vi.fn<(event: FiredAnimationEvent) => void>();
-  const unsubscribe = state.onAnimationEvent(healthy);
-  assert.throws(() => state.play(), /listener failed/);
+  const unsubscribe = state.playback.onAnimationEvent(healthy);
+  assert.throws(() => state.playback.play(), /listener failed/);
   assert.deepEqual(healthy.mock.calls[0]![0].data, { nested: [1] });
   assert.deepEqual(state.workingAnimation!.events![1]!.data, { nested: [1] });
   healthy.mockClear();
-  assert.throws(() => state.advancePlayback(1), AggregateError);
+  assert.throws(() => state.playback.advancePlayback(1), AggregateError);
   assert.deepEqual(
     healthy.mock.calls.map(([event]) => event.name),
     ['early', 'left', 'right', 'cloth', 'impact'],
   );
   assert.equal(state.currentTime, 1);
   unsubscribe();
-  assert.throws(() => state.restart(), /listener failed/);
+  assert.throws(() => state.playback.restart(), /listener failed/);
   assert.equal(healthy.mock.calls.length, 5);
 });
 
@@ -263,42 +263,42 @@ test('failing state subscribers cannot consume start, crossing or restart events
   });
   const synchronizedTimes: number[] = [];
   state.subscribe(() => synchronizedTimes.push(state.currentTimeMilliseconds));
-  state.onAnimationEvent(() => {
+  state.playback.onAnimationEvent(() => {
     assert.equal(synchronizedTimes.at(-1), state.currentTimeMilliseconds);
   });
 
-  assert.throws(() => state.play(), failure);
-  assert.isTrue(state.isPlaying);
+  assert.throws(() => state.playback.play(), failure);
+  assert.isTrue(state.playback.isPlaying);
   assert.deepEqual(names(), ['start']);
   events.length = 0;
-  assert.throws(() => state.advancePlayback(1), failure);
+  assert.throws(() => state.playback.advancePlayback(1), failure);
   assert.equal(state.currentTimeMilliseconds, 1000);
   assert.deepEqual(names(), ['early', 'left', 'right', 'cloth', 'impact']);
   events.length = 0;
-  assert.throws(() => state.restart(), failure);
+  assert.throws(() => state.playback.restart(), failure);
   assert.equal(state.currentTimeMilliseconds, 0);
   assert.deepEqual(names(), ['start']);
   release();
-  state.advancePlayback(0.1);
+  state.playback.advancePlayback(0.1);
   assert.deepEqual(names(), ['start', 'early']);
 });
 
 test('playback retains subscriber and event failures after delivering every committed marker', () => {
   const { state, names } = session();
-  state.play();
+  state.playback.play();
   const subscriberFailure = new Error('UI failed');
   const eventFailure = new Error('event listener failed');
   state.subscribe(() => {
     throw subscriberFailure;
   });
-  state.onAnimationEvent(() => {
+  state.playback.onAnimationEvent(() => {
     throw eventFailure;
   });
   const healthy = vi.fn();
-  state.onAnimationEvent(healthy);
+  state.playback.onAnimationEvent(healthy);
   let caught: unknown;
   try {
-    state.advancePlayback(0.5);
+    state.playback.advancePlayback(0.5);
   } catch (error) {
     caught = error;
   }
@@ -311,8 +311,8 @@ test('playback retains subscriber and event failures after delivering every comm
 
 test('stepped pose sampling never quantizes event crossings', () => {
   const { state, names } = session({ ...clip, playback: { mode: 'stepped', fps: 1 } });
-  state.play();
-  state.advancePlayback(0.5);
+  state.playback.play();
+  state.playback.advancePlayback(0.5);
   assert.deepEqual(names(), ['start', 'early', 'left', 'right', 'cloth']);
   assert.equal(state.currentTime, 0.5);
 });
@@ -320,11 +320,11 @@ test('stepped pose sampling never quantizes event crossings', () => {
 test('authored millisecond clock cannot replay a boundary after fractional seconds addition', () => {
   const { state, names } = session();
   state.setCurrentTime(0.3);
-  state.play();
-  state.advancePlayback(0.6);
+  state.playback.play();
+  state.playback.advancePlayback(0.6);
   assert.equal(state.currentTime, 0.9);
   assert.deepEqual(names(), ['right', 'cloth', 'impact']);
-  state.advancePlayback(0.01);
+  state.playback.advancePlayback(0.01);
   assert.deepEqual(names(), ['right', 'cloth', 'impact']);
 });
 
@@ -348,20 +348,20 @@ test.each([250.03, 3.97])('canceling an event drag restores exact %s ms without 
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
   assert.deepEqual(events, []);
-  state.play();
-  state.advancePlayback(0.1);
+  state.playback.play();
+  state.playback.advancePlayback(0.1);
   assert.deepEqual(events, []);
-  state.advancePlayback(1);
+  state.playback.advancePlayback(1);
   assert.deepEqual(names(), ['later']);
 });
 
 test('fractional millisecond marker boundaries remain exact across following updates', () => {
   const timestamp = 0.000000123456789;
   const { state, events } = session({ ...clip, events: [{ time: timestamp, name: 'fractional' }] });
-  state.play();
-  state.advancePlayback(timestamp / 1000);
+  state.playback.play();
+  state.playback.advancePlayback(timestamp / 1000);
   const count = events.length;
-  state.advancePlayback(0.001);
+  state.playback.advancePlayback(0.001);
   assert.equal(events.length, 1);
   assert.equal(count, 1);
 });
@@ -376,14 +376,14 @@ test('editor and runtime preserve fractional loop crossings and close, distinct 
     ],
   };
   const { state, events } = session(input);
-  state.setPreviewLoop(true);
+  state.playback.setPreviewLoop(true);
   const player = new AnimationPlayer(rig, new Map([['root', new Joint('root')]]), [compileClip(input, rig)]);
   const runtime: FiredAnimationEvent[] = [];
   player.onAnimationEvent((event) => runtime.push(event));
-  state.play();
+  state.playback.play();
   player.play(input.name);
   for (const delta of [1.1001, 0.001, 0.999]) {
-    state.advancePlayback(delta);
+    state.playback.advancePlayback(delta);
     player.update(delta * 1000);
     assert.deepEqual(events, runtime);
     assert.equal(state.currentTime * 1000, player.elapsedTime);
@@ -405,11 +405,11 @@ test('editor wrap distinguishes tail markers from tiny markers in the new cycle'
       { time: 1000, name: 'end' },
     ],
   });
-  state.setPreviewLoop(true);
-  state.play();
-  state.advancePlayback(2);
+  state.playback.setPreviewLoop(true);
+  state.playback.play();
+  state.playback.advancePlayback(2);
   events.length = 0;
-  state.advancePlayback(0.001);
+  state.playback.advancePlayback(0.001);
   assert.isEmpty(events);
 });
 
@@ -417,8 +417,8 @@ test('selection seeks to exact fractional authored time and excludes it on the n
   const timestamp = 0.031101767270538955;
   const { state, events } = session({ ...clip, events: [{ time: timestamp, name: 'fractional' }] });
   state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
-  state.play();
-  state.advancePlayback(0.000001);
+  state.playback.play();
+  state.playback.advancePlayback(0.000001);
   assert.deepEqual(events, []);
 });
 

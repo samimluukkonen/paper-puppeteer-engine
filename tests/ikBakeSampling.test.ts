@@ -639,15 +639,15 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     state.undo();
     state.selectBone('upper');
     state.setCurrentTime(0.5);
-    if (mode !== 'paused') state.play();
-    if (mode === 'scrubbing') state.beginScrub();
+    if (mode !== 'paused') state.playback.play();
+    if (mode === 'scrubbing') state.playback.beginScrub();
     if (mode !== 'playing') state.setTemporaryBoneProperty('rotation', 0.6);
     const puppet = new Puppet(puppetScene(), { rig: skeleton, autoUpdate: false });
     const preview = new AnimationEditorPreview(state, puppet);
     const snapshot = () => ({
       time: state.currentTime,
-      playing: state.isPlaying,
-      scrubbing: state.isScrubbing,
+      playing: state.playback.isPlaying,
+      scrubbing: state.playback.isScrubbing,
       history: state.historyLength,
       undo: state.canUndo,
       redo: state.canRedo,
@@ -665,7 +665,7 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const events = vi.fn<(event: FiredAnimationEvent) => void>();
     const runtimeEvents = vi.fn();
     const notifications = vi.fn();
-    const releaseEvent = state.onAnimationEvent(events);
+    const releaseEvent = state.playback.onAnimationEvent(events);
     const release = state.subscribe(notifications);
     puppet.onAnimationEvent(runtimeEvents);
     const sync = vi.spyOn(puppet.posePipeline, 'syncPose');
@@ -688,11 +688,11 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
       assert.equal(runtimeEvents.mock.calls.length, 0);
       assert.equal(sync.mock.calls.length, 0);
       assert.isTrue(reset.mock.instances.every((joint) => joint !== puppet.getBone('upper')));
-      state.pause();
-      state.endScrub();
-      state.restart();
-      state.play();
-      state.advancePlayback(0.35);
+      state.playback.pause();
+      state.playback.endScrub();
+      state.playback.restart();
+      state.playback.play();
+      state.playback.advancePlayback(0.35);
       assert.isTrue(events.mock.calls.some(([event]) => event.name === 'middle'));
       assert.equal(events.mock.calls.filter(([event]) => event.name === 'start').length, 1);
     } finally {

@@ -94,7 +94,7 @@ export class TimelineInputController {
           additive: event.ctrlKey || event.metaKey,
         };
         this.timeline.setPointerCapture(event.pointerId);
-        this.state.beginScrub();
+        this.state.playback.beginScrub();
         this.scrub(event.clientX);
       },
       options,
@@ -164,12 +164,12 @@ export class TimelineInputController {
         ? gesture.state !== this.state ||
           gesture.animation !== this.state.workingAnimation ||
           gesture.tracks !== this.state.timelineTracks ||
-          this.state.isPlaying
+          this.state.playback.isPlaying
         : gesture.kind === 'key-drag'
           ? !this.state.keyframes.keyframeDrag
           : gesture.kind === 'event-drag'
             ? !this.state.events.eventDrag
-            : !this.state.isScrubbing);
+            : !this.state.playback.isScrubbing);
     if (invalid) this.cancelGesture();
   }
 
@@ -262,8 +262,8 @@ export class TimelineInputController {
   }
 
   private beginMarquee(event: PointerEvent): void {
-    this.state.pause();
-    this.state.endScrub();
+    this.state.playback.pause();
+    this.state.playback.endScrub();
     this.state.cancelTransformEdit();
     const bounds = this.timeline.getBoundingClientRect();
     const element = document.createElement('div');
@@ -357,7 +357,7 @@ export class TimelineInputController {
     if (this.timeline.hasPointerCapture(gesture.id)) this.timeline.releasePointerCapture(gesture.id);
     switch (gesture.kind) {
       case 'scrub':
-        this.state.endScrub();
+        this.state.playback.endScrub();
         break;
       case 'key-drag':
         if (commit) this.state.keyframes.commitKeyframeDrag();
@@ -378,12 +378,12 @@ export class TimelineInputController {
     // State-only commands can begin/cancel a drag before a DOM pointer is acquired.
     this.state.keyframes.cancelKeyframeDrag();
     this.state.events.cancelEventDrag();
-    this.state.endScrub();
+    this.state.playback.endScrub();
   }
 
   endScrub(): void {
     if (this.gesture?.kind === 'scrub') this.endGesture(false);
-    else this.state.endScrub();
+    else this.state.playback.endScrub();
   }
 
   dispose(): void {

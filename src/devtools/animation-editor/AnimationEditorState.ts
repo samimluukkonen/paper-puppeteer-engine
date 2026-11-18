@@ -3,10 +3,8 @@ import type {
   Point,
   AnimationClip,
   AnimationLibraryMetadata,
-  AnimationPlaybackMode,
   Interpolation,
   PropertyKeyframe,
-  FiredAnimationEvent,
   AnimationPose,
   ValidationIssue,
   IKBakePlan,
@@ -30,15 +28,17 @@ import {
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
 import { AnimationEditorEventCommands, type AnimationEditorEventHandle } from './AnimationEditorEventCommands.js';
-import { AnimationEditorGraphGestures } from './AnimationEditorGraphGestures.js';
+import { AnimationEditorGraphGestures, type AnimationEditorGraphHandle } from './AnimationEditorGraphGestures.js';
 import { AnimationEditorIKCommands, type AnimationEditorIKHandle } from './AnimationEditorIKCommands.js';
 import {
   AnimationEditorKeyframeCommands,
   type AnimationEditorKeyframeHandle,
 } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
-import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
-import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
+import {
+  AnimationEditorPlaybackController,
+  type AnimationEditorPlaybackHandle,
+} from './AnimationEditorPlaybackController.js';
 import { AnimationEditorPreviewCommands, type AnimationEditorPreviewHandle } from './AnimationEditorPreviewCommands.js';
 import { AnimationEditorRootMotion, type AnimationEditorRootMotionHandle } from './AnimationEditorRootMotion.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
@@ -59,7 +59,6 @@ import {
   sampleGhostPose,
   sampleGhostPoses,
 } from './ghostPoseSampling.js';
-import type { GraphKeyEdit, GraphKeyRef } from './graphEditor.js';
 import {
   getAnimationInterpolation,
   getInterpolationForKeys,
@@ -81,7 +80,7 @@ import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
-export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
+export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackController.js';
 
 export type {
   AnimationEditorStateOptions,
@@ -110,7 +109,7 @@ export class AnimationEditorState {
 
   get previewElapsedTimeMilliseconds(): number {
     return this.previewAnimation === this.workingAnimation || this.previews.trajectoryCopyActive
-      ? this.playback.elapsedTimeMilliseconds
+      ? this.clock.elapsedTimeMilliseconds
       : this.previews.previewTimeMilliseconds;
   }
   private clearRootSelection(): void {
@@ -133,27 +132,9 @@ export class AnimationEditorState {
       this.deformationCommands.previewAnimation ??
       this.previewCommands.variationAnimation ??
       this.rootMotionCommands.previewAnimation ??
-      this.graphGestures.previewAnimation ??
+      this.graphCommands.previewAnimation ??
       this.working
     );
-  }
-  get graphEditActive(): boolean {
-    return this.graphGestures.graphEditActive;
-  }
-  beginGraphEdit(ref: GraphKeyRef): boolean {
-    return this.graphGestures.beginGraphEdit(ref);
-  }
-  previewGraphEdit(edit: GraphKeyEdit): boolean {
-    return this.graphGestures.previewGraphEdit(edit);
-  }
-  cancelGraphEdit(): boolean {
-    return this.graphGestures.cancelGraphEdit();
-  }
-  commitGraphEdit(): boolean {
-    return this.graphGestures.commitGraphEdit();
-  }
-  editGraphKey(ref: GraphKeyRef, edit: GraphKeyEdit): boolean {
-    return this.graphGestures.editGraphKey(ref, edit);
   }
 
   readonly poseLibrary: PoseLibrary;
@@ -195,7 +176,7 @@ export class AnimationEditorState {
       return this.session.commit(() => next, {
         pause: false,
         after: () => {
-          this.pause();
+          this.playback.pause();
           this.previewCommands.clearPose();
         },
       });
@@ -210,14 +191,16 @@ export class AnimationEditorState {
     this.document.replacementGuard = guard;
   }
   private readonly clipboard = new TimelineClipboard();
-  private readonly playback = new AnimationEditorPlayback(
+  private readonly clock = new AnimationEditorPlayback(
     () => this.working?.duration ?? 0,
     () => this.working?.events ?? [],
   );
   private readonly rootMotionCommands: AnimationEditorRootMotion;
   /** Root selection, world-displacement view preferences, root keys and the provisional XY drag. */
   readonly rootMotion: AnimationEditorRootMotionHandle;
-  private readonly graphGestures: AnimationEditorGraphGestures;
+  private readonly graphCommands: AnimationEditorGraphGestures;
+  /** Detached graph-editor curve gestures and one-shot graph key edits. */
+  readonly graph: AnimationEditorGraphHandle;
   private readonly previewCommands: AnimationEditorPreviewCommands;
   /** Detached trajectory, cleanup, variation and pose-library previews outside document history. */
   readonly previews: AnimationEditorPreviewHandle;
@@ -236,7 +219,8 @@ export class AnimationEditorState {
   /** Animation event edits, event clipboard, event drag and event selection. */
   readonly events: AnimationEditorEventHandle;
   private readonly playbackController: AnimationEditorPlaybackController;
-  private readonly playbackCommands: AnimationEditorPlaybackCommands;
+  /** Preview playback, scrubbing, preview preferences, animation events and authored playback metadata. */
+  readonly playback: AnimationEditorPlaybackHandle;
   private importedSessions = 0;
   private animationSessions = 0;
   private symmetry: BoneSymmetryMapping | null;
@@ -263,10 +247,10 @@ export class AnimationEditorState {
       authoringEnabled: () => this.animationAuthoringEnabled,
       working: () => this.working,
       rig: () => this.rig,
-      currentTime: () => this.playback.currentTime,
+      currentTime: () => this.clock.currentTime,
       cancelActiveDrags: () => this.cancelTimelineDrag(),
-      pausePlayback: () => this.pause(),
-      endScrub: () => this.endScrub(),
+      pausePlayback: () => this.playback.pause(),
+      endScrub: () => this.playback.endScrub(),
       updateTime: (time) => this.updateTime(time),
       updateTimeMilliseconds: (time) => this.updateTimeMilliseconds(time),
       clearTransformDraft: () => this.clearTransformDraft(),
@@ -299,7 +283,7 @@ export class AnimationEditorState {
       reconcilePreviews: () => this.previewCommands.reconcile(),
     });
     this.rootMotion = this.rootMotionCommands = new AnimationEditorRootMotion(this, this.session);
-    this.graphGestures = new AnimationEditorGraphGestures(this, this.session);
+    this.graph = this.graphCommands = new AnimationEditorGraphGestures(this, this.session);
     this.previews = this.previewCommands = new AnimationEditorPreviewCommands(this, this.document, this.session);
     this.selection = new AnimationEditorSelection(rig);
     this.deformation = this.deformationCommands = new AnimationEditorDeformationCommands(
@@ -315,13 +299,13 @@ export class AnimationEditorState {
     this.selectionCommands = new AnimationEditorSelectionCommands(
       this.document,
       this.selection,
-      this.playback,
+      this.clock,
       this.session,
     );
     this.keyframes = this.keyframeCommands = new AnimationEditorKeyframeCommands(
       this.document,
       this.selection,
-      this.playback,
+      this.clock,
       this.session,
       this.clipboard,
       this.snapping,
@@ -330,33 +314,39 @@ export class AnimationEditorState {
     this.events = this.eventCommands = new AnimationEditorEventCommands(
       this.document,
       this.selection,
-      this.playback,
+      this.clock,
       this.session,
       this.clipboard,
       this.snapping,
     );
-    this.playbackController = new AnimationEditorPlaybackController(this.document, this.selection, this.playback, {
-      notify: () => this.notify(),
-      navigate: (time) => this.setCurrentTime(time),
-      isDragging: () =>
-        !!(
-          this.keyframes.keyframeDrag ||
-          this.events.eventDrag ||
-          this.ik.ikTargetDrag ||
-          this.graphEditActive ||
-          this.rootMotion.rootMotionDragActive ||
-          this.deformation.deformationEditActive
-        ),
-    });
-    this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, this.session);
+    this.playback = this.playbackController = new AnimationEditorPlaybackController(
+      this.document,
+      this.selection,
+      this.clock,
+      this.session,
+      {
+        navigate: (time) => this.setCurrentTime(time),
+        authoringEnabled: () => this.animationAuthoringEnabled,
+        cancelCleanupPreview: () => this.previews.cancelCleanupPreview(),
+        isDragging: () =>
+          !!(
+            this.keyframes.keyframeDrag ||
+            this.events.eventDrag ||
+            this.ik.ikTargetDrag ||
+            this.graph.graphEditActive ||
+            this.rootMotion.rootMotionDragActive ||
+            this.deformation.deformationEditActive
+          ),
+      },
+    );
     this.ik = new AnimationEditorIKCommands(
       this.document,
       this.selection,
-      this.playback,
+      this.clock,
       this.snapping,
       this.session,
       () =>
-        this.graphEditActive || this.previewCommands.hasIKPreview
+        this.graph.graphEditActive || this.previewCommands.hasIKPreview
           ? { animation: this.previewAnimation!, timeMs: this.previews.previewTimeMilliseconds }
           : null,
     );
@@ -383,8 +373,8 @@ export class AnimationEditorState {
       this.cancelTimelineDrag();
       this.cancelTransformEdit();
       this.ik.cancelIKEdit();
-      this.pause();
-      this.endScrub();
+      this.playback.pause();
+      this.playback.endScrub();
       this.mode = mode;
       this.updateTimeMilliseconds(heldTime);
       this.notify();
@@ -395,7 +385,7 @@ export class AnimationEditorState {
   updatePreviewRig(rig: Rig): void {
     if (rig === this.rig) return;
     this.rootMotion.cancelRootMotionDrag();
-    this.cancelGraphEdit();
+    this.graph.cancelGraphEdit();
     this.document.rig = rig;
     this.selection.updateRig(rig);
     this.symmetry = createBoneSymmetryMapping(rig, { manualPairs: this.symmetry?.pairs ?? [] }).mapping;
@@ -491,7 +481,7 @@ export class AnimationEditorState {
     const root = this.rootMotion.cancelRootMotionDrag();
     const cleanup = this.previews.cancelCleanupPreview();
     const variation = this.previews.cancelVariationPreview();
-    const graph = this.cancelGraphEdit();
+    const graph = this.graph.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.events.cancelEventDrag();
     return this.keyframes.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root || deformation;
@@ -547,7 +537,7 @@ export class AnimationEditorState {
     if (this.rootMotion.rootMotionSelected && this.rootMotion.selectedRootKey) {
       const key = this.rootMotion.selectedRootKey;
       try {
-        return this.editGraphKey(
+        return this.graph.editGraphKey(
           { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
           { time: key.time + (direction * (large ? 10 : 1)) / this.keyframes.keyframeFPS },
         );
@@ -689,7 +679,7 @@ export class AnimationEditorState {
     if (!this.animationAuthoringEnabled) return;
     return this.batchNotifications(() => {
       this.cancelTimelineDrag();
-      if (this.selection.boneId && this.working) this.pause();
+      if (this.selection.boneId && this.working) this.playback.pause();
     });
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
@@ -698,7 +688,7 @@ export class AnimationEditorState {
       if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
         return false;
       this.cancelTimelineDrag();
-      this.playback.pause();
+      this.clock.pause();
       this.selection.setDraft(property, value);
       this.notify();
       return true;
@@ -742,25 +732,13 @@ export class AnimationEditorState {
     return this.working;
   }
   get currentTimeMilliseconds(): Milliseconds {
-    return this.playback.currentTimeMilliseconds;
+    return this.clock.currentTimeMilliseconds;
   }
   get currentTime(): Seconds {
-    return this.playback.currentTime;
+    return this.clock.currentTime;
   }
   get duration(): Seconds {
     return animationDurationSeconds(this.working);
-  }
-  get isPlaying(): boolean {
-    return this.playback.isPlaying;
-  }
-  get previewLoop(): boolean {
-    return this.playback.previewLoop;
-  }
-  get playbackSpeed(): number {
-    return this.playback.playbackSpeed;
-  }
-  get isScrubbing(): boolean {
-    return this.playback.isScrubbing;
   }
   get loop(): boolean {
     return this.working?.loop ?? false;
@@ -772,7 +750,7 @@ export class AnimationEditorState {
       !!this.keyframes.keyframeDrag ||
       !!this.events.eventDrag ||
       !!this.ik.ikTargetDrag ||
-      this.graphEditActive ||
+      this.graph.graphEditActive ||
       this.rootMotion.rootMotionDragActive ||
       this.deformation.deformationEditActive
     );
@@ -853,26 +831,6 @@ export class AnimationEditorState {
     return this.playbackController.setCurrentTimeMilliseconds(time);
   }
 
-  /** Preview preferences stay outside authored data and history. */
-  setPreviewLoop(loop: boolean): void {
-    this.playbackController.setPreviewLoop(loop);
-  }
-
-  setPlaybackSpeed(speed: number): boolean {
-    return this.playbackController.setPlaybackSpeed(speed);
-  }
-
-  /** Authored metadata edits share the session's atomic notification boundary. */
-  setAuthoredFPS(fps: number): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.playbackCommands.setAuthoredFPS(fps));
-  }
-
-  setAuthoredPlaybackMode(mode: AnimationPlaybackMode['mode']): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.playbackCommands.setAuthoredPlaybackMode(mode));
-  }
-
   get authoredInterpolation(): Interpolation | undefined {
     return getAnimationInterpolation(this.working);
   }
@@ -911,19 +869,19 @@ export class AnimationEditorState {
     timeSeconds = this.currentTime,
   ): PropertyKeyframe | undefined {
     return this.working
-      ? findBonePropertyKeyframe(this.working, boneId, property, this.playback.resolveTimeMilliseconds(timeSeconds))
+      ? findBonePropertyKeyframe(this.working, boneId, property, this.clock.resolveTimeMilliseconds(timeSeconds))
       : undefined;
   }
 
   hasKeyframeAtTime(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
     return this.working
-      ? hasKeyframeAtTime(this.working, boneId, property, this.playback.resolveTimeMilliseconds(timeSeconds))
+      ? hasKeyframeAtTime(this.working, boneId, property, this.clock.resolveTimeMilliseconds(timeSeconds))
       : false;
   }
 
   getKeyedPropertiesAtTime(boneId: string, timeSeconds = this.currentTime): TransformProperty[] {
     return this.working
-      ? getKeyedPropertiesAtTime(this.working, boneId, this.playback.resolveTimeMilliseconds(timeSeconds))
+      ? getKeyedPropertiesAtTime(this.working, boneId, this.clock.resolveTimeMilliseconds(timeSeconds))
       : [];
   }
 
@@ -940,7 +898,7 @@ export class AnimationEditorState {
           property,
           timeSeconds === this.currentTime
             ? this.previews.previewTimeMilliseconds
-            : this.playback.resolveTimeMilliseconds(timeSeconds),
+            : this.clock.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
   }
@@ -953,7 +911,7 @@ export class AnimationEditorState {
           boneId,
           timeSeconds === this.currentTime
             ? this.previews.previewTimeMilliseconds
-            : this.playback.resolveTimeMilliseconds(timeSeconds),
+            : this.clock.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
   }
@@ -966,51 +924,6 @@ export class AnimationEditorState {
   /** Up to three spaced authored poses per direction; never moves or notifies the editor clock. */
   sampleGhostPoses(settings: GhostSamplingSettings = {}): GhostPoseSample[] {
     return sampleGhostPoses(this.working, this.rig, this.currentTime, settings);
-  }
-
-  /** Keep playback intent while the pointer owns time; pause/play can still change that intent. */
-  beginScrub(): void {
-    if (!this.animationAuthoringEnabled) return;
-    return this.batchNotifications(() => {
-      this.cancelTimelineDrag();
-      this.playbackController.beginScrub();
-    });
-  }
-
-  endScrub(): void {
-    this.playbackController.endScrub();
-  }
-
-  play(): void {
-    if (!this.animationAuthoringEnabled) return;
-    this.previews.cancelCleanupPreview();
-    this.playbackController.play();
-  }
-
-  pause(): void {
-    this.playbackController.pause();
-  }
-
-  togglePlayback(): void {
-    if (!this.animationAuthoringEnabled) return;
-    this.previews.cancelCleanupPreview();
-    this.playbackController.togglePlayback();
-  }
-
-  restart(): void {
-    if (!this.animationAuthoringEnabled) return;
-    this.playbackController.restart();
-  }
-
-  /** Phaser supplies elapsed milliseconds; the scene converts them to continuous seconds here. */
-  advancePlayback(deltaSeconds: Seconds): void {
-    if (!this.animationAuthoringEnabled) return;
-    this.playbackController.advancePlayback(deltaSeconds);
-  }
-
-  /** Runtime-compatible notifications are delivered after preview subscribers synchronize the held pose. */
-  onAnimationEvent(listener: (event: FiredAnimationEvent) => void): () => void {
-    return this.playbackController.onAnimationEvent(listener);
   }
 
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
@@ -1065,14 +978,14 @@ export class AnimationEditorState {
     this.clearRootSelection();
     this.rootMotion.rootMotionEditing = false;
     this.previewCommands.reset();
-    this.cancelGraphEdit();
+    this.graph.cancelGraphEdit();
     this.ik.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframeCommands.resetSession();
     this.eventCommands.resetSession();
     this.selection.resetAnimation();
     if (clearBone) this.selection.selectBone(null);
-    this.playback.reset();
+    this.clock.reset();
   }
 
   /** Revert uses the current session's source, never a network reload or the last exported copy. */

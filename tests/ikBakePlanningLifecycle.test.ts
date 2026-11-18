@@ -184,10 +184,10 @@ test('a source edit during pause prevents installation of a previously verified 
   controller.setConstraint('arm', true);
   await vi.advanceTimersByTimeAsync(200);
   await finish(0);
-  state.play();
+  state.playback.play();
   let edited = false;
   const release = state.subscribe(() => {
-    if (!state.isPlaying && !edited) {
+    if (!state.playback.isPlaying && !edited) {
       edited = true;
       state.keyframes.setBonePropertyKeyframe('upper', 'rotation', 0.8);
     }

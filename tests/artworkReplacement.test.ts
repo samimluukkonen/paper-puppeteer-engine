@@ -382,9 +382,9 @@ test('preview, cancel, commit, superseding and revert preserve originals and aut
   assert.isFalse(rigEditor.dirty);
   assert.strictEqual(f.puppet.getBone('forearm').container.parentContainer, hierarchy);
   state.selectAnimation('walk');
-  state.play();
-  state.advancePlayback(0.2);
-  state.pause();
+  state.playback.play();
+  state.playback.advancePlayback(0.2);
+  state.playback.pause();
   assert.isFalse(state.dirty);
   assert.equal(f.puppet.getSlotImage('arm')!.texture.key, artwork.texture.key);
   f.controller.revert();
@@ -1077,9 +1077,9 @@ test('idle, walk, attack, IK, baked IK and mirrored motion preserve every sample
         assert.equal(f.puppet.getSlotImage('arm')!.texture.key, textureKey);
       }
       state.setCurrentTime(0);
-      state.play();
-      state.advancePlayback(0.25);
-      state.pause();
+      state.playback.play();
+      state.playback.advancePlayback(0.25);
+      state.playback.pause();
       assert.deepEqual(pose(), expected.get(`${animation.name}:0.25`));
     }
   assert.equal(f.add.mock.calls.length, registrations, 'playback never re-registers textures');

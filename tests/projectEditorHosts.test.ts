@@ -121,7 +121,7 @@ test('renderer cache suspends inactive hosts and evicts LRU renderers without lo
       expect(
         document.animation.createDerivedAnimation({ name: 'draft', duration: 1000, loop: false, tracks: {} }),
       ).toBe(true);
-      expect(document.animation.setAuthoredPlaybackMode('stepped')).toBe(true);
+      expect(document.animation.playback.setAuthoredPlaybackMode('stepped')).toBe(true);
       const unbind = characterContext(host).bindCharacter(
         () => false,
         () => {},

@@ -92,22 +92,22 @@ test('input disposal ends scrubbing, releases capture, and permits remount witho
   const { browser, timeline, create } = inputFixture(() => current);
   const first = create();
   timeline.dispatchEvent(pointer('pointerdown'));
-  assert.isTrue(previous.isScrubbing);
+  assert.isTrue(previous.playback.isScrubbing);
   assert.equal(previous.currentTime, 0.5);
   assert.isTrue(timeline.captures.has(1));
   first.dispose();
   first.dispose();
-  assert.isFalse(previous.isScrubbing);
+  assert.isFalse(previous.playback.isScrubbing);
   assert.equal(timeline.captures.size, 0);
   timeline.dispatchEvent(pointer('pointerdown', 75));
   browser.dispatchEvent(space());
   assert.equal(previous.currentTime, 0.5);
-  assert.isFalse(previous.isPlaying);
+  assert.isFalse(previous.playback.isPlaying);
   current = state();
   const second = create();
   browser.dispatchEvent(space());
-  assert.isTrue(current.isPlaying);
-  assert.isFalse(previous.isPlaying);
+  assert.isTrue(current.playback.isPlaying);
+  assert.isFalse(previous.playback.isPlaying);
   second.dispose();
 });
 
@@ -145,7 +145,7 @@ test('a key drag ignores other pointers and commits once when releasing capture 
   timeline.dispatchEvent(pointer('pointercancel', 90, 2));
   timeline.dispatchEvent(pointer('pointerup', 90, 2));
   assert.equal(current.keyframes.keyframeDrag?.previewTime, 0);
-  assert.isFalse(current.isScrubbing);
+  assert.isFalse(current.playback.isScrubbing);
   assert.deepEqual([...timeline.captures], [1]);
   timeline.dispatchEvent(pointer('pointermove', 75));
   timeline.dispatchEvent(pointer('pointerup', 75));
@@ -166,20 +166,20 @@ test('session actions follow replacements and disposed controls do not handle re
   const previous = current;
   const first = new TimelineSessionController(app, () => current, { endScrub() {} });
   await query('#play-pause').click();
-  assert.isTrue(previous.isPlaying);
+  assert.isTrue(previous.playback.isPlaying);
   current = state();
   await query('#play-pause').click();
-  assert.isTrue(current.isPlaying);
-  current.pause();
+  assert.isTrue(current.playback.isPlaying);
+  current.playback.pause();
   first.dispose();
   first.dispose();
   const second = new TimelineSessionController(app, () => current, { endScrub() {} });
   await query('#play-pause').click();
-  assert.isTrue(current.isPlaying);
-  assert.isTrue(previous.isPlaying);
+  assert.isTrue(current.playback.isPlaying);
+  assert.isTrue(previous.playback.isPlaying);
   second.dispose();
   await query('#play-pause').click();
-  assert.isTrue(current.isPlaying);
+  assert.isTrue(current.playback.isPlaying);
 });
 
 test('event pointer movement commits once, preserves identity and cancels cleanly across capture lifecycle', () => {

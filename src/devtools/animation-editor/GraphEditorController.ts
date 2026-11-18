@@ -278,7 +278,7 @@ export class GraphEditorController {
   private edit(edit: GraphKeyEdit): void {
     const ref = this.ref();
     if (!ref) return;
-    this.run(() => this.getState().editGraphKey(ref, edit));
+    this.run(() => this.getState().graph.editGraphKey(ref, edit));
     this.rendered = [];
     this.render();
   }
@@ -327,7 +327,7 @@ export class GraphEditorController {
       const ref = { channel, time: toSeconds(key.time) };
       // Selecting a tangent must keep the held playhead for a useful live curve preview.
       if (!hit.dataset.handle) this.select(ref);
-      if (!this.getState().beginGraphEdit(ref)) return;
+      if (!this.getState().graph.beginGraphEdit(ref)) return;
       this.drag = {
         ...base,
         kind: hit.dataset.handle === 'control1' ? 'control1' : hit.dataset.handle === 'control2' ? 'control2' : 'key',
@@ -337,7 +337,7 @@ export class GraphEditorController {
         raw: graphKeys(animation, channel)[index]!.value,
       };
     } else {
-      this.getState().pause();
+      this.getState().playback.pause();
       this.drag = { ...base, kind: 'scrub' };
       this.getState().setCurrentTime(pointToGraph(point.x, point.y, this.view, this.width, this.height).time);
     }
@@ -385,13 +385,13 @@ export class GraphEditorController {
       };
     }
     // Every published preview has passed the same authored validation boundary.
-    this.run(() => this.getState().previewGraphEdit(edit));
+    this.run(() => this.getState().graph.previewGraphEdit(edit));
   }
   private end(): void {
     const drag = this.drag;
     if (!drag) return;
     this.drag = undefined;
-    if (drag.kind !== 'pan' && drag.kind !== 'scrub') this.run(() => this.getState().commitGraphEdit());
+    if (drag.kind !== 'pan' && drag.kind !== 'scrub') this.run(() => this.getState().graph.commitGraphEdit());
     if (this.canvas.hasPointerCapture(drag.pointer)) this.canvas.releasePointerCapture(drag.pointer);
     this.rendered = [];
     this.render();
@@ -399,7 +399,7 @@ export class GraphEditorController {
   cancelGesture(): void {
     const drag = this.drag;
     this.drag = undefined;
-    this.owner?.cancelGraphEdit();
+    this.owner?.graph.cancelGraphEdit();
     if (drag && this.canvas.hasPointerCapture(drag.pointer)) this.canvas.releasePointerCapture(drag.pointer);
   }
   private keydown(event: KeyboardEvent): void {
@@ -449,7 +449,7 @@ export class GraphEditorController {
       this.context = '';
       this.view = undefined;
     }
-    if (this.drag && this.drag.kind !== 'pan' && this.drag.kind !== 'scrub' && !state.graphEditActive)
+    if (this.drag && this.drag.kind !== 'pan' && this.drag.kind !== 'scrub' && !state.graph.graphEditActive)
       this.cancelGesture();
     if (!this.active) return;
     const animation = state.previewAnimation;

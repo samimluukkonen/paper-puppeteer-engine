@@ -1,6 +1,6 @@
 import { ANIMATION_FORMAT_VERSION, AnimationValidationError } from '../../engine/core.js';
 import type { Rig } from '../../engine/data.js';
-import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackCommands.js';
+import { AUTHORED_FPS_MAX, AUTHORED_FPS_MIN } from './AnimationEditorPlaybackController.js';
 import { inspectEditorAnimation, type ReadonlyAnimation } from './validatedAnimation.js';
 
 export interface NewAnimationOptions {

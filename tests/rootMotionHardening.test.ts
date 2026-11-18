@@ -62,7 +62,7 @@ function fixture() {
   state.rootMotion.setRootPosition({ x: 10, y: 20 }, 0.25);
   state.rootMotion.setRootPosition({ x: 90, y: 20 }, 0.6);
   state.rootMotion.setRootPosition({ x: 90, y: 20 }, 1);
-  state.editGraphKey(
+  state.graph.editGraphKey(
     { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.25 },
     {
       curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } },

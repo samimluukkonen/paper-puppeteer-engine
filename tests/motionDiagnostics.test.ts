@@ -219,7 +219,7 @@ test('controller manual report, preview/cancel, timeline inspection, explicit at
   const authored = state.workingAnimation!;
   const json = state.exportJson();
   const events = vi.fn();
-  state.onAnimationEvent(events);
+  state.playback.onAnimationEvent(events);
   assert.isNull(controller.getSnapshot().report);
   assert.isFalse(controller.apply());
   assert.isTrue(controller.run());
@@ -267,9 +267,9 @@ test('preview invalidates on selection, edits, options, playback, sessions, mode
   state.selectKeyframe({ boneId: 'free', property: 'x', time: 0.5 });
   assert.isNull(controller.getSnapshot().preview);
   controller.previewCleanup();
-  state.play();
+  state.playback.play();
   assert.isNull(controller.getSnapshot().preview);
-  state.pause();
+  state.playback.pause();
   controller.previewCleanup();
   state.keyframes.setBonePropertyKeyframe('free', 'y', 5);
   assert.isNull(controller.getSnapshot().report);

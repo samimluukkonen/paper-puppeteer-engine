@@ -255,14 +255,14 @@ test('filtering preserves source, working animation, rig, dirty/history/redo, ex
   state.revealTimelineSelection();
   const rows = state.timelineTracks;
   const visibility = state.timelineVisibility;
-  state.play();
-  state.advancePlayback(0.25);
+  state.playback.play();
+  state.playback.advancePlayback(0.25);
   assert.equal(state.currentTime, 0.25);
   assert.strictEqual(state.timelineTracks, rows);
   assert.strictEqual(state.timelineVisibility, visibility);
-  state.beginScrub();
+  state.playback.beginScrub();
   state.setCurrentTime(0.6);
-  state.endScrub();
+  state.playback.endScrub();
   assert.strictEqual(state.workingAnimation, working);
   assert.strictEqual(state.sourceAnimation, source);
   assert.equal(state.exportJson(), exported);

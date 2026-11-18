@@ -189,10 +189,10 @@ export class BoneInspectorController {
       this.bone !== state?.selectedBoneId ||
       this.time !== state?.currentTime ||
       this.animation !== state?.previewAnimation ||
-      this.scrubbing !== state?.isScrubbing;
+      this.scrubbing !== state?.playback.isScrubbing;
     const previousDraft = this.draft;
     this.draft = state?.boneTransformDraft;
-    this.scrubbing = state?.isScrubbing;
+    this.scrubbing = state?.playback.isScrubbing;
     this.bone = state?.selectedBoneId;
     this.time = state?.currentTime;
     this.animation = state?.previewAnimation;

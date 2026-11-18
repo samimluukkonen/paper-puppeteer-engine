@@ -101,7 +101,7 @@ export class RootMotionController {
         const key = this.state?.rootMotion.selectedRootKey;
         if (key)
           this.run(() =>
-            this.state?.editGraphKey(
+            this.state?.graph.editGraphKey(
               { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
               { time: this.number(ANIMATION_IDS.rootKeyTime), value: this.number(ANIMATION_IDS.rootKeyValue) },
             ),
@@ -147,7 +147,7 @@ export class RootMotionController {
     this.cancel();
     this.state.rootMotion.selectRootMotion(property, time);
     const ref = { channel: { kind: 'root', id: 'Root Motion', property }, time } as const;
-    if (!this.state.beginGraphEdit(ref)) return;
+    if (!this.state.graph.beginGraphEdit(ref)) return;
     this.drag = { pointer: event.pointerId, startX: event.clientX, ref, marker, moved: false };
     marker.focus();
     marker.setPointerCapture(event.pointerId);
@@ -162,14 +162,14 @@ export class RootMotionController {
     if (!event.shiftKey && state.timelineSnapSettings.enabled && state.timelineSnapSettings.frames)
       time = Math.round(time * state.keyframes.keyframeFPS) / state.keyframes.keyframeFPS;
     time = Math.max(0, Math.min(state.duration, time));
-    if (this.run(() => state.previewGraphEdit({ time })))
+    if (this.run(() => state.graph.previewGraphEdit({ time })))
       drag.marker.style.left = `${timeToTimelineX(time, state.duration, this.width)}px`;
   };
   private up = (event: PointerEvent): void => {
     if (event.pointerId !== this.drag?.pointer) return;
     this.move(event);
     this.release();
-    this.run(() => this.state?.commitGraphEdit());
+    this.run(() => this.state?.graph.commitGraphEdit());
   };
   private release(): void {
     const drag = this.drag;
@@ -179,7 +179,7 @@ export class RootMotionController {
   private cancel = (): void => {
     if (!this.drag) return;
     this.release();
-    this.state?.cancelGraphEdit();
+    this.state?.graph.cancelGraphEdit();
   };
   render(state: AnimationEditorState, width: number): void {
     if (state !== this.state || this.session !== state.sessionRevision) {
@@ -187,7 +187,7 @@ export class RootMotionController {
       this.state = state;
       this.session = state.sessionRevision;
     }
-    if (this.drag && (!state.graphEditActive || width !== this.width)) this.cancel();
+    if (this.drag && (!state.graph.graphEditActive || width !== this.width)) this.cancel();
     const changed = this.document !== state.workingAnimation || this.renderedState !== state;
     const restoreFocus = changed && [...this.markers.values()].some((marker) => marker === document.activeElement);
     this.document = state.workingAnimation;

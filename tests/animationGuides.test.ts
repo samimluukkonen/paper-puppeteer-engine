@@ -142,7 +142,7 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
       dirty: animation.dirty,
       rigDirty: rig.dirty,
       time: animation.currentTime,
-      playing: animation.isPlaying,
+      playing: animation.playback.isPlaying,
       selection: animation.selectedBoneId,
       ik: animation.ik.selectedIKConstraintId,
       draft: animation.boneTransformDraft,
@@ -182,7 +182,7 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     assert.equal(animation.dirty, before.dirty);
     assert.equal(rig.dirty, before.rigDirty);
     assert.equal(animation.currentTime, before.time);
-    assert.equal(animation.isPlaying, before.playing);
+    assert.equal(animation.playback.isPlaying, before.playing);
     assert.equal(animation.selectedBoneId, before.selection);
     assert.equal(animation.ik.selectedIKConstraintId, before.ik);
     assert.deepEqual(animation.boneTransformDraft, before.draft);
@@ -219,9 +219,9 @@ test.each([false, true])(
       });
     }
     animation.setCurrentTime(0.3);
-    animation.setPreviewLoop(true);
-    animation.setPlaybackSpeed(2);
-    animation.play();
+    animation.playback.setPreviewLoop(true);
+    animation.playback.setPlaybackSpeed(2);
+    animation.playback.play();
     const before = {
       environment: environment.getSnapshot(),
       motion: motion.getSnapshot(),
@@ -230,7 +230,7 @@ test.each([false, true])(
       dirty: animation.dirty,
     };
     const events = vi.fn();
-    animation.onAnimationEvent(events);
+    animation.playback.onAnimationEvent(events);
     launcher.refresh();
     assert.isTrue(launcher.getAvailability(guide.id).available);
     assert.lengthOf(guide.steps, 10);
@@ -252,9 +252,9 @@ test.each([false, true])(
     assert.equal(animation.historyLength, before.history);
     assert.equal(animation.dirty, before.dirty);
     assert.equal(animation.currentTime, 0.3);
-    assert.isTrue(animation.isPlaying);
-    assert.isTrue(animation.previewLoop);
-    assert.equal(animation.playbackSpeed, 2);
+    assert.isTrue(animation.playback.isPlaying);
+    assert.isTrue(animation.playback.previewLoop);
+    assert.equal(animation.playback.playbackSpeed, 2);
     assert.lengthOf(events.mock.calls, 0);
     const instructions = guide.steps.map((step) => step.description).join(' ');
     for (const phrase of [
@@ -373,7 +373,7 @@ test.each([false, true])(
       animation.undo();
     }
     animation.setCurrentTime(0.3);
-    animation.play();
+    animation.playback.play();
     launcher.refresh();
     const snapshot = () => ({
       clip: animation.workingAnimation,
@@ -384,7 +384,7 @@ test.each([false, true])(
       redo: animation.canRedo,
       dirty: animation.dirty,
       time: animation.currentTime,
-      playing: animation.isPlaying,
+      playing: animation.playback.isPlaying,
       mode: animation.deformation.deformationEditing,
       mesh: animation.deformation.selectedMeshId,
       selected: animation.deformation.deformationSelected,

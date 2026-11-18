@@ -167,15 +167,15 @@ test('provisional drag follows the sole clock and blocks playback without histor
   const { state, input } = session();
   const before = state.workingAnimation;
   const source = state.sourceAnimation;
-  state.play();
+  state.playback.play();
   assert.isTrue(state.keyframes.beginKeyframeDrag(state.selectedKeyframe!));
   state.keyframes.previewKeyframeDrag(0.8);
   assert.equal(state.currentTime, 0.8);
   assert.equal(state.keyframes.keyframeDrag?.previewTime, 0.8);
   assert.equal(state.selectedKeyframe?.time, 0.5);
-  state.play();
-  state.advancePlayback(0.1);
-  assert.isFalse(state.isPlaying);
+  state.playback.play();
+  state.playback.advancePlayback(0.1);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.currentTime, 0.8);
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
@@ -191,7 +191,7 @@ test('provisional drag follows the sole clock and blocks playback without histor
   assert.equal(state.selectedTimelineProperty, 'rotation');
   assert.equal(state.selectedBoneTransform?.rotation, 0.3);
   assert.isTrue(state.hasKeyframeAtTime('root', 'rotation'));
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   state.undo();
   assert.strictEqual(state.workingAnimation, before);
   assert.isNull(state.selectedKeyframe, 'history validates transient selection rather than restoring it');
@@ -242,8 +242,8 @@ test('cancelled drag and unchanged gestures preserve authored data, saved state,
 
 test('snap preference is transient, authored FPS drives gestures, Shift bypasses drag snapping', () => {
   const { state } = session();
-  state.setAuthoredPlaybackMode('stepped');
-  state.setAuthoredFPS(20);
+  state.playback.setAuthoredPlaybackMode('stepped');
+  state.playback.setAuthoredFPS(20);
   state.markSaved();
   state.setKeyframeSnapMode('frame');
   const history = state.historyLength;
@@ -261,12 +261,12 @@ test('snap preference is transient, authored FPS drives gestures, Shift bypasses
 test('keyboard nudge follows selection, pauses, clamps and records one action per change', () => {
   const { state } = session();
   const before = state.workingAnimation;
-  state.play();
+  state.playback.play();
   state.setCurrentTime(0.7);
   state.nudgeSelectedKeyframe(1);
   assert.approximately(state.selectedKeyframe!.time, 0.51, 1e-12);
   assert.equal(state.currentTime, state.selectedKeyframe!.time);
-  assert.isFalse(state.isPlaying);
+  assert.isFalse(state.playback.isPlaying);
   assert.equal(state.historyLength, 1);
   const moved = state.workingAnimation;
   state.undo();
@@ -294,8 +294,8 @@ test.each(['undo', 'navigation', 'selection', 'settings', 'scrub', 'animation', 
     if (boundary === 'undo') state.undo();
     if (boundary === 'navigation') state.setCurrentTime(0.2);
     if (boundary === 'selection') state.selectBone('arm');
-    if (boundary === 'settings') state.setAuthoredPlaybackMode('stepped');
-    if (boundary === 'scrub') state.beginScrub();
+    if (boundary === 'settings') state.playback.setAuthoredPlaybackMode('stepped');
+    if (boundary === 'scrub') state.playback.beginScrub();
     if (boundary === 'animation') state.selectAnimation(null);
     if (boundary === 'collapse') state.setTimelineBoneExpanded('root', false);
     assert.isNull(state.keyframes.keyframeDrag);

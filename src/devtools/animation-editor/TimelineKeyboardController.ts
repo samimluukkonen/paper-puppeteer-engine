@@ -153,9 +153,9 @@ export class TimelineKeyboardController {
         event.preventDefault();
         if (!event.repeat) {
           if (event.key === 'Home') {
-            this.state.restart();
+            this.state.playback.restart();
             this.gestures.navigation?.centerPlayhead();
-          } else this.state.togglePlayback();
+          } else this.state.playback.togglePlayback();
         }
       },
       options,
