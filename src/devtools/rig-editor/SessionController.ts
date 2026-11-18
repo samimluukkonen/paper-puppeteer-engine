@@ -6,7 +6,9 @@ import {
   type JsonWorkloadLimitOptions,
 } from '../../engine/core.js';
 import { downloadJson } from '../../shared/downloadJson.js';
+import { requireElement } from '../shared/editorElements.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
+import { RIG_IDS, RIG_SESSION_IDS, type RigSessionElementIds } from './elementIds.js';
 import type { RigEditor } from './RigEditor.js';
 import { serializeRigJson } from './rigSerialization.js';
 
@@ -32,22 +34,24 @@ export function createSessionController(
   onStateChange: (editor: RigEditor) => void = () => {},
   inputLimits: JsonWorkloadLimitOptions = {},
   presentation: {
-    idPrefix?: string;
-    stageSelector?: string;
+    /** Which copy of the session controls to bind; defaults to the rig editor's own. */
+    ids?: RigSessionElementIds;
+    /** The preview stage that shows the snapping grid; defaults to the rig editor's stage. */
+    stageId?: string;
     dirtyLabel?: string;
     sessionFormat?: 'text' | 'table';
     hasPendingChanges?: () => boolean;
   } = {},
 ) {
   const lifetime = new AbortController();
-  const prefix = presentation.idPrefix ?? '';
+  const ids = presentation.ids ?? RIG_SESSION_IDS;
   let editor: RigEditor | undefined;
   let rigRevision: number | undefined;
-  const dirty = app.querySelector<HTMLElement>(`#${prefix}dirty-status`)!;
-  const session = app.querySelector<HTMLElement>(`#${prefix}session-status`)!;
+  const dirty = requireElement(app, ids.dirtyStatus, HTMLElement);
+  const session = requireElement(app, ids.sessionStatus, HTMLElement);
   let sessionCells: HTMLTableCellElement[] | undefined;
-  const validation = app.querySelector<HTMLElement>(`#${prefix}validation`)!;
-  const feedback = app.querySelector<HTMLElement>(`#${prefix}action-feedback`)!;
+  const validation = requireElement(app, ids.validation, HTMLElement);
+  const feedback = requireElement(app, ids.actionFeedback, HTMLElement);
   let lastExport: RigJsonDefinition | undefined;
   let lastExportFilename: string | undefined;
   const requests = new SessionActionGuard(lifetime.signal);
@@ -65,9 +69,10 @@ export function createSessionController(
       : isDirty
         ? 'Unsaved changes *'
         : 'No changes';
-    app
-      .querySelector(presentation.stageSelector ?? '#editor-stage')!
-      .classList.toggle('grid-active', current.state.gridSnap !== 0);
+    requireElement(app, presentation.stageId ?? RIG_IDS.stage, HTMLElement).classList.toggle(
+      'grid-active',
+      current.state.gridSnap !== 0,
+    );
     const issues = current.state.validationIssues();
     const validationStatus = current.state.validationPending
       ? 'Pending'
@@ -113,13 +118,13 @@ export function createSessionController(
     } else {
       session.textContent = sessionRows.map(([label, value]) => `${label}: ${value}`).join('\n');
     }
-    app.querySelector<HTMLButtonElement>(`#${prefix}undo`)!.disabled = !current.state.canUndo;
-    app.querySelector<HTMLButtonElement>(`#${prefix}redo`)!.disabled = !current.state.canRedo;
-    app.querySelector<HTMLButtonElement>(`#${prefix}reset-selected`)!.disabled = !current.state.selection;
+    requireElement(app, ids.undo, HTMLButtonElement).disabled = !current.state.canUndo;
+    requireElement(app, ids.redo, HTMLButtonElement).disabled = !current.state.canRedo;
+    requireElement(app, ids.resetSelected, HTMLButtonElement).disabled = !current.state.selection;
   }
 
   const action = (id: string, run: () => void | Promise<void>): void => {
-    app.querySelector<HTMLButtonElement>(`#${prefix}${id}`)!.addEventListener(
+    requireElement(app, id, HTMLButtonElement).addEventListener(
       'click',
       () => {
         try {
@@ -135,15 +140,15 @@ export function createSessionController(
       { signal: lifetime.signal },
     );
   };
-  action('undo', () => editor?.undo());
-  action('redo', () => editor?.redo());
-  action('reset-selected', () => editor?.resetSelected());
-  action('reset-rig', () => {
+  action(ids.undo, () => editor?.undo());
+  action(ids.redo, () => editor?.redo());
+  action(ids.resetSelected, () => editor?.resetSelected());
+  action(ids.resetRig, () => {
     if (!confirmReplacement('Reset rig edits to the session start?')) return;
     editor?.resetRig();
     feedback.textContent = 'Rig reset to session start.';
   });
-  action('validate-rig', () => {
+  action(ids.validateRig, () => {
     if (!editor) return;
     editor.state.validate();
     const issues = editor.state.validationIssues();
@@ -190,7 +195,7 @@ export function createSessionController(
     updateStatus(prepared.editor);
     return true;
   };
-  action('copy-json', async () => {
+  action(ids.copyJson, async () => {
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard API is unavailable. Use Download or Log rig JSON.');
     if (!editor) throw new Error('No rig is loaded.');
     const prepared = prepareExport();
@@ -203,13 +208,13 @@ export function createSessionController(
     }
     if (commitExport(prepared) && prepared.request.isLatest()) feedback.textContent = 'Rig JSON copied.';
   });
-  action('download-json', () => {
+  action(ids.downloadJson, () => {
     const prepared = prepareExport();
     downloadJson(prepared.json, prepared.filename);
     commitExport(prepared);
     feedback.textContent = 'Rig JSON download started.';
   });
-  action('log-json', () => {
+  action(ids.logJson, () => {
     const prepared = prepareExport();
     console.log(prepared.json);
     commitExport(prepared);
@@ -222,7 +227,7 @@ export function createSessionController(
       window.confirm(proposal ? `${message} Pending artwork proposals will also be discarded.` : message)
     );
   };
-  action('reload-exported', () => {
+  action(ids.reloadExported, () => {
     const shared = getScene().rigExportCheckpoint;
     const exported = shared?.rig ?? lastExport;
     if (!exported) throw new Error('Export the rig first.');
@@ -231,7 +236,7 @@ export function createSessionController(
     getScene().reloadRig(exported, shared?.filename ?? lastExportFilename, 'reload-export');
     feedback.textContent = 'Exported rig reloaded and validated.';
   });
-  action('reload-original', () => {
+  action(ids.reloadOriginal, () => {
     if (!confirmReplacement('Discard unsaved rig edits and reload the original?')) return;
     requests.cancelImports();
     getScene().reloadOriginal();
@@ -265,7 +270,7 @@ export function createSessionController(
       if (request.isCurrent()) feedback.textContent = `Could not load rig: ${String(error)}`;
     }
   };
-  app.querySelector<HTMLInputElement>(`#${prefix}load-json`)!.addEventListener(
+  requireElement(app, ids.loadJson, HTMLInputElement).addEventListener(
     'change',
     (event) => {
       void importRig(event);

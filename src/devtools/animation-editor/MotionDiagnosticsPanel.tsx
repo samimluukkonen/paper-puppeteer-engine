@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS as targets } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS, focusAuthoringToolsMenu } from './elementIds.js';
 import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import type { MotionDiagnosticsController } from './MotionDiagnosticsController.js';
 
@@ -18,7 +19,7 @@ export function MotionDiagnosticsPanel({ controller }: { controller: MotionDiagn
   useEffect(() => () => controller.cancel(), [controller]);
   return (
     <details
-      id="animation-motion-panel"
+      id={ANIMATION_IDS.motionPanel}
       data-tool-panel
       className="animation-popover"
       onToggle={(event) => {
@@ -30,7 +31,7 @@ export function MotionDiagnosticsPanel({ controller }: { controller: MotionDiagn
         event.stopPropagation();
         event.currentTarget.open = false;
         controller.cancel();
-        document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
+        focusAuthoringToolsMenu();
       }}
     >
       <summary>Motion Diagnostics</summary>

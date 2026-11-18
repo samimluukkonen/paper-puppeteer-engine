@@ -1,7 +1,9 @@
 import type { PropertyKeyframe, PropertyCurve } from '../../engine/data.js';
 import { setText } from '../../shared/domUpdates.js';
 import { blocksEditorShortcut, isTypingTarget } from '../../shared/keyboardShortcuts.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import {
   constrainGraphHandle,
   DEFAULT_GRAPH_CURVE,
@@ -71,12 +73,12 @@ export class GraphEditorController {
     private readonly app: HTMLElement,
     private readonly getState: () => AnimationEditorState,
   ) {
-    this.panel = this.element('#graph-editor');
-    this.canvas = this.element('#graph-canvas');
-    this.drawing = this.element('#graph-drawing');
-    this.playhead = this.element('#graph-playhead');
-    this.property = this.element('#graph-property');
-    this.toggle = this.element('#graph-toggle');
+    this.panel = requireElement(this.app, ANIMATION_IDS.graphEditor, HTMLElement);
+    this.canvas = requireElement(this.app, ANIMATION_IDS.graphCanvas, SVGSVGElement);
+    this.drawing = requireElement(this.app, ANIMATION_IDS.graphDrawing, SVGGElement);
+    this.playhead = requireElement(this.app, ANIMATION_IDS.graphPlayhead, SVGLineElement);
+    this.property = requireElement(this.app, ANIMATION_IDS.graphProperty, HTMLSelectElement);
+    this.toggle = requireElement(this.app, ANIMATION_IDS.graphToggle, HTMLButtonElement);
     this.timelinePanel = this.element('.timeline-panel');
     const options = { signal: this.abort.signal };
     this.toggle.addEventListener('click', () => this.setActive(!this.active), options);
@@ -92,21 +94,29 @@ export class GraphEditorController {
       },
       options,
     );
-    this.element('#graph-fit').addEventListener('click', () => this.fit(), options);
-    this.element('#graph-zoom-in').addEventListener('click', () => this.zoom(0.5), options);
-    this.element('#graph-zoom-out').addEventListener('click', () => this.zoom(2), options);
-    this.element('#graph-key-form').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.graphFit, HTMLElement).addEventListener('click', () => this.fit(), options);
+    requireElement(this.app, ANIMATION_IDS.graphZoomIn, HTMLElement).addEventListener(
+      'click',
+      () => this.zoom(0.5),
+      options,
+    );
+    requireElement(this.app, ANIMATION_IDS.graphZoomOut, HTMLElement).addEventListener(
+      'click',
+      () => this.zoom(2),
+      options,
+    );
+    requireElement(this.app, ANIMATION_IDS.graphKeyForm, HTMLElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
         this.edit({
-          time: this.number('#graph-key-time'),
-          value: graphLocalValue(this.channel()!, this.number('#graph-key-value')),
+          time: this.number(ANIMATION_IDS.graphKeyTime),
+          value: graphLocalValue(this.channel()!, this.number(ANIMATION_IDS.graphKeyValue)),
         });
       },
       options,
     );
-    this.element<HTMLSelectElement>('#graph-interpolation').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.graphInterpolation, HTMLSelectElement).addEventListener(
       'change',
       (event) => {
         const mode = (event.target as HTMLSelectElement).value;
@@ -120,20 +130,20 @@ export class GraphEditorController {
       },
       options,
     );
-    this.element('#graph-reset-handles').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.graphResetHandles, HTMLElement).addEventListener(
       'click',
       () => this.edit({ curve: DEFAULT_GRAPH_CURVE }),
       options,
     );
-    this.element('#graph-handle-form').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.graphHandleForm, HTMLElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
         this.edit({
           curve: {
             mode: 'bezier',
-            control1: { x: this.number('#graph-control1-x'), y: this.number('#graph-control1-y') },
-            control2: { x: this.number('#graph-control2-x'), y: this.number('#graph-control2-y') },
+            control1: { x: this.number(ANIMATION_IDS.graphControl1X), y: this.number(ANIMATION_IDS.graphControl1Y) },
+            control2: { x: this.number(ANIMATION_IDS.graphControl2X), y: this.number(ANIMATION_IDS.graphControl2Y) },
           },
         });
       },
@@ -191,8 +201,8 @@ export class GraphEditorController {
     if (!element) throw new Error(`Missing graph editor element ${selector}.`);
     return element;
   }
-  private number(selector: string): number {
-    return this.element<HTMLInputElement>(selector).valueAsNumber;
+  private number(id: string): number {
+    return requireElement(this.app, id, HTMLInputElement).valueAsNumber;
   }
   private channel(): GraphChannel | undefined {
     return selectedGraphChannel(this.getState());
@@ -277,7 +287,7 @@ export class GraphEditorController {
     } catch (error) {
       this.message = error instanceof Error ? error.message : String(error);
     }
-    setText(this.element('#graph-status'), this.message);
+    setText(requireElement(this.app, ANIMATION_IDS.graphStatus, HTMLElement), this.message);
   }
   private select(ref: GraphKeyRef): void {
     const state = this.getState();
@@ -494,7 +504,7 @@ export class GraphEditorController {
     if (channel) this.property.value = channel.property;
     this.property.disabled = !animation || !channel || !state.animationAuthoringEnabled;
     setText(
-      this.element('#graph-target'),
+      requireElement(this.app, ANIMATION_IDS.graphTarget, HTMLElement),
       channel
         ? channel.kind === 'root'
           ? 'Root Motion'
@@ -507,24 +517,33 @@ export class GraphEditorController {
     const selectedKey = keys[selected];
     const raw = animation && channel ? graphKeys(animation, channel)[selected] : undefined;
     const outgoing = selected >= 0 && selected + 1 < keys.length;
-    for (const selector of ['#graph-key-time', '#graph-key-value', '#graph-apply'])
-      this.element<HTMLInputElement>(selector).disabled = !selectedKey || !state.animationAuthoringEnabled;
-    for (const selector of ['#graph-interpolation', '#graph-reset-handles'])
-      this.element<HTMLInputElement>(selector).disabled = !outgoing || !state.animationAuthoringEnabled;
-    this.input('#graph-key-time', raw ? String(toSeconds(raw.time)) : '');
-    this.input('#graph-key-value', raw && channel ? String(graphDisplayValue(channel, raw.value)) : '');
-    this.element<HTMLInputElement>('#graph-key-value').step = 'any';
-    const mode = this.element<HTMLSelectElement>('#graph-interpolation');
+    for (const control of [
+      requireElement(this.app, ANIMATION_IDS.graphKeyTime, HTMLInputElement),
+      requireElement(this.app, ANIMATION_IDS.graphKeyValue, HTMLInputElement),
+      requireElement(this.app, ANIMATION_IDS.graphApply, HTMLButtonElement),
+    ])
+      control.disabled = !selectedKey || !state.animationAuthoringEnabled;
+    requireElement(this.app, ANIMATION_IDS.graphInterpolation, HTMLSelectElement).disabled =
+      !outgoing || !state.animationAuthoringEnabled;
+    requireElement(this.app, ANIMATION_IDS.graphResetHandles, HTMLButtonElement).disabled =
+      !outgoing || !state.animationAuthoringEnabled;
+    this.input(ANIMATION_IDS.graphKeyTime, raw ? String(toSeconds(raw.time)) : '');
+    this.input(ANIMATION_IDS.graphKeyValue, raw && channel ? String(graphDisplayValue(channel, raw.value)) : '');
+    requireElement(this.app, ANIMATION_IDS.graphKeyValue, HTMLInputElement).step = 'any';
+    const mode = requireElement(this.app, ANIMATION_IDS.graphInterpolation, HTMLSelectElement);
     mode.value = selectedKey?.curve?.mode ?? 'auto';
     const curve = selectedKey?.curve;
-    for (const handle of ['control1', 'control2'] as const)
-      for (const axis of ['x', 'y'] as const) {
-        const selector = `#graph-${handle}-${axis}`;
-        this.element<HTMLInputElement>(selector).disabled =
-          !outgoing || curve?.mode !== 'bezier' || !state.animationAuthoringEnabled;
-        this.input(selector, curve?.mode === 'bezier' ? String(curve[handle][axis]) : '');
-      }
-    this.element<HTMLButtonElement>('#graph-apply-handles').disabled =
+    for (const [id, handle, axis] of [
+      [ANIMATION_IDS.graphControl1X, 'control1', 'x'],
+      [ANIMATION_IDS.graphControl1Y, 'control1', 'y'],
+      [ANIMATION_IDS.graphControl2X, 'control2', 'x'],
+      [ANIMATION_IDS.graphControl2Y, 'control2', 'y'],
+    ] as const) {
+      requireElement(this.app, id, HTMLInputElement).disabled =
+        !outgoing || curve?.mode !== 'bezier' || !state.animationAuthoringEnabled;
+      this.input(id, curve?.mode === 'bezier' ? String(curve[handle][axis]) : '');
+    }
+    requireElement(this.app, ANIMATION_IDS.graphApplyHandles, HTMLButtonElement).disabled =
       !outgoing || curve?.mode !== 'bezier' || !state.animationAuthoringEnabled;
     const empty = !animation
       ? 'Select an animation.'
@@ -537,7 +556,7 @@ export class GraphEditorController {
             : !outgoing
               ? 'Last key: no outgoing segment.'
               : '';
-    setText(this.element('#graph-status'), this.message || empty);
+    setText(requireElement(this.app, ANIMATION_IDS.graphStatus, HTMLElement), this.message || empty);
     const view = this.view;
     if (!view || !animation || !channel) {
       this.drawing.replaceChildren();
@@ -655,8 +674,8 @@ export class GraphEditorController {
     );
     this.drawing.replaceChildren(...children);
   }
-  private input(selector: string, value: string): void {
-    const input = this.element<HTMLInputElement>(selector);
+  private input(id: string, value: string): void {
+    const input = requireElement(this.app, id, HTMLInputElement);
     if (document.activeElement !== input && input.value !== value) input.value = value;
   }
   dispose(): void {

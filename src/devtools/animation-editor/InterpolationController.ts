@@ -1,6 +1,8 @@
 import { animationClipSchema } from '../../engine/core.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { selectedInterpolationControl } from './interpolationPresentation.js';
 
 /** Selection inspection and explicitly scoped clip declaration edits through the existing state APIs. */
@@ -17,14 +19,9 @@ export class InterpolationController {
     app: HTMLElement,
     private readonly getState: () => AnimationEditorState,
   ) {
-    const element = <T extends HTMLElement>(selector: string): T => {
-      const found = app.querySelector<T>(selector);
-      if (!found) throw new Error(`Missing animation editor element ${selector}.`);
-      return found;
-    };
-    this.selection = element('#timeline-interpolation');
-    this.help = element('#timeline-interpolation-help');
-    this.declaration = element('#animation-interpolation');
+    this.selection = requireElement(app, ANIMATION_IDS.timelineInterpolation, HTMLSelectElement);
+    this.help = requireElement(app, ANIMATION_IDS.timelineInterpolationHelp, HTMLElement);
+    this.declaration = requireElement(app, ANIMATION_IDS.interpolation, HTMLSelectElement);
     this.declaration.addEventListener(
       'change',
       () => {

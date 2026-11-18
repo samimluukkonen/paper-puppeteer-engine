@@ -1,10 +1,11 @@
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS } from './elementIds.js';
 
 export function MeshDeformationPanel() {
   return (
-    <div id="mesh-deformation-panel">
+    <div id={ANIMATION_IDS.meshDeformationPanel}>
       <label className="deformation-toggle" data-guide-id={GUIDE_TARGETS.animationDeformationMode}>
-        <input id="deformation-edit-mode" type="checkbox" />
+        <input id={ANIMATION_IDS.deformationEditMode} type="checkbox" />
         <span>Edit Mesh Deformation</span>
       </label>
       <p className="animation-field-help">
@@ -13,39 +14,45 @@ export function MeshDeformationPanel() {
       </p>
       <label data-guide-id={GUIDE_TARGETS.animationDeformationMesh}>
         Mesh
-        <select id="deformation-mesh" aria-label="Deformable mesh" />
+        <select id={ANIMATION_IDS.deformationMesh} aria-label="Deformable mesh" />
       </label>
       <label className="deformation-toggle">
-        <input id="deformation-diagnostics" type="checkbox" />
+        <input id={ANIMATION_IDS.deformationDiagnostics} type="checkbox" />
         <span>Show mesh diagnostics</span>
       </label>
-      <p id="animation-mesh-diagnostics-status" hidden />
-      <p id="deformation-empty" />
-      <svg id="deformation-bind-view" className="deformation-bind-view" aria-label="Bind-space mesh corrections" />
+      <p id={ANIMATION_IDS.meshDiagnosticsStatus} hidden />
+      <p id={ANIMATION_IDS.deformationEmpty} />
+      <svg
+        id={ANIMATION_IDS.deformationBindView}
+        className="deformation-bind-view"
+        aria-label="Bind-space mesh corrections"
+      />
       <label data-guide-id={GUIDE_TARGETS.animationDeformationVertex}>
         Vertex
-        <select id="deformation-vertex" aria-label="Mesh vertex" />
+        <select id={ANIMATION_IDS.deformationVertex} aria-label="Mesh vertex" />
       </label>
       <form
         data-guide-id={GUIDE_TARGETS.animationDeformationOffsets}
-        id="deformation-offset-form"
+        id={ANIMATION_IDS.deformationOffsetForm}
         className="root-motion-fields"
       >
         <label>
-          Offset X<input id="deformation-x" type="number" step="any" required />
+          Offset X
+          <input id={ANIMATION_IDS.deformationX} type="number" step="any" required />
         </label>
         <label>
-          Offset Y<input id="deformation-y" type="number" step="any" required />
+          Offset Y
+          <input id={ANIMATION_IDS.deformationY} type="number" step="any" required />
         </label>
         <button type="submit" className="workspace-primary">
           Set vertex correction key
         </button>
       </form>
       <div data-guide-id={GUIDE_TARGETS.animationDeformationShapes} className="root-motion-actions">
-        <button id="deformation-add-key" className="workspace-primary" type="button">
+        <button id={ANIMATION_IDS.deformationAddKey} className="workspace-primary" type="button">
           Add shape key
         </button>
-        <button id="deformation-neutral" type="button">
+        <button id={ANIMATION_IDS.deformationNeutral} type="button">
           Set neutral key
         </button>
       </div>
@@ -55,29 +62,29 @@ export function MeshDeformationPanel() {
       </p>
       <form
         data-guide-id={GUIDE_TARGETS.animationDeformationTiming}
-        id="deformation-key-form"
+        id={ANIMATION_IDS.deformationKeyForm}
         className="root-motion-fields"
       >
         <label>
           Key time (s)
-          <input id="deformation-key-time" type="number" min="0" step="any" required />
+          <input id={ANIMATION_IDS.deformationKeyTime} type="number" min="0" step="any" required />
         </label>
         <label>
           Outgoing interpolation
-          <select id="deformation-curve" defaultValue="linear">
+          <select id={ANIMATION_IDS.deformationCurve} defaultValue="linear">
             <option value="linear">Linear</option>
             <option value="stepped">Stepped</option>
           </select>
         </label>
-        <button id="deformation-apply-key" type="submit">
+        <button id={ANIMATION_IDS.deformationApplyKey} type="submit">
           Apply key
         </button>
       </form>
       <div className="root-motion-actions">
-        <button id="deformation-duplicate-key" type="button">
+        <button id={ANIMATION_IDS.deformationDuplicateKey} type="button">
           Duplicate key
         </button>
-        <button id="deformation-delete-key" type="button" className="workspace-danger">
+        <button id={ANIMATION_IDS.deformationDeleteKey} type="button" className="workspace-danger">
           Delete key
         </button>
       </div>
@@ -87,11 +94,11 @@ export function MeshDeformationPanel() {
         Mirroring and Pose Library change bones and preserve mesh corrections unchanged. Variations scale correction
         times; IK baking preserves corrections; Motion Diagnostics measures bones.
       </p>
-      <p id="deformation-topology" role="status" />
-      <button id="deformation-remove-incompatible" className="workspace-danger" type="button" hidden>
+      <p id={ANIMATION_IDS.deformationTopology} role="status" />
+      <button id={ANIMATION_IDS.deformationRemoveIncompatible} className="workspace-danger" type="button" hidden>
         Remove incompatible tracks
       </button>
-      <p id="deformation-status" role="status" />
+      <p id={ANIMATION_IDS.deformationStatus} role="status" />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { bindCharacterSelection } from '../../ui/characterSelection.js';
 import type { AnimationEditorScene } from '../animation-editor/AnimationEditorScene.js';
+import { requireElement } from '../shared/editorElements.js';
 import { createControlsController } from './ControlsController.js';
+import { RIG_IDS } from './elementIds.js';
 import { createHierarchyController } from './HierarchyController.js';
 import { createInspectorController } from './InspectorController.js';
 import type { RigEditor } from './RigEditor.js';
@@ -18,12 +20,13 @@ export function createRigWorkspaceController(
     getScene,
     changed,
     {},
-    {
-      hasPendingChanges: () => getScene().hasPendingArtworkProposal,
-    },
+    { hasPendingChanges: () => getScene().hasPendingArtworkProposal },
   );
-  const inspector = createInspectorController(app.querySelector<HTMLElement>('#inspector')!, session.updateStatus);
-  const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#hierarchy')!);
+  const inspector = createInspectorController(
+    requireElement(app, RIG_IDS.inspector, HTMLElement),
+    session.updateStatus,
+  );
+  const hierarchy = createHierarchyController(requireElement(app, RIG_IDS.hierarchy, HTMLElement));
   const controls = createControlsController(app, session.updateStatus);
   let selected: string | undefined;
   let rendered = false;
@@ -39,7 +42,7 @@ export function createRigWorkspaceController(
         const preferred = editor.state.selectionInspectorTab;
         const id = preferred
           ? `rig-inspector-${preferred}`
-          : app.querySelector('#rig-inspector:focus-within')
+          : requireElement(app, RIG_IDS.rigInspector, HTMLElement).matches(':focus-within')
             ? undefined
             : marker
               ? 'rig-inspector-contact-markers'

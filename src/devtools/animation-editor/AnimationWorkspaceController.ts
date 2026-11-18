@@ -1,5 +1,7 @@
+import { requireElement } from '../shared/editorElements.js';
 import { bindWorkspaceDivider } from '../shared/workspaceDivider.js';
 import { EditorMenuController } from './EditorMenuController.js';
+import { ANIMATION_IDS } from './elementIds.js';
 
 /** Workspace preferences are transient and never author animation data. */
 export class AnimationWorkspaceController {
@@ -14,17 +16,20 @@ export class AnimationWorkspaceController {
   ) {
     const options = { signal: this.abort.signal };
     // Native modal dialogs provide focus containment, Escape, and focus restoration.
-    for (const name of ['tools', 'help']) {
-      const dialog = app.querySelector<HTMLDialogElement>(`#animation-${name}-dialog`)!;
-      app.querySelector(`#animation-${name}-open`)!.addEventListener('click', () => dialog.showModal(), options);
+    for (const [open, dialogId] of [
+      [ANIMATION_IDS.toolsOpen, ANIMATION_IDS.toolsDialog],
+      [ANIMATION_IDS.helpOpen, ANIMATION_IDS.helpDialog],
+    ] as const) {
+      const dialog = requireElement(app, dialogId, HTMLDialogElement);
+      requireElement(app, open, HTMLButtonElement).addEventListener('click', () => dialog.showModal(), options);
     }
     this.menus = new EditorMenuController(app);
 
     const layout = app.querySelector<HTMLElement>('.animation-layout')!;
-    const vertical = app.querySelector<HTMLElement>('#animation-workspace-divider')!;
-    const horizontal = app.querySelector<HTMLElement>('#timeline-label-divider')!;
-    const previewDivider = app.querySelector<HTMLElement>('#animation-preview-divider')!;
-    const inspector = app.querySelector<HTMLElement>('#animation-inspector')!;
+    const vertical = requireElement(app, ANIMATION_IDS.workspaceDivider, HTMLElement);
+    const horizontal = requireElement(app, ANIMATION_IDS.timelineLabelDivider, HTMLElement);
+    const previewDivider = requireElement(app, ANIMATION_IDS.previewDivider, HTMLElement);
+    const inspector = requireElement(app, ANIMATION_IDS.inspector, HTMLElement);
     const preview = app.querySelector<HTMLElement>('.animation-preview')!;
     const previewOptions = app.querySelector<HTMLElement>('.animation-preview-options')!;
     const commands = app.querySelector<HTMLElement>('.editor-tabs')!;
@@ -103,7 +108,7 @@ export class AnimationWorkspaceController {
         return true;
       },
     );
-    app.querySelector('#animation-reset-layout')!.addEventListener(
+    requireElement(app, ANIMATION_IDS.resetLayout, HTMLElement).addEventListener(
       'click',
       () => {
         layout.style.removeProperty('--upper-share');
@@ -117,8 +122,8 @@ export class AnimationWorkspaceController {
           String(Math.round(parseFloat(getComputedStyle(app).getPropertyValue('--timeline-label-width')))),
         );
         layout.style.removeProperty('--preview-width');
-        app.querySelector<HTMLButtonElement>('#timeline-clear-filters')!.click();
-        const zoom = app.querySelector<HTMLSelectElement>('#timeline-zoom')!;
+        requireElement(app, ANIMATION_IDS.timelineClearFilters, HTMLButtonElement).click();
+        const zoom = requireElement(app, ANIMATION_IDS.timelineZoom, HTMLSelectElement);
         zoom.value = '1';
         zoom.dispatchEvent(new Event('change'));
         inset.scrollLeft = 0;
@@ -159,7 +164,7 @@ export class AnimationWorkspaceController {
         refreshPreview();
       });
     });
-    this.previewResize.observe(app.querySelector('#animation-stage')!);
+    this.previewResize.observe(requireElement(app, ANIMATION_IDS.stage, HTMLElement));
     this.previewResize.observe(layout);
     this.previewResize.observe(previewOptions);
     this.previewResize.observe(inspector);

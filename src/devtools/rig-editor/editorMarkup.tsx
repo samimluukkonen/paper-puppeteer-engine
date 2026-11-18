@@ -29,6 +29,7 @@ import type { PackageController } from '../shared/package/PackageController.js';
 import { PackagePanel } from '../shared/package/PackagePanel.js';
 import type { AttachmentController } from './AttachmentController.js';
 import { AttachmentPanel } from './AttachmentPanel.js';
+import { RIG_IDS, RIG_SESSION_IDS } from './elementIds.js';
 import { FootContactMarkersPanel } from './FootContactMarkersPanel.js';
 import { MeshGeometryPanel } from './MeshGeometryPanel.js';
 import { RigHelp } from './RigHelp.js';
@@ -67,7 +68,7 @@ export function RigEditorView({
                   <div className="rig-session-editing" role="group" aria-label="Rig editing controls">
                     <label>
                       Edit{' '}
-                      <select id="edit-mode" data-guide-id={GUIDE_TARGETS.rigEditMode}>
+                      <select id={RIG_IDS.editMode} data-guide-id={GUIDE_TARGETS.rigEditMode}>
                         <option value="joint">Joint Editing</option>
                         <option value="mesh">Edit Mesh Geometry</option>
                         <option value="weights">Paint Bone Weights</option>
@@ -78,7 +79,7 @@ export function RigEditorView({
                     </label>
                     <label>
                       Grid{' '}
-                      <select id="grid-snap">
+                      <select id={RIG_IDS.gridSnap}>
                         <option value="0">Off</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
@@ -88,7 +89,7 @@ export function RigEditorView({
                     </label>
                     <label>
                       Rotation snap{' '}
-                      <select id="rotation-snap">
+                      <select id={RIG_IDS.rotationSnap}>
                         <option value="0">Off</option>
                         <option value="1">1°</option>
                         <option value="5">5°</option>
@@ -96,11 +97,11 @@ export function RigEditorView({
                       </select>
                     </label>
                     <span className="rig-history" data-guide-id={GUIDE_TARGETS.rigHistory}>
-                      <button id="undo" type="button" aria-keyshortcuts="Control+Z Meta+Z">
+                      <button id={RIG_SESSION_IDS.undo} type="button" aria-keyshortcuts="Control+Z Meta+Z">
                         <Undo2 size={16} aria-hidden="true" />
                         Undo
                       </button>
-                      <button id="redo" type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
+                      <button id={RIG_SESSION_IDS.redo} type="button" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
                         <Redo2 size={16} aria-hidden="true" />
                         Redo
                       </button>
@@ -108,7 +109,7 @@ export function RigEditorView({
                   </div>
                   <div className="rig-session-actions" role="group" aria-label="Rig commands">
                     <button
-                      id="rig-tools-open"
+                      id={RIG_IDS.toolsOpen}
                       title="Open file tools for import and export (Ctrl/Cmd+S)"
                       data-guide-id={GUIDE_TARGETS.rigFileTools}
                       type="button"
@@ -127,7 +128,7 @@ export function RigEditorView({
                       <CircleHelp size={16} aria-hidden="true" />
                       Help
                     </button>
-                    <button id="rig-reset-layout" type="button" onClick={inspector.reset}>
+                    <button id={RIG_IDS.resetLayout} type="button" onClick={inspector.reset}>
                       <LayoutTemplate size={16} aria-hidden="true" />
                       Reset layout
                     </button>
@@ -145,7 +146,7 @@ export function RigEditorView({
                     </button>
                     <div className="workspace-save">
                       <button
-                        id="download-json"
+                        id={RIG_SESSION_IDS.downloadJson}
                         data-guide-id={GUIDE_TARGETS.rigDownload}
                         className="workspace-primary"
                         type="button"
@@ -156,9 +157,9 @@ export function RigEditorView({
                     </div>
                   </div>
                   <div className="workspace-feedback">
-                    <span id="dirty-status" role="status" />
-                    <div id="validation" role="status" data-guide-id={GUIDE_TARGETS.rigValidation} />
-                    <div id="action-feedback" role="status" />
+                    <span id={RIG_SESSION_IDS.dirtyStatus} role="status" />
+                    <div id={RIG_SESSION_IDS.validation} role="status" data-guide-id={GUIDE_TARGETS.rigValidation} />
+                    <div id={RIG_SESSION_IDS.actionFeedback} role="status" />
                   </div>
                 </section>
               ),
@@ -181,12 +182,12 @@ export function RigEditorView({
                 <>
                   <EditorDraftControls>{afterHeader}</EditorDraftControls>
                   <div className="rig-recovery" role="group" aria-label="Rig draft recovery">
-                    <p id="rig-draft-status" role="status" />
-                    <button id="rig-download-retained-drafts" className="workspace-primary" type="button" hidden>
+                    <p id={RIG_IDS.draftStatus} role="status" />
+                    <button id={RIG_IDS.downloadRetainedDrafts} className="workspace-primary" type="button" hidden>
                       Download retained drafts
                     </button>
                     <button
-                      id="rig-clear-retained-drafts"
+                      id={RIG_IDS.clearRetainedDrafts}
                       className="workspace-danger"
                       type="button"
                       title="Permanently delete retained browser drafts for this rig"
@@ -202,7 +203,7 @@ export function RigEditorView({
         />
         <aside
           ref={inspector.panel}
-          id="rig-inspector"
+          id={RIG_IDS.rigInspector}
           data-guide-inspector
           className="workspace-inspector inspector workspace-inspector-sections"
           inert={inspector.narrow && !inspector.open}
@@ -230,7 +231,7 @@ export function RigEditorView({
                 icon: Network,
                 content: (
                   <div className="workspace-hierarchy" data-guide-id={GUIDE_TARGETS.rigHierarchy}>
-                    <div id="hierarchy" role="tree" />
+                    <div id={RIG_IDS.hierarchy} role="tree" />
                     {attachments && <RigStructurePanel controller={attachments} />}
                   </div>
                 ),
@@ -242,7 +243,7 @@ export function RigEditorView({
                 content: (
                   <div className="rig-selection-details" data-guide-id={GUIDE_TARGETS.rigSelection}>
                     <section aria-label="Rig properties">
-                      <div id="inspector">Loading character…</div>
+                      <div id={RIG_IDS.inspector}>Loading character…</div>
                     </section>
                   </div>
                 ),
@@ -312,10 +313,10 @@ export function RigEditorView({
                 icon: Eye,
                 content: (
                   <>
-                    <div id="visibility" />
+                    <div id={RIG_IDS.visibility} />
                     <label className="opacity-label">
                       Artwork opacity{' '}
-                      <select id="opacity">
+                      <select id={RIG_IDS.opacity}>
                         <option value="1">100%</option>
                         <option value="0.5">50%</option>
                         <option value="0.25">25%</option>
@@ -324,17 +325,22 @@ export function RigEditorView({
                   </>
                 ),
               },
-              { id: 'rig-inspector-session', label: 'Session', icon: Info, content: <div id="session-status" /> },
+              {
+                id: 'rig-inspector-session',
+                label: 'Session',
+                icon: Info,
+                content: <div id={RIG_SESSION_IDS.sessionStatus} />,
+              },
               {
                 id: 'rig-inspector-reset',
                 label: 'Reset',
                 icon: RotateCcw,
                 content: (
                   <div className="action-grid">
-                    <button id="reset-selected" type="button">
+                    <button id={RIG_SESSION_IDS.resetSelected} type="button">
                       Reset Selected
                     </button>
-                    <button id="reset-rig" type="button">
+                    <button id={RIG_SESSION_IDS.resetRig} type="button">
                       Reset Rig
                     </button>
                   </div>
@@ -344,7 +350,7 @@ export function RigEditorView({
           />
         </aside>
         <div
-          id="rig-preview-divider"
+          id={RIG_IDS.previewDivider}
           role="separator"
           tabIndex={0}
           aria-label="Rig preview width"
@@ -359,56 +365,56 @@ export function RigEditorView({
           <div className="workspace-preview-options">
             <label>
               Facing{' '}
-              <select id="rig-facing">
+              <select id={RIG_IDS.facing}>
                 <option value="right">Right</option>
                 <option value="left">Left</option>
               </select>
             </label>
             <label>
               Pose{' '}
-              <select id="rig-preview-pose" data-guide-id={GUIDE_TARGETS.rigPreviewPose}>
+              <select id={RIG_IDS.previewPose} data-guide-id={GUIDE_TARGETS.rigPreviewPose}>
                 <option value="">Bind pose</option>
               </select>
             </label>
             <label>
-              Time (ms) <input id="rig-preview-time" type="number" step="any" min="0" defaultValue="0" />
+              Time (ms) <input id={RIG_IDS.previewTime} type="number" step="any" min="0" defaultValue="0" />
             </label>
             <label>
-              <input id="dim-selection" type="checkbox" /> Dim unselected artwork
+              <input id={RIG_IDS.dimSelection} type="checkbox" /> Dim unselected artwork
             </label>
             <label data-guide-id={GUIDE_TARGETS.rigIKPreview}>
-              <input id="ik-preview" type="checkbox" /> IK Preview
+              <input id={RIG_IDS.ikPreview} type="checkbox" /> IK Preview
             </label>
           </div>
-          <div id="rig-mode-hint" className="workspace-caption">
+          <div id={RIG_IDS.modeHint} className="workspace-caption">
             Joint Editing · Wheel to zoom · Middle drag to pan
           </div>
           <div className="rig-preview-viewport">
-            <div id="editor-stage" data-guide-id={GUIDE_TARGETS.rigCanvas} aria-label="Rig canvas" />
+            <div id={RIG_IDS.stage} data-guide-id={GUIDE_TARGETS.rigCanvas} aria-label="Rig canvas" />
           </div>
         </section>
       </main>
       <WorkspaceDialog id="rig-tools-dialog" title="Rig file tools">
         <p>Export committed rig edits as JSON. Place the downloaded file in your character folder.</p>
         <div className="action-grid">
-          <button id="validate-rig" type="button">
+          <button id={RIG_SESSION_IDS.validateRig} type="button">
             Validate
           </button>
-          <button id="copy-json" type="button">
+          <button id={RIG_SESSION_IDS.copyJson} type="button">
             Copy rig JSON
           </button>
-          <button id="log-json" type="button">
+          <button id={RIG_SESSION_IDS.logJson} type="button">
             Log rig JSON
           </button>
-          <button id="reload-exported" type="button">
+          <button id={RIG_SESSION_IDS.reloadExported} type="button">
             Reload exported rig
           </button>
-          <button id="reload-original" type="button">
+          <button id={RIG_SESSION_IDS.reloadOriginal} type="button">
             Reload original rig
           </button>
         </div>
         <label className="load-label">
-          Load rig JSON <input id="load-json" type="file" accept=".json,application/json" />
+          Load rig JSON <input id={RIG_SESSION_IDS.loadJson} type="file" accept=".json,application/json" />
         </label>
       </WorkspaceDialog>
       <WorkspaceDialog id="rig-help-dialog" title="Rig editor help">

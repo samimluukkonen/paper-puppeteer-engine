@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import type { PoseLibraryController } from './PoseLibraryController.js';
 
 export function PoseLibraryPanel({ controller }: { controller: PoseLibraryController }) {
@@ -44,7 +45,7 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
   };
   return (
     <details
-      id="animation-pose-library-panel"
+      id={ANIMATION_IDS.poseLibraryPanel}
       className="animation-popover animation-pose-library"
       data-tool-panel
       onToggle={(event) => {

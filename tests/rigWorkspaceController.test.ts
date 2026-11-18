@@ -324,8 +324,10 @@ test.each(['hierarchy', 'mesh', 'attachments', 'canvas'] as const)(
   async (origin) => {
     const { editor, controller, element } = await panelFixture();
     const app = element('#editor-app');
+    vi.spyOn(element('#rig-inspector'), 'matches').mockImplementation(
+      (selector) => selector === ':focus-within' && origin !== 'canvas',
+    );
     vi.spyOn(app, 'querySelector').mockImplementation((selector) => {
-      if (selector === '#rig-inspector:focus-within') return origin === 'canvas' ? null : element(`#${origin}`);
       if (selector === '.workspace-hierarchy:focus-within')
         return origin === 'hierarchy' ? element('#hierarchy') : null;
       return element(selector);

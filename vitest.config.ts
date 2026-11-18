@@ -6,5 +6,6 @@ export default defineConfig({
     fileParallelism: false,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    setupFiles: ['tests/setup/editorElementTypes.ts'],
   },
 });

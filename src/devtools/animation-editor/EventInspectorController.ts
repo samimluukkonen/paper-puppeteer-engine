@@ -1,5 +1,7 @@
 import { flushSync } from 'react-dom';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { toSeconds } from './timeUnits.js';
 
 /** Local text drafts commit once on blur/Enter; authored snapshots remain authoritative. */
@@ -18,12 +20,12 @@ export class EventInspectorController {
     private readonly app: HTMLElement,
     private readonly getState: () => AnimationEditorState,
   ) {
-    this.time = app.querySelector<HTMLInputElement>('#animation-event-time')!;
-    this.name = app.querySelector<HTMLInputElement>('#animation-event-name')!;
-    this.data = app.querySelector<HTMLTextAreaElement>('#animation-event-data')!;
-    this.add = app.querySelector<HTMLButtonElement>('#timeline-add-event')!;
-    this.remove = app.querySelector<HTMLButtonElement>('#animation-delete-event')!;
-    this.error = app.querySelector<HTMLElement>('#animation-event-error')!;
+    this.time = requireElement(app, ANIMATION_IDS.eventTime, HTMLInputElement);
+    this.name = requireElement(app, ANIMATION_IDS.eventName, HTMLInputElement);
+    this.data = requireElement(app, ANIMATION_IDS.eventData, HTMLTextAreaElement);
+    this.add = requireElement(app, ANIMATION_IDS.timelineAddEvent, HTMLButtonElement);
+    this.remove = requireElement(app, ANIMATION_IDS.deleteEvent, HTMLButtonElement);
+    this.error = requireElement(app, ANIMATION_IDS.eventError, HTMLElement);
     const options = { signal: this.abort.signal };
     this.add.addEventListener(
       'click',
@@ -99,7 +101,7 @@ export class EventInspectorController {
 
   render(state: AnimationEditorState): void {
     const event = state.selectedEventData;
-    const eventPanel = this.app.querySelector<HTMLElement>('#animation-event-inspector')!;
+    const eventPanel = requireElement(this.app, ANIMATION_IDS.eventInspector, HTMLElement);
     if (eventPanel.hidden !== !event) eventPanel.hidden = !event;
     this.add.disabled = !state.workingAnimation;
     this.remove.disabled = !event;

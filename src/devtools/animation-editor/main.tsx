@@ -12,13 +12,15 @@ import { buildCharacterDraft } from '../project/editorDrafts.js';
 import { projectCharacterContext } from '../project/projectBridge.js';
 import { AttachmentController } from '../rig-editor/AttachmentController.js';
 import { RigEditorView } from '../rig-editor/editorMarkup.js';
-import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
+import { RIG_IDS } from '../rig-editor/elementIds.js';
 import '../rig-editor/style.css';
+import { createRigWorkspaceController } from '../rig-editor/RigWorkspaceController.js';
 import { RigWorkspaceLayoutController } from '../rig-editor/RigWorkspaceLayoutController.js';
 import { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { attachLocalAutosave, LocalAutosave } from '../shared/autosave/LocalAutosave.js';
 import { LocalDraftControls, localDrafts } from '../shared/autosave/RecoveryPanel.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
+import { optionalElement, requireElement } from '../shared/editorElements.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
 import { defaultGroundGuide } from '../shared/groundGuide.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
@@ -38,6 +40,7 @@ import { AnimationWorkspaceController } from './AnimationWorkspaceController.js'
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { browserCharacterDrafts } from './characterDocuments.js';
 import { AnimationEditorView } from './editorMarkup.js';
+import { ANIMATION_IDS, RIG_TWEAK_SESSION_IDS } from './elementIds.js';
 import { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import { FootContactGroundController } from './FootContactGroundController.js';
 import { IKBakeController } from './IKBakeController.js';
@@ -54,7 +57,9 @@ import { TimelineController } from './TimelineController.js';
 import { workspaceGuideHost } from './workspaceGuideHost.js';
 import './style.css';
 
-const host = document.querySelector<HTMLElement>('#animation-editor-app, #editor-app');
+// Each editor page provides one of the two hosts; the workspace then renders both views inside it.
+const host =
+  optionalElement(document, ANIMATION_IDS.app, HTMLElement) ?? optionalElement(document, RIG_IDS.app, HTMLElement);
 if (!host) throw new Error('Missing character workspace host.');
 host.id = 'character-workspace';
 const projectContext = projectCharacterContext();
@@ -174,7 +179,7 @@ function CharacterWorkspace() {
           selecting the root bone or importing artwork. Download a character ZIP to keep the complete character.
         </p>
       )}
-      <div id="editor-app" className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
+      <div id={RIG_IDS.app} className="view-shell workspace-shell rig-workspace" hidden={!rigView} inert={!rigView}>
         <RigEditorView
           header={rigView}
           afterHeader={rigView ? draftControls : undefined}
@@ -182,7 +187,7 @@ function CharacterWorkspace() {
         />
       </div>
       <div
-        id="animation-editor-app"
+        id={ANIMATION_IDS.app}
         className="view-shell workspace-shell animation-workspace"
         hidden={rigView}
         inert={rigView}
@@ -223,16 +228,16 @@ const unmount = mountView(
   (root) => {
     let autosave: LocalAutosave | undefined;
     let previewPreferences: AnimationPreviewPreferencesBinding | undefined;
-    const app = root.querySelector<HTMLElement>('#animation-editor-app')!;
-    const rigApp = root.querySelector<HTMLElement>('#editor-app')!;
+    const app = requireElement(root, ANIMATION_IDS.app, HTMLElement);
+    const rigApp = requireElement(root, RIG_IDS.app, HTMLElement);
     const releaseRigExport = bindExportShortcut(rigApp, () =>
-      rigApp.querySelector<HTMLButtonElement>('#rig-tools-open')?.click(),
+      requireElement(rigApp, RIG_IDS.toolsOpen, HTMLButtonElement).click(),
     );
     const releaseAnimationExport = bindExportShortcut(app, () => {
       if (stateOwner?.editorMode === 'rig-tweak') {
         app.dispatchEvent(new Event('workspace:reveal-inspector'));
-        app.querySelector<HTMLButtonElement>('#tweak-download-json')?.focus();
-      } else app.querySelector<HTMLButtonElement>('#animation-tools-open')?.click();
+        requireElement(app, RIG_TWEAK_SESSION_IDS.downloadJson, HTMLButtonElement).focus();
+      } else requireElement(app, ANIMATION_IDS.toolsOpen, HTMLButtonElement).click();
     });
     const deleteRigSelection = (event: KeyboardEvent): void => {
       if (
@@ -288,9 +293,9 @@ const unmount = mountView(
       { hostGuarded: !!projectContext },
     );
     const recoveryControls = new DraftRecoveryControls<ReadonlyAnimation | null>(
-      app.querySelector<HTMLElement>('#animation-draft-status')!,
-      app.querySelector<HTMLButtonElement>('#animation-download-retained-drafts')!,
-      app.querySelector<HTMLButtonElement>('#animation-clear-retained-drafts')!,
+      requireElement(app, ANIMATION_IDS.draftStatus, HTMLElement),
+      requireElement(app, ANIMATION_IDS.downloadRetainedDrafts, HTMLButtonElement),
+      requireElement(app, ANIMATION_IDS.clearRetainedDrafts, HTMLButtonElement),
     );
     const recovery = new AnimationDraftRecoveryController(recoveryControls.recovery, window.location.pathname);
     const releaseArtworkPackage = artwork.subscribe(() => {
@@ -393,7 +398,7 @@ const unmount = mountView(
                     ? 'animation-inspector-ik'
                     : state.selectedBoneId &&
                         state.selectedBoneId !== selectedBone &&
-                        !app.querySelector('#animation-bones:focus-within')
+                        !requireElement(app, ANIMATION_IDS.bones, HTMLElement).matches(':focus-within')
                       ? 'animation-inspector-selection'
                       : undefined;
             if (id)
@@ -410,7 +415,7 @@ const unmount = mountView(
         });
         if (!projectContext) recovery.bind(state, id);
         else
-          app.querySelector<HTMLElement>('#animation-draft-status')!.textContent =
+          requireElement(app, ANIMATION_IDS.draftStatus, HTMLElement).textContent =
             'Project session: export a project ZIP to keep your work.';
         packages.bind(() => {
           const snapshot = editorScene.packageSnapshot();
@@ -520,7 +525,7 @@ const unmount = mountView(
     rigTweak.initialize(app, () => editorScene);
     scene = editorScene;
     const previewControls = new AbortController();
-    app.querySelector<HTMLSelectElement>('#animation-facing')!.addEventListener(
+    requireElement(app, ANIMATION_IDS.facing, HTMLSelectElement).addEventListener(
       'change',
       (event) => {
         const facing = (event.target as HTMLSelectElement).value;
@@ -528,7 +533,7 @@ const unmount = mountView(
       },
       { signal: previewControls.signal },
     );
-    app.querySelector<HTMLInputElement>('#animation-show-bones')!.addEventListener(
+    requireElement(app, ANIMATION_IDS.showBones, HTMLInputElement).addEventListener(
       'change',
       (event) => {
         editorScene.setBonesVisible((event.target as HTMLInputElement).checked);
@@ -536,10 +541,10 @@ const unmount = mountView(
       { signal: previewControls.signal },
     );
     for (const [id, apply] of [
-      ['#animation-ik-handles', (value: boolean) => editorScene.setIKHandlesVisible(value)],
-      ['#animation-ik-drag', (value: boolean) => editorScene.setIKHandlesInteractive(value)],
+      [ANIMATION_IDS.ikHandles, (value: boolean) => editorScene.setIKHandlesVisible(value)],
+      [ANIMATION_IDS.ikDrag, (value: boolean) => editorScene.setIKHandlesInteractive(value)],
     ] as const) {
-      app.querySelector<HTMLInputElement>(id)!.addEventListener(
+      requireElement(app, id, HTMLInputElement).addEventListener(
         'change',
         (event) => {
           apply((event.target as HTMLInputElement).checked);
@@ -548,7 +553,7 @@ const unmount = mountView(
       );
     }
     const onionControls = new OnionSkinControlsController(app, editorScene, guides.refresh);
-    app.querySelector<HTMLInputElement>('#animation-ik-preview')!.addEventListener(
+    requireElement(app, ANIMATION_IDS.ikPreview, HTMLInputElement).addEventListener(
       'change',
       (event) => {
         editorScene.setIKPreview((event.target as HTMLInputElement).checked);
@@ -556,7 +561,7 @@ const unmount = mountView(
       },
       { signal: previewControls.signal },
     );
-    const game = createEditorGame(initialRigView ? 'editor-stage' : 'animation-stage', editorScene, {
+    const game = createEditorGame(initialRigView ? RIG_IDS.stage : ANIMATION_IDS.stage, editorScene, {
       width: 630,
       height: 891,
     });
@@ -583,15 +588,17 @@ const unmount = mountView(
     });
     movePreview = () => {
       const rigView = stateOwner ? stateOwner.editorMode === 'rig' : initialRigView;
-      const target = root.querySelector<HTMLElement>(rigView ? '#editor-stage' : '#animation-stage')!;
+      const target = rigView
+        ? requireElement(rigApp, RIG_IDS.stage, HTMLElement)
+        : requireElement(app, ANIMATION_IDS.stage, HTMLElement);
       if (game.canvas && game.canvas.parentElement !== target) target.append(game.canvas);
       game.scale.parent = target;
-      const facingControl = app.querySelector<HTMLSelectElement>('#animation-facing');
-      if (facingControl && editorScene.rigEditor) facingControl.value = editorScene.rigEditor.state.facing;
+      if (editorScene.rigEditor)
+        requireElement(app, ANIMATION_IDS.facing, HTMLSelectElement).value = editorScene.rigEditor.state.facing;
       game.scale.getParentBounds();
       game.scale.refresh();
-      const characterStatus = app.querySelector<HTMLElement>('#character-status');
-      if (characterStatus) characterStatus.textContent = `Character: ${editorScene.characterId}`;
+      requireElement(app, ANIMATION_IDS.characterStatus, HTMLElement).textContent =
+        `Character: ${editorScene.characterId}`;
       document.title = `${rigView ? 'Rig Editor' : 'Animation Editor'} · Paper Puppeteer Engine`;
       const shell = target.closest<HTMLElement>('.workspace-shell');
       if (focusViewOnMove && shell && !shell.hidden) {
@@ -599,7 +606,7 @@ const unmount = mountView(
         focusViewOnMove = false;
       }
     };
-    const releaseRigResize = observePreview(rigApp.querySelector<HTMLElement>('#editor-stage')!, game);
+    const releaseRigResize = observePreview(requireElement(rigApp, RIG_IDS.stage, HTMLElement), game);
     const rigLayout = new RigWorkspaceLayoutController(rigApp);
     workspaceRoutes = bindWorkspaceNavigation(root, (view) => {
       if (!stateOwner) return view === (initialRigView ? 'rig' : 'animation');

@@ -4,6 +4,7 @@ import { InspectorSection } from '../../ui/InspectorSection.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { InspectorNumberField } from '../shared/InspectorNumberField.js';
 import type { AttachmentController } from './AttachmentController.js';
+import { RIG_IDS } from './elementIds.js';
 import { WeightPaintControls } from './WeightPaintControls.js';
 
 export function MeshGeometryPanel({
@@ -93,7 +94,7 @@ export function MeshGeometryPanel({
                 />
                 Show mesh diagnostics
               </label>
-              <p id="rig-mesh-diagnostics-status" hidden={!editor?.meshDiagnosticsEnabled} />
+              <p id={RIG_IDS.meshDiagnosticsStatus} hidden={!editor?.meshDiagnosticsEnabled} />
               {editor && <WeightPaintControls controller={controller} editor={editor} />}
               <button
                 type="button"

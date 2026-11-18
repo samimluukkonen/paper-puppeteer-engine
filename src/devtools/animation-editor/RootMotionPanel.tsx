@@ -1,28 +1,29 @@
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS } from './elementIds.js';
 
 export function RootMotionPanel() {
   return (
-    <div id="root-motion-panel" data-guide-id={GUIDE_TARGETS.animationRootMotion}>
+    <div id={ANIMATION_IDS.rootMotionPanel} data-guide-id={GUIDE_TARGETS.animationRootMotion}>
       <p>
         Move the whole character independently of bones and IK. X points right; Y points down before facing and scale.
       </p>
       <label>
-        <input id="root-edit-mode" type="checkbox" /> Edit Root Motion
+        <input id={ANIMATION_IDS.rootEditMode} type="checkbox" /> Edit Root Motion
       </label>
       <label>
         World displacement
-        <select id="root-displacement-mode" aria-label="World displacement" defaultValue="authored">
+        <select id={ANIMATION_IDS.rootDisplacementMode} aria-label="World displacement" defaultValue="authored">
           <option value="authored">Authored Root Motion</option>
           <option value="preview">Preview-Only Displacement</option>
           <option value="none">No World Displacement</option>
         </select>
       </label>
       <label>
-        <input id="root-show-trajectory" type="checkbox" defaultChecked /> Show root trajectory
+        <input id={ANIMATION_IDS.rootShowTrajectory} type="checkbox" defaultChecked /> Show root trajectory
       </label>
       <label>
         Root loop behavior
-        <select id="root-loop-mode" aria-label="Root loop behavior" defaultValue="reset">
+        <select id={ANIMATION_IDS.rootLoopMode} aria-label="Root loop behavior" defaultValue="reset">
           <option value="reset">Reset each cycle</option>
           <option value="continuous">Continuous travel</option>
         </select>
@@ -33,42 +34,42 @@ export function RootMotionPanel() {
         starts in the first cycle. Editing the root shows that cycle and pauses camera follow. No World Displacement
         retains skeletal motion, including bone translation.
       </p>
-      <form id="root-position-form" className="root-motion-fields">
+      <form id={ANIMATION_IDS.rootPositionForm} className="root-motion-fields">
         <label>
-          Position X<input id="root-x" type="number" step="any" />
+          Position X<input id={ANIMATION_IDS.rootX} type="number" step="any" />
         </label>
         <label>
-          Position Y<input id="root-y" type="number" step="any" />
+          Position Y<input id={ANIMATION_IDS.rootY} type="number" step="any" />
         </label>
         <button type="submit" className="workspace-primary">
           Set position key
         </button>
       </form>
-      <button id="root-add-key" type="button" className="workspace-primary">
+      <button id={ANIMATION_IDS.rootAddKey} type="button" className="workspace-primary">
         Add root position key
       </button>
       <p>
         Select a Position X or Position Y timeline key to edit its time and value. Use Graph Editor for interpolation
         and tangents.
       </p>
-      <form id="root-key-form" className="root-motion-fields">
+      <form id={ANIMATION_IDS.rootKeyForm} className="root-motion-fields">
         <label>
           Key time (s)
-          <input id="root-key-time" type="number" min="0" step="any" />
+          <input id={ANIMATION_IDS.rootKeyTime} type="number" min="0" step="any" />
         </label>
         <label>
           Key value
-          <input id="root-key-value" type="number" step="any" />
+          <input id={ANIMATION_IDS.rootKeyValue} type="number" step="any" />
         </label>
-        <button id="root-apply-key" type="submit">
+        <button id={ANIMATION_IDS.rootApplyKey} type="submit">
           Apply key
         </button>
       </form>
       <div className="root-motion-actions">
-        <button id="root-duplicate-key" type="button">
+        <button id={ANIMATION_IDS.rootDuplicateKey} type="button">
           Duplicate key
         </button>
-        <button id="root-delete-key" type="button" className="workspace-danger">
+        <button id={ANIMATION_IDS.rootDeleteKey} type="button" className="workspace-danger">
           Delete key
         </button>
       </div>
@@ -76,7 +77,7 @@ export function RootMotionPanel() {
         Drag the purple square at the character origin. Release commits both axes; Escape cancels. Middle drag pans;
         wheel zooms.
       </p>
-      <p id="root-motion-status" role="status" />
+      <p id={ANIMATION_IDS.rootMotionStatus} role="status" />
     </div>
   );
 }

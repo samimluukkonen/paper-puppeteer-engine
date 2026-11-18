@@ -17,6 +17,7 @@ import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
 import { assetFilename } from '../shared/assetFilename.js';
+import { requireElement } from '../shared/editorElements.js';
 import { contactGroundDistance } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';
 import { GroundGuideWorkspace } from '../shared/GroundGuideWorkspace.js';
@@ -31,6 +32,7 @@ import { AnimationEditorPreview } from './AnimationEditorPreview.js';
 import { AnimationEditorRootHandle } from './AnimationEditorRootHandle.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { createCharacterDocuments } from './characterDocuments.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { EnvironmentPreviewCamera } from './EnvironmentPreviewCamera.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 import { EnvironmentPreviewLayer } from './EnvironmentPreviewLayer.js';
@@ -247,8 +249,8 @@ export class AnimationEditorScene extends Phaser.Scene {
         (entry) => entry.type === 'mesh' && entry.id === this.state?.selectedMeshId,
       );
       const message = this.meshDiagnostics.render(this.puppet, mesh?.type === 'mesh' ? mesh : undefined);
-      const status = document.getElementById('animation-mesh-diagnostics-status');
-      if (status && status.textContent !== message) status.textContent = message;
+      const status = requireElement(document, ANIMATION_IDS.meshDiagnosticsStatus, HTMLElement);
+      if (status.textContent !== message) status.textContent = message;
     } else this.meshDiagnostics?.clear();
     this.syncMirrorPreview();
     this.syncBakePreview();

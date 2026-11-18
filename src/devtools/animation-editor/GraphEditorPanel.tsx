@@ -1,58 +1,59 @@
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS } from './elementIds.js';
 
 /** React owns stable controls; GraphEditorController owns SVG children and transient gestures. */
 export function GraphEditorPanel() {
   return (
-    <section id="graph-editor" className="graph-editor" aria-label="Graph Editor" hidden data-tool-panel>
+    <section id={ANIMATION_IDS.graphEditor} className="graph-editor" aria-label="Graph Editor" hidden data-tool-panel>
       <div className="graph-controls" data-guide-id={GUIDE_TARGETS.animationGraphNavigation}>
-        <span id="graph-target" />
+        <span id={ANIMATION_IDS.graphTarget} />
         <label>
           Property{' '}
           <select
-            id="graph-property"
+            id={ANIMATION_IDS.graphProperty}
             aria-label="Graph property"
             data-guide-id={GUIDE_TARGETS.animationGraphProperty}
           />
         </label>
-        <button id="graph-fit" type="button" title="Fit all keys without changing authored data">
+        <button id={ANIMATION_IDS.graphFit} type="button" title="Fit all keys without changing authored data">
           Fit graph
         </button>
-        <button id="graph-zoom-in" type="button" aria-label="Zoom graph in">
+        <button id={ANIMATION_IDS.graphZoomIn} type="button" aria-label="Zoom graph in">
           +
         </button>
-        <button id="graph-zoom-out" type="button" aria-label="Zoom graph out">
+        <button id={ANIMATION_IDS.graphZoomOut} type="button" aria-label="Zoom graph out">
           −
         </button>
       </div>
       <svg
-        id="graph-canvas"
+        id={ANIMATION_IDS.graphCanvas}
         data-guide-id={GUIDE_TARGETS.animationGraphCanvas}
         role="group"
         aria-label="Property curve. Wheel to zoom, middle drag to pan, click the plot to scrub."
         tabIndex={0}
       >
-        <g id="graph-drawing" />
-        <line id="graph-playhead" className="graph-playhead" aria-label="Current playhead" />
+        <g id={ANIMATION_IDS.graphDrawing} />
+        <line id={ANIMATION_IDS.graphPlayhead} className="graph-playhead" aria-label="Current playhead" />
       </svg>
       <form
-        id="graph-key-form"
+        id={ANIMATION_IDS.graphKeyForm}
         className="graph-controls"
         aria-label="Graph key precision editing"
         data-guide-id={GUIDE_TARGETS.animationGraphKeys}
       >
         <label>
-          Key time (s) <input id="graph-key-time" type="number" min="0" step="any" required />
+          Key time (s) <input id={ANIMATION_IDS.graphKeyTime} type="number" min="0" step="any" required />
         </label>
         <label>
-          Value <input id="graph-key-value" type="number" step="any" required />
+          Value <input id={ANIMATION_IDS.graphKeyValue} type="number" step="any" required />
         </label>
-        <button id="graph-apply" type="submit">
+        <button id={ANIMATION_IDS.graphApply} type="submit">
           Apply key
         </button>
         <label title="Outgoing segment only. Auto inherits the clip's linear default; Stepped holds the value until the next key.">
           Interpolation
           <select
-            id="graph-interpolation"
+            id={ANIMATION_IDS.graphInterpolation}
             aria-label="Graph interpolation"
             data-guide-id={GUIDE_TARGETS.animationGraphInterpolation}
           >
@@ -63,7 +64,7 @@ export function GraphEditorPanel() {
           </select>
         </label>
         <button
-          id="graph-reset-handles"
+          id={ANIMATION_IDS.graphResetHandles}
           type="button"
           title="Reset to horizontal endpoint tangents at one third and two thirds of the segment"
         >
@@ -73,7 +74,7 @@ export function GraphEditorPanel() {
       <details className="graph-tangent-details">
         <summary>Tangent precision</summary>
         <form
-          id="graph-handle-form"
+          id={ANIMATION_IDS.graphHandleForm}
           className="graph-controls"
           aria-label="Tangent precision editing"
           data-guide-id={GUIDE_TARGETS.animationGraphTangents}
@@ -86,12 +87,12 @@ export function GraphEditorPanel() {
               </label>
             )),
           )}
-          <button id="graph-apply-handles" type="submit">
+          <button id={ANIMATION_IDS.graphApplyHandles} type="submit">
             Apply handles
           </button>
         </form>
       </details>
-      <p id="graph-status" className="workspace-caption" role="status" />
+      <p id={ANIMATION_IDS.graphStatus} className="workspace-caption" role="status" />
       <p className="workspace-caption graph-help">
         Drag keys to edit time/value; Shift bypasses frame snapping. Tangents control normalized segment time/progress
         (0–1). Wheel zooms, middle drag pans, F fits. Delete removes shared selected keys; Escape cancels a drag.

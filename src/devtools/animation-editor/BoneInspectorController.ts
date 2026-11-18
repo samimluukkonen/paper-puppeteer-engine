@@ -1,9 +1,11 @@
 import { transformProperties, type JointTransform, type TransformProperty } from '../../engine/core.js';
 import { setAttribute, setText } from '../../shared/domUpdates.js';
 import { boneHierarchy } from '../shared/boneHierarchy.js';
+import { requireElement } from '../shared/editorElements.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import { type HierarchyEntry, navigateHierarchy, setHierarchyTabStop } from '../shared/hierarchyNavigation.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { toDisplayTransformValue, toLocalTransformValue } from './transformValues.js';
 
 const labels: Record<TransformProperty, string> = {
@@ -23,6 +25,9 @@ export class BoneInspectorController {
   private readonly title: HTMLElement;
   private readonly fields: HTMLFieldSetElement;
   private readonly cancel: HTMLButtonElement;
+  private readonly section: HTMLElement;
+  private readonly boneEmpty: HTMLElement;
+  private readonly selectionEmpty: HTMLElement;
   private readonly buttons = new Map<string, HTMLButtonElement>();
   private readonly hierarchyEntries: HierarchyEntry[] = [];
   private selectedButton: HTMLButtonElement | undefined;
@@ -42,15 +47,13 @@ export class BoneInspectorController {
   private scrubbing: boolean | undefined;
 
   constructor(app: HTMLElement) {
-    const element = <T extends HTMLElement>(selector: string): T => {
-      const found = app.querySelector<T>(selector);
-      if (!found) throw new Error(`Missing bone inspector element ${selector}.`);
-      return found;
-    };
-    this.hierarchy = element('#animation-bones');
-    this.title = element('#animation-bone-title');
-    this.fields = element('#animation-bone-fields');
-    this.cancel = element('#animation-cancel-transform');
+    this.hierarchy = requireElement(app, ANIMATION_IDS.bones, HTMLElement);
+    this.title = requireElement(app, ANIMATION_IDS.boneTitle, HTMLElement);
+    this.fields = requireElement(app, ANIMATION_IDS.boneFields, HTMLFieldSetElement);
+    this.cancel = requireElement(app, ANIMATION_IDS.cancelTransform, HTMLButtonElement);
+    this.section = requireElement(app, ANIMATION_IDS.boneInspector, HTMLElement);
+    this.boneEmpty = requireElement(app, ANIMATION_IDS.boneEmpty, HTMLElement);
+    this.selectionEmpty = requireElement(app, ANIMATION_IDS.selectionEmpty, HTMLElement);
     const options = { signal: this.abort.signal };
     for (const property of transformProperties) {
       const row = document.createElement('div');
@@ -178,13 +181,9 @@ export class BoneInspectorController {
   private render(force = false): void {
     const state = this.state;
     const transform = state?.selectedBoneTransform;
-    const section = this.title.closest<HTMLElement>('#animation-bone-inspector');
     // This controller owns bone-panel visibility for every selection kind.
-    if (section) section.hidden = !!state?.selectedIKConstraintId || !!state?.selectedEvent;
-    const selectionEmpty = this.title
-      .closest('.animation-selection-details')
-      ?.querySelector<HTMLElement>('#animation-selection-empty');
-    if (selectionEmpty) selectionEmpty.hidden = !state?.selectedIKConstraintId;
+    this.section.hidden = !!state?.selectedIKConstraintId || !!state?.selectedEvent;
+    this.selectionEmpty.hidden = !state?.selectedIKConstraintId;
     const navigated =
       force ||
       this.bone !== state?.selectedBoneId ||
@@ -201,9 +200,8 @@ export class BoneInspectorController {
     if (this.fields.disabled !== !transform) this.fields.disabled = !transform;
     this.fields.hidden = !transform;
     this.cancel.hidden = !transform;
-    const empty = section?.querySelector<HTMLElement>('#animation-bone-empty');
-    if (empty) empty.hidden = !!transform;
-    const help = section?.querySelector<HTMLElement>('.animation-field-help');
+    this.boneEmpty.hidden = !!transform;
+    const help = this.section.querySelector<HTMLElement>('.animation-field-help');
     if (help) help.hidden = !transform;
     const selected = this.bone ? this.buttons.get(this.bone) : undefined;
     if (selected !== this.selectedButton) {

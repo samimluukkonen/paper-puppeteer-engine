@@ -1,3 +1,5 @@
+import { requireElement } from '../shared/editorElements.js';
+import { ANIMATION_IDS, focusAuthoringToolsMenu } from './elementIds.js';
 /** Dismiss and position disclosures without changing editor selection or document state. */
 export class EditorMenuController {
   private readonly abort = new AbortController();
@@ -66,7 +68,7 @@ export class EditorMenuController {
         const menu = button.closest<HTMLDetailsElement>('[data-workspace-menu]');
         const panelId = button.dataset.openPanel;
         if (panelId) {
-          const panel = app.querySelector<HTMLDetailsElement>(`#${panelId}`)!;
+          const panel = requireElement(app, panelId, HTMLDetailsElement);
           for (const other of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]'))
             if (other !== panel) other.open = false;
           panel.open = true;
@@ -74,7 +76,7 @@ export class EditorMenuController {
           panel.querySelector<HTMLButtonElement>('[data-close-panel]')!.focus({ preventScroll: true });
         } else if (button.hasAttribute('data-close-panel')) {
           button.closest<HTMLDetailsElement>('[data-tool-panel]')!.open = false;
-          app.querySelector<HTMLElement>('#animation-authoring-tools > summary')!.focus({ preventScroll: true });
+          focusAuthoringToolsMenu(app, { preventScroll: true });
         } else if (menu && !app.querySelector('dialog[open]')) {
           // Return focus to the disclosure or the marker that opened the context commands.
           this.close(menu, true);
@@ -90,7 +92,7 @@ export class EditorMenuController {
         const marker = event.target.closest<HTMLElement>('.timeline-keyframe, .timeline-event');
         if (!marker) return;
         event.preventDefault();
-        const menu = app.querySelector<HTMLDetailsElement>('#timeline-edit-menu')!;
+        const menu = requireElement(app, ANIMATION_IDS.timelineEditMenu, HTMLDetailsElement);
         this.closeOthers(menu);
         this.contextSource = marker;
         menu.open = true;

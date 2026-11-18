@@ -1,8 +1,19 @@
 import { setAttribute } from '../../shared/domUpdates.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import type { GraphKeyRef } from './graphEditor.js';
 import { rootKeys } from './rootMotionEdits.js';
 import { timeToTimelineX } from './timeline.js';
+
+/** Controls that edit the selected root key, disabled until one is selected. */
+const KEY_CONTROLS = new Set<string>([
+  ANIMATION_IDS.rootKeyTime,
+  ANIMATION_IDS.rootKeyValue,
+  ANIMATION_IDS.rootApplyKey,
+  ANIMATION_IDS.rootDeleteKey,
+  ANIMATION_IDS.rootDuplicateKey,
+]);
 
 /** DOM adapter for root rows and the collapsed inspector; all authored changes use session commands. */
 export class RootMotionController {
@@ -41,32 +52,27 @@ export class RootMotionController {
       this.lanes.push(lane);
     }
     const options = { signal: this.abort.signal };
-    this.app
-      .querySelector('#root-add-key')
-      ?.addEventListener('click', () => this.run(() => this.state?.addRootPositionKey()), options);
-    this.app
-      .querySelector('#root-delete-key')
-      ?.addEventListener('click', () => this.run(() => this.state?.deleteRootKey()), options);
-    this.app
-      .querySelector('#root-duplicate-key')
-      ?.addEventListener('click', () => this.run(() => this.state?.duplicateRootKey()), options);
-    for (const [id, setting] of [
-      ['root-edit-mode', 'editing'],
-      ['root-show-trajectory', 'trajectory'],
+    for (const [id, action] of [
+      [ANIMATION_IDS.rootAddKey, () => this.state?.addRootPositionKey()],
+      [ANIMATION_IDS.rootDeleteKey, () => this.state?.deleteRootKey()],
+      [ANIMATION_IDS.rootDuplicateKey, () => this.state?.duplicateRootKey()],
     ] as const)
-      this.app
-        .querySelector<HTMLInputElement>(`#${id}`)
-        ?.addEventListener(
-          'change',
-          (event) => this.state?.setRootMotionView({ [setting]: (event.target as HTMLInputElement).checked }),
-          options,
-        );
-    for (const id of ['root-displacement-mode', 'root-loop-mode'])
-      this.app.querySelector<HTMLSelectElement>(`#${id}`)?.addEventListener(
+      requireElement(this.app, id, HTMLButtonElement).addEventListener('click', () => this.run(action), options);
+    for (const [id, setting] of [
+      [ANIMATION_IDS.rootEditMode, 'editing'],
+      [ANIMATION_IDS.rootShowTrajectory, 'trajectory'],
+    ] as const)
+      requireElement(this.app, id, HTMLInputElement).addEventListener(
+        'change',
+        (event) => this.state?.setRootMotionView({ [setting]: (event.target as HTMLInputElement).checked }),
+        options,
+      );
+    for (const id of [ANIMATION_IDS.rootDisplacementMode, ANIMATION_IDS.rootLoopMode])
+      requireElement(this.app, id, HTMLSelectElement).addEventListener(
         'change',
         () => {
-          const mode = this.app.querySelector<HTMLSelectElement>('#root-displacement-mode')!.value;
-          const loop = this.app.querySelector<HTMLSelectElement>('#root-loop-mode')!.value;
+          const mode = requireElement(this.app, ANIMATION_IDS.rootDisplacementMode, HTMLSelectElement).value;
+          const loop = requireElement(this.app, ANIMATION_IDS.rootLoopMode, HTMLSelectElement).value;
           if (
             (mode === 'authored' || mode === 'preview' || mode === 'none') &&
             (loop === 'reset' || loop === 'continuous')
@@ -75,15 +81,17 @@ export class RootMotionController {
         },
         options,
       );
-    this.app.querySelector('#root-position-form')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.rootPositionForm, HTMLFormElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
-        this.run(() => this.state?.setRootPosition({ x: this.number('root-x'), y: this.number('root-y') }));
+        this.run(() =>
+          this.state?.setRootPosition({ x: this.number(ANIMATION_IDS.rootX), y: this.number(ANIMATION_IDS.rootY) }),
+        );
       },
       options,
     );
-    this.app.querySelector('#root-key-form')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.rootKeyForm, HTMLFormElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
@@ -92,7 +100,7 @@ export class RootMotionController {
           this.run(() =>
             this.state?.editGraphKey(
               { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
-              { time: this.number('root-key-time'), value: this.number('root-key-value') },
+              { time: this.number(ANIMATION_IDS.rootKeyTime), value: this.number(ANIMATION_IDS.rootKeyValue) },
             ),
           );
       },
@@ -115,18 +123,17 @@ export class RootMotionController {
     );
   }
   private number(id: string): number {
-    return this.app.querySelector<HTMLInputElement>(`#${id}`)!.valueAsNumber;
+    return requireElement(this.app, id, HTMLInputElement).valueAsNumber;
   }
   private run(action: () => unknown): unknown {
-    const status = this.app.querySelector('#root-motion-status');
+    const status = requireElement(this.app, ANIMATION_IDS.rootMotionStatus, HTMLElement);
     try {
       const result = action();
-      if (status)
-        status.textContent =
-          result === false ? 'No change applied. Check the selected key and choose a time inside the clip.' : '';
+      status.textContent =
+        result === false ? 'No change applied. Check the selected key and choose a time inside the clip.' : '';
       return result;
     } catch (error) {
-      if (status) status.textContent = error instanceof Error ? error.message : String(error);
+      status.textContent = error instanceof Error ? error.message : String(error);
       return false;
     }
   }
@@ -227,27 +234,23 @@ export class RootMotionController {
     if (restoreFocus) {
       const key = state.selectedRootKey;
       const marker = key ? this.markers.get(`${key.property}:${key.time}`) : undefined;
-      (marker ?? this.app.querySelector<HTMLElement>('#timeline'))?.focus({ preventScroll: true });
+      (marker ?? requireElement(this.app, ANIMATION_IDS.timeline, HTMLElement)).focus({ preventScroll: true });
     }
     for (const [id, checked] of [
-      ['root-edit-mode', state.rootMotionEditing],
-      ['root-show-trajectory', state.rootTrajectoryVisible],
-    ] as const) {
-      const input = this.app.querySelector<HTMLInputElement>(`#${id}`);
-      if (input) input.checked = checked;
-    }
+      [ANIMATION_IDS.rootEditMode, state.rootMotionEditing],
+      [ANIMATION_IDS.rootShowTrajectory, state.rootTrajectoryVisible],
+    ] as const)
+      requireElement(this.app, id, HTMLInputElement).checked = checked;
     for (const [id, value] of [
-      ['root-displacement-mode', state.worldDisplacementMode],
-      ['root-loop-mode', state.rootLoopMode],
-    ] as const) {
-      const select = this.app.querySelector<HTMLSelectElement>(`#${id}`);
-      if (select) select.value = value;
-    }
+      [ANIMATION_IDS.rootDisplacementMode, state.worldDisplacementMode],
+      [ANIMATION_IDS.rootLoopMode, state.rootLoopMode],
+    ] as const)
+      requireElement(this.app, id, HTMLSelectElement).value = value;
     const values: Record<string, number | undefined> = {
-      'root-x': state.rootPosition.x,
-      'root-y': state.rootPosition.y,
-      'root-key-time': state.selectedRootKey?.time,
-      'root-key-value':
+      [ANIMATION_IDS.rootX]: state.rootPosition.x,
+      [ANIMATION_IDS.rootY]: state.rootPosition.y,
+      [ANIMATION_IDS.rootKeyTime]: state.selectedRootKey?.time,
+      [ANIMATION_IDS.rootKeyValue]:
         state.selectedRootKey && state.workingAnimation
           ? rootKeys(state.workingAnimation, state.selectedRootKey.property).find(
               (key) => key.time / 1000 === state.selectedRootKey!.time,
@@ -255,21 +258,16 @@ export class RootMotionController {
           : undefined,
     };
     for (const [id, value] of Object.entries(values)) {
-      const input = this.app.querySelector<HTMLInputElement>(`#${id}`);
-      if (input && document.activeElement !== input) input.value = value === undefined ? '' : String(value);
+      const input = requireElement(this.app, id, HTMLInputElement);
+      if (document.activeElement !== input) input.value = value === undefined ? '' : String(value);
     }
-    this.app
-      .querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
-        '#root-motion-panel input, #root-motion-panel button, #root-motion-panel select',
-      )
+    requireElement(this.app, ANIMATION_IDS.rootMotionPanel, HTMLElement)
+      .querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select')
       .forEach((input) => {
         input.disabled =
           !state.workingAnimation ||
           !state.animationAuthoringEnabled ||
-          (['root-key-time', 'root-key-value', 'root-apply-key', 'root-delete-key', 'root-duplicate-key'].includes(
-            input.id,
-          ) &&
-            !state.selectedRootKey);
+          (KEY_CONTROLS.has(input.id) && !state.selectedRootKey);
       });
   }
   dispose(): void {

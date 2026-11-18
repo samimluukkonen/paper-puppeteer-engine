@@ -1,3 +1,5 @@
+import { requireElement } from '../shared/editorElements.js';
+import { RIG_IDS } from './elementIds.js';
 import type { RigEditor } from './RigEditor.js';
 import type { EditMode, GridSnap, RotationSnap } from './RigEditorState.js';
 
@@ -7,7 +9,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
   let editor: RigEditor | undefined;
   let clipsEditor: RigEditor | undefined;
   let clipNames = '';
-  const visibility = app.querySelector<HTMLElement>('#visibility')!;
+  const visibility = requireElement(app, RIG_IDS.visibility, HTMLElement);
   function render(current: RigEditor): void {
     if (lifetime.signal.aborted) return;
     editor = current;
@@ -46,7 +48,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     if (clipsEditor !== current || clipNames !== namesKey) {
       clipsEditor = current;
       clipNames = namesKey;
-      const poses = app.querySelector<HTMLSelectElement>('#rig-preview-pose')!;
+      const poses = requireElement(app, RIG_IDS.previewPose, HTMLSelectElement);
       poses.replaceChildren();
       for (const [name, title] of [
         ['', 'Bind pose'],
@@ -58,13 +60,13 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
         poses.append(option);
       }
     }
-    app.querySelector<HTMLSelectElement>('#rig-facing')!.value = state.facing;
-    app.querySelector<HTMLSelectElement>('#rig-preview-pose')!.value = current.previewName ?? '';
-    const time = app.querySelector<HTMLInputElement>('#rig-preview-time')!;
+    requireElement(app, RIG_IDS.facing, HTMLSelectElement).value = state.facing;
+    requireElement(app, RIG_IDS.previewPose, HTMLSelectElement).value = current.previewName ?? '';
+    const time = requireElement(app, RIG_IDS.previewTime, HTMLInputElement);
     time.value = String(current.previewTime ?? 0);
     time.disabled = !current.previewName;
     time.max = String(current.previewClips?.find((clip) => clip.name === current.previewName)?.duration ?? 0);
-    app.querySelector<HTMLElement>('#rig-mode-hint')!.textContent =
+    requireElement(app, RIG_IDS.modeHint, HTMLElement).textContent =
       {
         mesh: 'Edit Mesh Geometry: drag cyan diamond vertices; select edges in the Mesh inspector',
         weights: 'Paint Bone Weights: brush mesh vertices; choose bone and brush in Mesh geometry',
@@ -75,16 +77,16 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
       }[state.editMode] +
       (current.previewName ? ' · Bone pose preview; switch to Bind pose for joint/slot editing' : '') +
       ' · Wheel to zoom · Middle drag to pan · Escape cancels';
-    app.querySelector<HTMLInputElement>('#ik-preview')!.checked = state.ikPreview;
-    app.querySelector<HTMLSelectElement>('#edit-mode')!.value = state.editMode;
-    app.querySelector<HTMLSelectElement>('#grid-snap')!.value = String(state.gridSnap);
-    app.querySelector<HTMLSelectElement>('#rotation-snap')!.value = String(state.rotationSnap);
-    app.querySelector<HTMLSelectElement>('#opacity')!.value = String(state.artworkOpacity);
-    app.querySelector<HTMLInputElement>('#dim-selection')!.checked = state.dimUnselected;
+    requireElement(app, RIG_IDS.ikPreview, HTMLInputElement).checked = state.ikPreview;
+    requireElement(app, RIG_IDS.editMode, HTMLSelectElement).value = state.editMode;
+    requireElement(app, RIG_IDS.gridSnap, HTMLSelectElement).value = String(state.gridSnap);
+    requireElement(app, RIG_IDS.rotationSnap, HTMLSelectElement).value = String(state.rotationSnap);
+    requireElement(app, RIG_IDS.opacity, HTMLSelectElement).value = String(state.artworkOpacity);
+    requireElement(app, RIG_IDS.dimSelection, HTMLInputElement).checked = state.dimUnselected;
     for (const input of visibility.querySelectorAll<HTMLInputElement>('input'))
       input.checked = state.visibility[input.dataset.visibility as keyof typeof state.visibility];
   }
-  app.querySelector<HTMLSelectElement>('#opacity')!.addEventListener(
+  requireElement(app, RIG_IDS.opacity, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       if (!editor) return;
@@ -93,7 +95,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLSelectElement>('#edit-mode')!.addEventListener(
+  requireElement(app, RIG_IDS.editMode, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       if (!editor) return;
@@ -105,7 +107,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLSelectElement>('#grid-snap')!.addEventListener(
+  requireElement(app, RIG_IDS.gridSnap, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       if (!editor) return;
@@ -115,7 +117,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLSelectElement>('#rotation-snap')!.addEventListener(
+  requireElement(app, RIG_IDS.rotationSnap, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       if (!editor) return;
@@ -124,7 +126,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLInputElement>('#dim-selection')!.addEventListener(
+  requireElement(app, RIG_IDS.dimSelection, HTMLInputElement).addEventListener(
     'change',
     (event) => {
       if (!editor) return;
@@ -133,7 +135,7 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLInputElement>('#ik-preview')!.addEventListener(
+  requireElement(app, RIG_IDS.ikPreview, HTMLInputElement).addEventListener(
     'change',
     (event) => {
       editor?.setIKPreview((event.target as HTMLInputElement).checked);
@@ -141,21 +143,21 @@ export function createControlsController(app: HTMLElement, updateStatus: (editor
     { signal: lifetime.signal },
   );
 
-  app.querySelector<HTMLSelectElement>('#rig-facing')!.addEventListener(
+  requireElement(app, RIG_IDS.facing, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       editor?.setFacing((event.target as HTMLSelectElement).value as 'left' | 'right');
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLSelectElement>('#rig-preview-pose')!.addEventListener(
+  requireElement(app, RIG_IDS.previewPose, HTMLSelectElement).addEventListener(
     'change',
     (event) => {
       editor?.setPreviewPose((event.target as HTMLSelectElement).value);
     },
     { signal: lifetime.signal },
   );
-  app.querySelector<HTMLInputElement>('#rig-preview-time')!.addEventListener(
+  requireElement(app, RIG_IDS.previewTime, HTMLInputElement).addEventListener(
     'input',
     (event) => {
       const time = Number((event.target as HTMLInputElement).value);

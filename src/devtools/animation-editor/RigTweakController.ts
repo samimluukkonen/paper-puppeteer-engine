@@ -1,4 +1,5 @@
 import type { AttachmentController } from '../rig-editor/AttachmentController.js';
+import { RIG_IDS } from '../rig-editor/elementIds.js';
 import { createHierarchyController } from '../rig-editor/HierarchyController.js';
 import { createInspectorController } from '../rig-editor/InspectorController.js';
 import type { RigEditor } from '../rig-editor/RigEditor.js';
@@ -6,10 +7,12 @@ import type { EditMode, GridSnap, RigEditorRecoverySnapshot, RotationSnap } from
 import { createSessionController } from '../rig-editor/SessionController.js';
 import { DraftRecoveryControls } from '../shared/DraftRecoveryControls.js';
 import { draftSource } from '../shared/draftSource.js';
+import { requireElement } from '../shared/editorElements.js';
 import { rigDraftKey } from '../shared/rigDraftSession.js';
 import { Subscribers } from '../shared/subscriberNotifications.js';
 import type { AnimationEditorScene } from './AnimationEditorScene.js';
 import type { AnimationEditorState, EditorMode } from './AnimationEditorState.js';
+import { ANIMATION_IDS, RIG_TWEAK_SESSION_IDS } from './elementIds.js';
 
 interface RigTweakSnapshot {
   mode: EditorMode;
@@ -67,22 +70,20 @@ export class RigTweakController {
   }
 
   initialize(app: HTMLElement, getScene: () => AnimationEditorScene): void {
+    // The rig view shares this recovery; the character workspace renders it beside the animation view.
+    const rigApp = requireElement(app.parentElement ?? document, RIG_IDS.app, HTMLElement);
     const recoveryControls = new DraftRecoveryControls<RigEditorRecoverySnapshot>(
       [
-        app.querySelector<HTMLElement>('#tweak-rig-draft-status')!,
-        ...Array.from(app.parentElement?.querySelectorAll<HTMLElement>('#editor-app #rig-draft-status') ?? []),
+        requireElement(app, ANIMATION_IDS.tweakRigDraftStatus, HTMLElement),
+        requireElement(rigApp, RIG_IDS.draftStatus, HTMLElement),
       ],
       [
-        app.querySelector<HTMLButtonElement>('#tweak-rig-download-retained-drafts')!,
-        ...Array.from(
-          app.parentElement?.querySelectorAll<HTMLButtonElement>('#editor-app #rig-download-retained-drafts') ?? [],
-        ),
+        requireElement(app, ANIMATION_IDS.tweakRigDownloadRetainedDrafts, HTMLButtonElement),
+        requireElement(rigApp, RIG_IDS.downloadRetainedDrafts, HTMLButtonElement),
       ],
       [
-        app.querySelector<HTMLButtonElement>('#tweak-rig-clear-retained-drafts')!,
-        ...Array.from(
-          app.parentElement?.querySelectorAll<HTMLButtonElement>('#editor-app #rig-clear-retained-drafts') ?? [],
-        ),
+        requireElement(app, ANIMATION_IDS.tweakRigClearRetainedDrafts, HTMLButtonElement),
+        requireElement(rigApp, RIG_IDS.clearRetainedDrafts, HTMLButtonElement),
       ],
     );
     const recovery = recoveryControls.recovery;
@@ -95,30 +96,34 @@ export class RigTweakController {
       },
       {},
       {
-        idPrefix: 'tweak-',
-        stageSelector: '#animation-stage',
+        ids: RIG_TWEAK_SESSION_IDS,
+        stageId: ANIMATION_IDS.stage,
         dirtyLabel: 'Rig',
         sessionFormat: 'table',
         hasPendingChanges: () => getScene().hasPendingArtworkProposal,
       },
     );
     const inspector = createInspectorController(
-      app.querySelector<HTMLElement>('#tweak-inspector')!,
+      requireElement(app, ANIMATION_IDS.tweakInspector, HTMLElement),
       session.updateStatus,
     );
-    const hierarchy = createHierarchyController(app.querySelector<HTMLElement>('#tweak-hierarchy')!);
+    const hierarchy = createHierarchyController(requireElement(app, ANIMATION_IDS.tweakHierarchy, HTMLElement));
     const lifetime = new AbortController();
-    for (const id of ['edit-mode', 'grid-snap', 'rotation-snap'] as const) {
-      app.querySelector<HTMLSelectElement>(`#tweak-${id}`)!.addEventListener(
+    for (const [id, setting] of [
+      [ANIMATION_IDS.tweakEditMode, 'edit-mode'],
+      [ANIMATION_IDS.tweakGridSnap, 'grid-snap'],
+      [ANIMATION_IDS.tweakRotationSnap, 'rotation-snap'],
+    ] as const) {
+      requireElement(app, id, HTMLSelectElement).addEventListener(
         'change',
         (event) => {
           const editor = this.editor;
           if (!editor || this.state?.editorMode !== 'rig-tweak') return;
           editor.cancelGesture();
           const value = (event.target as HTMLSelectElement).value;
-          if (id === 'edit-mode') editor.state.editMode = value as EditMode;
-          if (id === 'grid-snap') editor.state.gridSnap = Number(value) as GridSnap;
-          if (id === 'rotation-snap') editor.state.rotationSnap = Number(value) as RotationSnap;
+          if (setting === 'edit-mode') editor.state.editMode = value as EditMode;
+          if (setting === 'grid-snap') editor.state.gridSnap = Number(value) as GridSnap;
+          if (setting === 'rotation-snap') editor.state.rotationSnap = Number(value) as RotationSnap;
           editor.refresh();
         },
         { signal: lifetime.signal },
@@ -132,9 +137,9 @@ export class RigTweakController {
         inspector.render(editor);
         hierarchy.render(editor);
       }
-      app.querySelector<HTMLSelectElement>('#tweak-edit-mode')!.value = editor.state.editMode;
-      app.querySelector<HTMLSelectElement>('#tweak-grid-snap')!.value = String(editor.state.gridSnap);
-      app.querySelector<HTMLSelectElement>('#tweak-rotation-snap')!.value = String(editor.state.rotationSnap);
+      requireElement(app, ANIMATION_IDS.tweakEditMode, HTMLSelectElement).value = editor.state.editMode;
+      requireElement(app, ANIMATION_IDS.tweakGridSnap, HTMLSelectElement).value = String(editor.state.gridSnap);
+      requireElement(app, ANIMATION_IDS.tweakRotationSnap, HTMLSelectElement).value = String(editor.state.rotationSnap);
     };
     this.bindDraft = () => {
       if (this.options.projectHosted) return;

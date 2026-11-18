@@ -1,9 +1,11 @@
 import { readJsonFile } from '../../engine/core.js';
 import { setText } from '../../shared/domUpdates.js';
 import { downloadJson } from '../../shared/downloadJson.js';
+import { requireElement } from '../shared/editorElements.js';
 import { SessionActionGuard } from '../shared/SessionActionGuard.js';
 import type { AnimationImportOptions } from './AnimationEditorDocument.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 
 /** Owns animation file controls, request lifetimes, replacement confirmation and export checkpoints. */
 export class AnimationFileController {
@@ -25,16 +27,16 @@ export class AnimationFileController {
     private readonly getState: () => AnimationEditorState,
     private readonly onReplace: () => void,
   ) {
-    this.download = this.element<HTMLButtonElement>('#animation-download');
-    this.copyJson = this.element<HTMLButtonElement>('#animation-copy-json');
-    this.logJson = this.element<HTMLButtonElement>('#animation-log-json');
-    this.exportFeedback = this.element('#animation-export-feedback');
-    this.importPanel = this.element('#animation-import-panel');
-    this.importText = this.element<HTMLTextAreaElement>('#animation-import-text');
-    this.importFile = this.element<HTMLInputElement>('#animation-import-file');
-    this.importFeedback = this.element('#animation-import-feedback');
-    this.reloadExport = this.element<HTMLButtonElement>('#animation-reload-export');
-    this.revert = this.element<HTMLButtonElement>('#animation-revert');
+    this.download = requireElement(this.app, ANIMATION_IDS.download, HTMLButtonElement);
+    this.copyJson = requireElement(this.app, ANIMATION_IDS.copyJson, HTMLButtonElement);
+    this.logJson = requireElement(this.app, ANIMATION_IDS.logJson, HTMLButtonElement);
+    this.exportFeedback = requireElement(this.app, ANIMATION_IDS.exportFeedback, HTMLElement);
+    this.importPanel = requireElement(this.app, ANIMATION_IDS.importPanel, HTMLElement);
+    this.importText = requireElement(this.app, ANIMATION_IDS.importText, HTMLTextAreaElement);
+    this.importFile = requireElement(this.app, ANIMATION_IDS.importFile, HTMLInputElement);
+    this.importFeedback = requireElement(this.app, ANIMATION_IDS.importFeedback, HTMLElement);
+    this.reloadExport = requireElement(this.app, ANIMATION_IDS.reloadExport, HTMLButtonElement);
+    this.revert = requireElement(this.app, ANIMATION_IDS.revert, HTMLButtonElement);
     const options = { signal: this.abort.signal };
     // Keep invalid inspector drafts from moving the reload button between down/up.
     for (const button of [this.reloadExport, this.revert])
@@ -45,7 +47,7 @@ export class AnimationFileController {
         },
         options,
       );
-    this.element('#animation-import-paste').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.importPaste, HTMLElement).addEventListener(
       'click',
       () => {
         this.importPanel.hidden = false;
@@ -53,7 +55,7 @@ export class AnimationFileController {
       },
       options,
     );
-    this.element('#animation-import-cancel').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.importCancel, HTMLElement).addEventListener(
       'click',
       () => {
         this.requests.cancelImports();
@@ -63,7 +65,7 @@ export class AnimationFileController {
       },
       options,
     );
-    this.element('#animation-import-submit').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.importSubmit, HTMLElement).addEventListener(
       'click',
       () => {
         this.requests.cancelImports();
@@ -125,12 +127,12 @@ export class AnimationFileController {
 
   private setImportFeedback(message: string): void {
     setText(this.importFeedback, message);
-    setText(this.element('#animation-file-import-feedback'), message);
+    setText(requireElement(this.app, ANIMATION_IDS.fileImportFeedback, HTMLElement), message);
   }
 
   private setExportFeedback(message: string): void {
     setText(this.exportFeedback, message);
-    setText(this.element('#animation-file-export-feedback'), message);
+    setText(requireElement(this.app, ANIMATION_IDS.fileExportFeedback, HTMLElement), message);
   }
 
   private get state(): AnimationEditorState {
@@ -237,12 +239,6 @@ export class AnimationFileController {
     }
   }
 
-  private element<T extends HTMLElement = HTMLElement>(selector: string): T {
-    const element = this.app.querySelector<T>(selector);
-    if (!element) throw new Error(`Missing animation editor element ${selector}.`);
-    return element;
-  }
-
   /** Selection/discard replaces pending requests while preserving any open import text. */
   invalidateSession(message = ''): void {
     this.requests.invalidate();
@@ -266,7 +262,7 @@ export class AnimationFileController {
     this.reloadExport.disabled = !animation;
     this.revert.disabled = !animation;
     this.importFile.disabled = !state.rig;
-    this.element<HTMLButtonElement>('#animation-import-paste').disabled = !state.rig;
+    requireElement(this.app, ANIMATION_IDS.importPaste, HTMLButtonElement).disabled = !state.rig;
   }
 
   dispose(): void {

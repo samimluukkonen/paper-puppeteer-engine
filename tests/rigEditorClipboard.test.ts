@@ -1,4 +1,5 @@
 import { afterEach, assert, test, vi } from 'vitest';
+import { RIG_TWEAK_SESSION_IDS } from '../src/devtools/animation-editor/elementIds.js';
 import type { RigEditor } from '../src/devtools/rig-editor/RigEditor.js';
 import { RigEditorState } from '../src/devtools/rig-editor/RigEditorState.js';
 import { createSessionController, type RigSessionHost } from '../src/devtools/rig-editor/SessionController.js';
@@ -75,7 +76,7 @@ test('rig file checkpoints can be reloaded from either view of the shared owner'
     () => scene,
     () => {},
     {},
-    { idPrefix: 'tweak-' },
+    { ids: RIG_TWEAK_SESSION_IDS },
   );
   querySelector('#tweak-reload-exported').click();
   assert.equal(scene.reloadRig.mock.calls.at(-1)![0].bones[0]!.x, 15);
@@ -91,7 +92,7 @@ test('a delayed export from another rig view cannot overwrite a newer successful
     () => scene,
     () => {},
     {},
-    { idPrefix: 'tweak-' },
+    { ids: RIG_TWEAK_SESSION_IDS },
   );
   second.updateStatus({ state, exportRig: (save: boolean) => state.exportRig(save) } as RigEditor);
   state.editBone('root', 'x', 20);

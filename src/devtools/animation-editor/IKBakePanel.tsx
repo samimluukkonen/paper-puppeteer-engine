@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
+import { ANIMATION_IDS, focusAuthoringToolsMenu } from './elementIds.js';
 import type { IKBakeController } from './IKBakeController.js';
 
 /** React renders controller proposals; no animation mutation or separate clock lives here. */
@@ -9,7 +10,7 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
   const plan = state.plan?.success ? state.plan : null;
   return (
     <details
-      id="animation-bake-panel"
+      id={ANIMATION_IDS.bakePanel}
       data-tool-panel
       className="animation-popover animation-ik-baking"
       onToggle={(event) => {
@@ -21,7 +22,7 @@ export function IKBakePanel({ controller }: { controller: IKBakeController }) {
           event.stopPropagation();
           controller.setPanelOpen(false);
           event.currentTarget.open = false;
-          document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
+          focusAuthoringToolsMenu();
         }
       }}
     >

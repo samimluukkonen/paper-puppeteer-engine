@@ -1,9 +1,19 @@
 import { getMeshDeformationTrack, sampleMeshDeformation } from '../../engine/core.js';
 import type { MeshDeformationKey, VertexOffset, MeshAttachmentDefinition } from '../../engine/data.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { timeToTimelineX } from './timeline.js';
 
 const svgNS = 'http://www.w3.org/2000/svg';
+/** Controls that edit the selected deformation key, disabled until one is selected. */
+const KEY_CONTROLS = new Set<string>([
+  ANIMATION_IDS.deformationKeyTime,
+  ANIMATION_IDS.deformationCurve,
+  ANIMATION_IDS.deformationApplyKey,
+  ANIMATION_IDS.deformationDeleteKey,
+  ANIMATION_IDS.deformationDuplicateKey,
+]);
 /** Bind-space manipulation deliberately avoids inverting a weighted, potentially singular posed mesh. */
 export class MeshDeformationController {
   readonly labels: HTMLElement[] = [];
@@ -37,21 +47,21 @@ export class MeshDeformationController {
 
   constructor(private readonly app: HTMLElement) {
     const options = { signal: this.abort.signal };
-    this.element<HTMLInputElement>('deformation-diagnostics')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.deformationDiagnostics, HTMLInputElement).addEventListener(
       'change',
       (event) => {
         this.state?.setMeshDiagnostics((event.target as HTMLInputElement).checked);
       },
       options,
     );
-    this.element<HTMLInputElement>('deformation-edit-mode')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.deformationEditMode, HTMLInputElement).addEventListener(
       'change',
       (event) => {
         this.state?.setDeformationEditing((event.target as HTMLInputElement).checked);
       },
       options,
     );
-    this.element<HTMLSelectElement>('deformation-mesh')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.deformationMesh, HTMLSelectElement).addEventListener(
       'change',
       (event) => {
         this.vertices.clear();
@@ -59,7 +69,7 @@ export class MeshDeformationController {
       },
       options,
     );
-    this.element<HTMLSelectElement>('deformation-vertex')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.deformationVertex, HTMLSelectElement).addEventListener(
       'change',
       (event) => {
         this.vertices = new Set([(event.target as HTMLSelectElement).value]);
@@ -67,7 +77,7 @@ export class MeshDeformationController {
       },
       options,
     );
-    this.element('deformation-offset-form')?.addEventListener(
+    requireElement(this.app, ANIMATION_IDS.deformationOffsetForm, HTMLFormElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
@@ -76,10 +86,7 @@ export class MeshDeformationController {
             Object.fromEntries(
               [...this.vertices].map((id) => [
                 id,
-                {
-                  x: this.number('deformation-x'),
-                  y: this.number('deformation-y'),
-                },
+                { x: this.number(ANIMATION_IDS.deformationX), y: this.number(ANIMATION_IDS.deformationY) },
               ]),
             ),
           ),
@@ -88,33 +95,33 @@ export class MeshDeformationController {
       options,
     );
     for (const [id, action] of [
-      ['deformation-remove-incompatible', () => this.state?.removeIncompatibleDeformationTracks()],
-      ['deformation-add-key', () => this.state?.setMeshOffsets({})],
-      ['deformation-neutral', () => this.state?.setMeshOffsets(null)],
-      ['deformation-delete-key', () => this.state?.changeDeformationKey(null)],
-      ['deformation-duplicate-key', () => this.state?.duplicateDeformationKey()],
+      [ANIMATION_IDS.deformationRemoveIncompatible, () => this.state?.removeIncompatibleDeformationTracks()],
+      [ANIMATION_IDS.deformationAddKey, () => this.state?.setMeshOffsets({})],
+      [ANIMATION_IDS.deformationNeutral, () => this.state?.setMeshOffsets(null)],
+      [ANIMATION_IDS.deformationDeleteKey, () => this.state?.changeDeformationKey(null)],
+      [ANIMATION_IDS.deformationDuplicateKey, () => this.state?.duplicateDeformationKey()],
     ] as const)
-      this.element(id)?.addEventListener('click', () => this.run(action), options);
-    this.element('deformation-key-form')?.addEventListener(
+      requireElement(this.app, id, HTMLButtonElement).addEventListener('click', () => this.run(action), options);
+    requireElement(this.app, ANIMATION_IDS.deformationKeyForm, HTMLFormElement).addEventListener(
       'submit',
       (event) => {
         event.preventDefault();
         const key = this.state?.selectedDeformationKey;
-        const mode = this.element<HTMLSelectElement>('deformation-curve')!.value;
+        const mode = requireElement(this.app, ANIMATION_IDS.deformationCurve, HTMLSelectElement).value;
         if (key)
           this.run(() =>
             this.state?.changeDeformationKey({
               ...key,
-              time: this.number('deformation-key-time') * 1000,
+              time: this.number(ANIMATION_IDS.deformationKeyTime) * 1000,
               ...(mode === 'bezier' ? {} : { curve: { mode: mode === 'stepped' ? 'stepped' : 'linear' } }),
             }),
           );
       },
       options,
     );
-    const svg = this.element<SVGSVGElement>('deformation-bind-view');
-    svg?.addEventListener('pointerdown', (event) => this.beginVertex(event), options);
-    svg?.addEventListener(
+    const svg = requireElement(this.app, ANIMATION_IDS.deformationBindView, SVGSVGElement);
+    svg.addEventListener('pointerdown', (event) => this.beginVertex(event), options);
+    svg.addEventListener(
       'keydown',
       (event) => {
         const id = (event.target as Element).getAttribute('data-vertex');
@@ -142,28 +149,26 @@ export class MeshDeformationController {
       { ...options, capture: true },
     );
   }
-  private element<T extends Element = HTMLElement>(id: string): T | null {
-    return this.app.querySelector<T>(`#${id}`);
-  }
   private number(id: string): number {
-    return this.element<HTMLInputElement>(id)!.valueAsNumber;
+    return requireElement(this.app, id, HTMLInputElement).valueAsNumber;
   }
   private run(action: () => unknown): boolean {
     try {
       const result = action();
-      this.element('deformation-status')!.textContent =
+      requireElement(this.app, ANIMATION_IDS.deformationStatus, HTMLElement).textContent =
         result === false
           ? this.state?.validationIssues.map((issue) => issue.message).join(' ') ||
             'No change applied. Select a mesh/key and use a time inside the clip.'
           : '';
       return result !== false;
     } catch (error) {
-      this.element('deformation-status')!.textContent = error instanceof Error ? error.message : String(error);
+      requireElement(this.app, ANIMATION_IDS.deformationStatus, HTMLElement).textContent =
+        error instanceof Error ? error.message : String(error);
       return false;
     }
   }
   private reveal(): void {
-    this.element('mesh-deformation-panel')?.dispatchEvent(
+    requireElement(this.app, ANIMATION_IDS.meshDeformationPanel, HTMLElement).dispatchEvent(
       new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: 'animation-inspector-deformation' }),
     );
   }
@@ -174,7 +179,7 @@ export class MeshDeformationController {
     } else if (!this.vertices.has(id)) this.vertices = new Set([id]);
   }
   private point(event: PointerEvent): DOMPoint | null {
-    const matrix = this.element<SVGSVGElement>('deformation-bind-view')?.getScreenCTM();
+    const matrix = requireElement(this.app, ANIMATION_IDS.deformationBindView, SVGSVGElement).getScreenCTM();
     if (!matrix || !Number.isFinite(matrix.a) || matrix.a * matrix.d - matrix.b * matrix.c === 0) return null;
     return new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
   }
@@ -199,7 +204,7 @@ export class MeshDeformationController {
       ),
     );
     // Capture on the SVG: handles are reconciled while a provisional shape changes.
-    const element = this.element<SVGSVGElement>('deformation-bind-view')!;
+    const element = requireElement(this.app, ANIMATION_IDS.deformationBindView, SVGSVGElement);
     this.drag = {
       pointer: event.pointerId,
       element,
@@ -307,7 +312,7 @@ export class MeshDeformationController {
           const selected = [...this.markers].find(
             ([, ref]) => ref.mesh === state.selectedMeshId && ref.time === state.selectedDeformationTime,
           )?.[0];
-          (selected ?? this.element('timeline'))?.focus({ preventScroll: true });
+          (selected ?? requireElement(this.app, ANIMATION_IDS.timeline, HTMLElement)).focus({ preventScroll: true });
         });
     }
     for (const [marker, ref] of this.markers) {
@@ -378,10 +383,10 @@ export class MeshDeformationController {
   }
   private refresh(): void {
     const state = this.state;
-    if (!state || !this.element('mesh-deformation-panel')) return;
+    if (!state) return;
     const meshes =
       state.rig?.attachments.filter((entry): entry is MeshAttachmentDefinition => entry.type === 'mesh') ?? [];
-    const select = this.element<HTMLSelectElement>('deformation-mesh')!;
+    const select = requireElement(this.app, ANIMATION_IDS.deformationMesh, HTMLSelectElement);
     const signature = JSON.stringify(meshes.map((entry) => entry.id));
     if (select.dataset.options !== signature) {
       select.replaceChildren(...meshes.map((mesh) => new Option(mesh.id, mesh.id)));
@@ -398,19 +403,20 @@ export class MeshDeformationController {
       this.mesh = mesh;
     }
     select.value = mesh?.id ?? '';
-    this.element<HTMLInputElement>('deformation-diagnostics')!.checked = state.meshDiagnosticsEnabled;
-    this.element('animation-mesh-diagnostics-status')!.hidden = !state.meshDiagnosticsEnabled;
-    this.element<HTMLInputElement>('deformation-edit-mode')!.checked = state.deformationEditing;
-    this.element('deformation-empty')!.textContent = !meshes.length
+    requireElement(this.app, ANIMATION_IDS.deformationDiagnostics, HTMLInputElement).checked =
+      state.meshDiagnosticsEnabled;
+    requireElement(this.app, ANIMATION_IDS.meshDiagnosticsStatus, HTMLElement).hidden = !state.meshDiagnosticsEnabled;
+    requireElement(this.app, ANIMATION_IDS.deformationEditMode, HTMLInputElement).checked = state.deformationEditing;
+    requireElement(this.app, ANIMATION_IDS.deformationEmpty, HTMLElement).textContent = !meshes.length
       ? 'No mesh attachments. Create a mesh in the Rig Editor first.'
       : !mesh
         ? 'Choose a mesh to edit corrections.'
         : '';
-    this.element('deformation-topology')!.textContent = state.deformationTopologyIssues
-      .map((issue) => issue.message)
-      .join(' ');
-    this.element('deformation-remove-incompatible')!.hidden = !state.deformationTopologyIssues.length;
-    const vertices = this.element<HTMLSelectElement>('deformation-vertex')!;
+    requireElement(this.app, ANIMATION_IDS.deformationTopology, HTMLElement).textContent =
+      state.deformationTopologyIssues.map((issue) => issue.message).join(' ');
+    requireElement(this.app, ANIMATION_IDS.deformationRemoveIncompatible, HTMLButtonElement).hidden =
+      !state.deformationTopologyIssues.length;
+    const vertices = requireElement(this.app, ANIMATION_IDS.deformationVertex, HTMLSelectElement);
     const vertexSignature = JSON.stringify(mesh?.vertices.map((entry) => entry.id));
     if (vertices.dataset.options !== vertexSignature) {
       vertices.replaceChildren(...(mesh?.vertices.map((vertex) => new Option(vertex.id, vertex.id)) ?? []));
@@ -423,47 +429,38 @@ export class MeshDeformationController {
     const offsets = sampleMeshDeformation(keys, state.currentTimeMilliseconds);
     const offset = offsets.get(vertices.value) ?? { x: 0, y: 0 };
     for (const [id, value] of [
-      ['deformation-x', offset.x],
-      ['deformation-y', offset.y],
+      [ANIMATION_IDS.deformationX, offset.x],
+      [ANIMATION_IDS.deformationY, offset.y],
       [
-        'deformation-key-time',
+        ANIMATION_IDS.deformationKeyTime,
         state.selectedDeformationKey?.time === undefined ? '' : state.selectedDeformationKey.time / 1000,
       ],
     ] as const) {
-      const input = this.element<HTMLInputElement>(id)!;
+      const input = requireElement(this.app, id, HTMLInputElement);
       if (document.activeElement !== input) input.value = String(value);
     }
-    const curve = this.element<HTMLSelectElement>('deformation-curve')!;
+    const curve = requireElement(this.app, ANIMATION_IDS.deformationCurve, HTMLSelectElement);
     const mode = state.selectedDeformationKey?.curve?.mode ?? 'linear';
     if (mode === 'bezier' && !curve.querySelector('[value="bezier"]'))
       curve.add(new Option('Bézier (preserve imported controls)', 'bezier'));
     if (document.activeElement !== curve) curve.value = mode;
-    this.app
-      .querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>(
-        '#mesh-deformation-panel input, #mesh-deformation-panel select, #mesh-deformation-panel button',
-      )
+    requireElement(this.app, ANIMATION_IDS.meshDeformationPanel, HTMLElement)
+      .querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, select, button')
       .forEach((input) => {
         input.disabled =
-          input.id !== 'deformation-diagnostics' &&
+          input.id !== ANIMATION_IDS.deformationDiagnostics &&
           (!state.workingAnimation ||
             !state.animationAuthoringEnabled ||
-            (input.id !== 'deformation-edit-mode' &&
-              input.id !== 'deformation-mesh' &&
-              input.id !== 'deformation-remove-incompatible' &&
+            (input.id !== ANIMATION_IDS.deformationEditMode &&
+              input.id !== ANIMATION_IDS.deformationMesh &&
+              input.id !== ANIMATION_IDS.deformationRemoveIncompatible &&
               (!mesh || !state.deformationEditing)) ||
-            ([
-              'deformation-key-time',
-              'deformation-curve',
-              'deformation-apply-key',
-              'deformation-delete-key',
-              'deformation-duplicate-key',
-            ].includes(input.id) &&
-              !state.selectedDeformationKey));
+            (KEY_CONTROLS.has(input.id) && !state.selectedDeformationKey));
       });
     this.draw(mesh, offsets);
   }
   private draw(mesh: MeshAttachmentDefinition | undefined, offsets: ReadonlyMap<string, VertexOffset>): void {
-    const svg = this.element<SVGSVGElement>('deformation-bind-view')!;
+    const svg = requireElement(this.app, ANIMATION_IDS.deformationBindView, SVGSVGElement);
     svg.style.display = mesh && this.state?.deformationEditing ? '' : 'none';
     if (!mesh || !this.state?.deformationEditing) {
       this.drawSignature = '';

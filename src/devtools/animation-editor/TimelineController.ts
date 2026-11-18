@@ -1,6 +1,8 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { GuideTargets } from '../shared/guides/GuideTargets.js';
 import { AnimationEditorState } from './AnimationEditorState.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { EventInspectorController } from './EventInspectorController.js';
 import { GraphEditorController } from './GraphEditorController.js';
 import { registerGraphGuideTargets } from './graphGuideTargets.js';
@@ -51,21 +53,21 @@ export class TimelineController {
     private readonly app: HTMLElement,
     guideTargets?: GuideTargets,
   ) {
-    this.timeline = this.element('#timeline');
+    this.timeline = requireElement(this.app, ANIMATION_IDS.timeline, HTMLElement);
     this.inset = this.element('.timeline-inset');
-    this.ruler = this.element('#timeline-ruler');
-    this.playhead = this.element('#timeline-playhead');
-    this.snapGuide = this.element('#timeline-snap-guide');
-    this.filter = this.element('#timeline-filter');
-    this.filterStatus = this.element('#timeline-filter-status');
-    this.search = this.element('#timeline-search');
-    this.showIK = this.element('#timeline-show-ik');
-    this.showEvents = this.element('#timeline-show-events');
+    this.ruler = requireElement(this.app, ANIMATION_IDS.timelineRuler, HTMLElement);
+    this.playhead = requireElement(this.app, ANIMATION_IDS.timelinePlayhead, HTMLElement);
+    this.snapGuide = requireElement(this.app, ANIMATION_IDS.timelineSnapGuide, HTMLElement);
+    this.filter = requireElement(this.app, ANIMATION_IDS.timelineFilter, HTMLSelectElement);
+    this.filterStatus = requireElement(this.app, ANIMATION_IDS.timelineFilterStatus, HTMLElement);
+    this.search = requireElement(this.app, ANIMATION_IDS.timelineSearch, HTMLInputElement);
+    this.showIK = requireElement(this.app, ANIMATION_IDS.timelineShowIk, HTMLInputElement);
+    this.showEvents = requireElement(this.app, ANIMATION_IDS.timelineShowEvents, HTMLInputElement);
     this.root = new RootMotionController(app);
     this.deformation = new MeshDeformationController(app);
     this.tracks = new TimelineTracksController(
-      this.element('#timeline-track-labels'),
-      this.element('#timeline-tracks'),
+      requireElement(this.app, ANIMATION_IDS.timelineTrackLabels, HTMLElement),
+      requireElement(this.app, ANIMATION_IDS.timelineTracks, HTMLElement),
       (event, key, marker) => this.input.beginKeyDrag(event, key, marker),
       (event, ref, marker) => this.input.beginEventDrag(event, ref, marker),
       this.root,
@@ -125,7 +127,7 @@ export class TimelineController {
     this.search.addEventListener('input', updateFilters, options);
     for (const control of [this.filter, this.showIK, this.showEvents])
       control.addEventListener('change', updateFilters, options);
-    this.element('#timeline-clear-filters').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.timelineClearFilters, HTMLElement).addEventListener(
       'click',
       () => {
         this.input.cancelGesture();
@@ -134,11 +136,11 @@ export class TimelineController {
       options,
     );
     for (const [id, mode] of [
-      ['timeline-expand-all', 'all'],
-      ['timeline-collapse-all', 'none'],
-      ['timeline-expand-selected', 'selected'],
+      [ANIMATION_IDS.timelineExpandAll, 'all'],
+      [ANIMATION_IDS.timelineCollapseAll, 'none'],
+      [ANIMATION_IDS.timelineExpandSelected, 'selected'],
     ] as const)
-      this.element(`#${id}`).addEventListener(
+      requireElement(this.app, id, HTMLButtonElement).addEventListener(
         'click',
         () => {
           this.input.cancelGesture();
@@ -146,21 +148,21 @@ export class TimelineController {
         },
         options,
       );
-    this.element('#timeline-reveal-selection').addEventListener(
+    requireElement(this.app, ANIMATION_IDS.timelineRevealSelection, HTMLElement).addEventListener(
       'click',
       () => {
         this.input.cancelGesture();
         this.state.revealTimelineSelection();
         this.revealSelection();
         const selected =
-          this.element('#timeline-tracks').querySelector<HTMLElement>(
+          requireElement(this.app, ANIMATION_IDS.timelineTracks, HTMLElement).querySelector<HTMLElement>(
             '[data-primary="true"], .timeline-event[aria-pressed="true"]',
           ) ??
-          this.element('#timeline-track-labels').querySelector<HTMLElement>(
+          requireElement(this.app, ANIMATION_IDS.timelineTrackLabels, HTMLElement).querySelector<HTMLElement>(
             '.timeline-property-track[data-selected="true"] .timeline-track-select, ' +
               '.timeline-ik-property-track[data-selected="true"] .timeline-track-select',
           ) ??
-          this.element('#timeline-track-labels').querySelector<HTMLElement>(
+          requireElement(this.app, ANIMATION_IDS.timelineTrackLabels, HTMLElement).querySelector<HTMLElement>(
             '[data-selected="true"] .timeline-track-select',
           );
         selected?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -288,12 +290,13 @@ export class TimelineController {
         this.filterStatus,
         `${visibility.rows.size + (visibility.eventVisible ? 1 : 0)} visible rows · Ancestors are kept for context. Clear Filters to show every track.`,
       );
-      this.element('#timeline-filter-empty').hidden = !active || visibility.rows.size > 0 || visibility.eventVisible;
-      this.element<HTMLButtonElement>('#timeline-clear-filters').disabled = !active;
-      this.element<HTMLButtonElement>('#timeline-expand-selected').disabled =
+      requireElement(this.app, ANIMATION_IDS.timelineFilterEmpty, HTMLElement).hidden =
+        !active || visibility.rows.size > 0 || visibility.eventVisible;
+      requireElement(this.app, ANIMATION_IDS.timelineClearFilters, HTMLButtonElement).disabled = !active;
+      requireElement(this.app, ANIMATION_IDS.timelineExpandSelected, HTMLButtonElement).disabled =
         !state.selectedTarget && !state.selectedKeys.length;
-      this.element('#timeline-reveal-selection').hidden = !visibility.selectionHidden;
-      const selectionStatus = this.element('#timeline-selection-status');
+      requireElement(this.app, ANIMATION_IDS.timelineRevealSelection, HTMLElement).hidden = !visibility.selectionHidden;
+      const selectionStatus = requireElement(this.app, ANIMATION_IDS.timelineSelectionStatus, HTMLElement);
       selectionStatus.hidden = !visibility.selectionHidden;
       const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
       setText(

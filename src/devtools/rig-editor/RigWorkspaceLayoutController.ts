@@ -1,3 +1,5 @@
+import { requireElement } from '../shared/editorElements.js';
+import { RIG_IDS } from './elementIds.js';
 /** View-only portrait sizing and divider gestures; rig data and history stay untouched. */
 export class RigWorkspaceLayoutController {
   private readonly abort = new AbortController();
@@ -9,8 +11,8 @@ export class RigWorkspaceLayoutController {
     const layout = app.querySelector<HTMLElement>('.workspace-layout')!;
     const preview = app.querySelector<HTMLElement>('.workspace-preview')!;
     const options = app.querySelector<HTMLElement>('.workspace-preview-options')!;
-    const caption = app.querySelector<HTMLElement>('#rig-mode-hint')!;
-    const divider = app.querySelector<HTMLElement>('#rig-preview-divider')!;
+    const caption = requireElement(app, RIG_IDS.modeHint, HTMLElement);
+    const divider = requireElement(app, RIG_IDS.previewDivider, HTMLElement);
     const maximum = (): number => Math.max(280, layout.clientWidth - 332);
     const update = (value: number): void => {
       const width = Math.max(280, Math.min(maximum(), value));
@@ -73,7 +75,7 @@ export class RigWorkspaceLayoutController {
       },
       listeners,
     );
-    app.querySelector('#rig-reset-layout')!.addEventListener(
+    requireElement(app, RIG_IDS.resetLayout, HTMLElement).addEventListener(
       'click',
       () => {
         layout.style.removeProperty('--rig-preview-width');

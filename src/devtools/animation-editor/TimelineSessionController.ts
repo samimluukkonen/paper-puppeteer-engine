@@ -1,7 +1,9 @@
 import { setAttribute, setText } from '../../shared/domUpdates.js';
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { AnimationFileController } from './AnimationFileController.js';
 import { retimeSelectionReason, setCommandAvailability } from './commandAvailability.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import type { TimelineInputController } from './TimelineInputController.js';
 import type { TimelineSnapSettings } from './timelineSnapping.js';
 
@@ -43,31 +45,36 @@ export class TimelineSessionController {
     private readonly getState: () => AnimationEditorState,
     private readonly input: Pick<TimelineInputController, 'endScrub'>,
   ) {
-    this.selection = this.element<HTMLSelectElement>('#animation-selection');
-    this.timeDisplay = this.element('#current-time');
-    this.metadata = this.element('#animation-metadata');
-    this.status = this.element('#animation-status');
-    this.reset = this.element<HTMLButtonElement>('#reset-time');
-    this.playPause = this.element<HTMLButtonElement>('#play-pause');
-    this.loop = this.element<HTMLButtonElement>('#preview-loop');
-    this.dirty = this.element('#animation-dirty');
-    this.speed = this.element<HTMLSelectElement>('#playback-speed');
-    this.mode = this.element<HTMLSelectElement>('#animation-mode');
-    this.fps = this.element<HTMLInputElement>('#animation-fps');
-    this.undo = this.element<HTMLButtonElement>('#animation-undo');
-    this.redo = this.element<HTMLButtonElement>('#animation-redo');
-    this.discard = this.element<HTMLButtonElement>('#animation-discard');
-    this.sessionStatus = this.element('#animation-session-status');
-    this.deleteKey = this.element<HTMLButtonElement>('#timeline-delete-key');
-    this.copyKeys = this.element<HTMLButtonElement>('#timeline-copy-keys');
-    this.pasteKeys = this.element<HTMLButtonElement>('#timeline-paste-keys');
-    this.duplicateKeys = this.element<HTMLButtonElement>('#timeline-duplicate-keys');
-    this.previousKey = this.element<HTMLButtonElement>('#timeline-previous-key');
-    this.nextKey = this.element<HTMLButtonElement>('#timeline-next-key');
-    this.snap = (['enabled', 'frames', 'keyframes', 'events', 'playhead'] as const).map((setting) => ({
-      setting,
-      input: this.element<HTMLInputElement>(`#timeline-snap-${setting}`),
-    }));
+    this.selection = requireElement(this.app, ANIMATION_IDS.selection, HTMLSelectElement);
+    this.timeDisplay = requireElement(this.app, ANIMATION_IDS.currentTime, HTMLElement);
+    this.metadata = requireElement(this.app, ANIMATION_IDS.metadata, HTMLElement);
+    this.status = requireElement(this.app, ANIMATION_IDS.status, HTMLElement);
+    this.reset = requireElement(this.app, ANIMATION_IDS.resetTime, HTMLButtonElement);
+    this.playPause = requireElement(this.app, ANIMATION_IDS.playPause, HTMLButtonElement);
+    this.loop = requireElement(this.app, ANIMATION_IDS.previewLoop, HTMLButtonElement);
+    this.dirty = requireElement(this.app, ANIMATION_IDS.dirty, HTMLElement);
+    this.speed = requireElement(this.app, ANIMATION_IDS.playbackSpeed, HTMLSelectElement);
+    this.mode = requireElement(this.app, ANIMATION_IDS.mode, HTMLSelectElement);
+    this.fps = requireElement(this.app, ANIMATION_IDS.fps, HTMLInputElement);
+    this.undo = requireElement(this.app, ANIMATION_IDS.undo, HTMLButtonElement);
+    this.redo = requireElement(this.app, ANIMATION_IDS.redo, HTMLButtonElement);
+    this.discard = requireElement(this.app, ANIMATION_IDS.discard, HTMLButtonElement);
+    this.sessionStatus = requireElement(this.app, ANIMATION_IDS.sessionStatus, HTMLElement);
+    this.deleteKey = requireElement(this.app, ANIMATION_IDS.timelineDeleteKey, HTMLButtonElement);
+    this.copyKeys = requireElement(this.app, ANIMATION_IDS.timelineCopyKeys, HTMLButtonElement);
+    this.pasteKeys = requireElement(this.app, ANIMATION_IDS.timelinePasteKeys, HTMLButtonElement);
+    this.duplicateKeys = requireElement(this.app, ANIMATION_IDS.timelineDuplicateKeys, HTMLButtonElement);
+    this.previousKey = requireElement(this.app, ANIMATION_IDS.timelinePreviousKey, HTMLButtonElement);
+    this.nextKey = requireElement(this.app, ANIMATION_IDS.timelineNextKey, HTMLButtonElement);
+    this.snap = (
+      [
+        ['enabled', ANIMATION_IDS.timelineSnapEnabled],
+        ['frames', ANIMATION_IDS.timelineSnapFrames],
+        ['keyframes', ANIMATION_IDS.timelineSnapKeyframes],
+        ['events', ANIMATION_IDS.timelineSnapEvents],
+        ['playhead', ANIMATION_IDS.timelineSnapPlayhead],
+      ] as const
+    ).map(([setting, id]) => ({ setting, input: requireElement(this.app, id, HTMLInputElement) }));
     this.files = new AnimationFileController(app, getState, () => {
       this.externalError = '';
       this.render();
@@ -146,18 +153,14 @@ export class TimelineSessionController {
     return this.getState();
   }
 
-  private element<T extends HTMLElement = HTMLElement>(selector: string): T {
-    const element = this.app.querySelector<T>(selector);
-    if (!element) throw new Error(`Missing animation editor element ${selector}.`);
-    return element;
-  }
-
   bind(characterId?: string): void {
     this.files.reset();
     const state = this.state;
     this.externalError = '';
     this.updateAnimationOptions(state);
-    this.element('#character-status').textContent = characterId ? `Character: ${characterId}` : 'No character loaded.';
+    requireElement(this.app, ANIMATION_IDS.characterStatus, HTMLElement).textContent = characterId
+      ? `Character: ${characterId}`
+      : 'No character loaded.';
   }
 
   private updateAnimationOptions(state: AnimationEditorState): void {
@@ -274,13 +277,13 @@ export class TimelineSessionController {
       'Delete the complete selection (Delete / Backspace), including hidden keys',
     );
     setCommandAvailability(
-      this.element<HTMLButtonElement>('#animation-retime-open'),
+      requireElement(this.app, ANIMATION_IDS.retimeOpen, HTMLButtonElement),
       retimeSelectionReason(state),
       'Scale selected key times around the first selected time or playhead',
     );
     // Pair configuration must remain reachable when the current mapping needs repair.
     setCommandAvailability(
-      this.element<HTMLButtonElement>('#animation-mirror-open'),
+      requireElement(this.app, ANIMATION_IDS.mirrorOpen, HTMLButtonElement),
       !state.rig ? 'Load a character to configure symmetry pairs.' : !animation ? 'Load a valid animation first.' : '',
       'Configure bone pairs, preview and mirror authored bone motion',
     );
@@ -293,7 +296,7 @@ export class TimelineSessionController {
           ? 'No active rig IK constraints. Undo a bake or load a rig with enabled IK.'
           : '';
     setCommandAvailability(
-      this.element<HTMLButtonElement>('#animation-bake-open'),
+      requireElement(this.app, ANIMATION_IDS.bakeOpen, HTMLButtonElement),
       bakeReason,
       'Select IK constraints and sampling FPS, then preview before baking',
     );

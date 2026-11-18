@@ -22,8 +22,10 @@ import type {
 import { Puppet } from '../../engine/runtime.js';
 import { sameRigTopology } from '../shared/boneHierarchy.js';
 import { equalEditorData } from '../shared/editorData.js';
+import { optionalElement } from '../shared/editorElements.js';
 import { ikPreviewTarget } from '../shared/ikPreviewTarget.js';
 import { MeshDiagnosticsOverlay } from '../shared/MeshDiagnosticsOverlay.js';
+import { RIG_IDS } from './elementIds.js';
 import { RigEditorInputController } from './RigEditorInputController.js';
 import { RigEditorOverlay } from './RigEditorOverlay.js';
 import { type BoneField, RigEditorState, type SlotField, type SpriteField } from './RigEditorState.js';
@@ -688,7 +690,8 @@ export class RigEditor {
         this.state.selectedMesh,
         this.state.selection?.type === 'slot' ? this.state.selection.id : undefined,
       );
-      const status = document.getElementById('rig-mesh-diagnostics-status');
+      // The status renders only while the Mesh geometry panel shows a selected mesh attachment.
+      const status = optionalElement(document, RIG_IDS.meshDiagnosticsStatus, HTMLElement);
       if (status && status.textContent !== message) status.textContent = message;
     } else this.meshDiagnostics?.clear();
   }

@@ -1,5 +1,7 @@
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
 import { setCommandAvailability } from './commandAvailability.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import { clampTime } from './timeline.js';
 import {
   centerTimelineTime,
@@ -44,22 +46,22 @@ export class TimelineNavigationController {
   ) {
     this.inset = this.element('.timeline-inset');
     this.labels = this.element('.timeline-label-column');
-    this.zoomControl = this.element('#timeline-zoom');
-    this.customZoom = this.element('#timeline-custom-zoom');
-    this.time = this.element('#timeline-time-input');
-    this.frame = this.element('#timeline-frame-input');
-    this.frameControl = this.element('#timeline-frame-control');
-    this.follow = this.element('#timeline-follow');
+    this.zoomControl = requireElement(this.app, ANIMATION_IDS.timelineZoom, HTMLSelectElement);
+    this.customZoom = requireElement(this.app, ANIMATION_IDS.timelineCustomZoom, HTMLOptionElement);
+    this.time = requireElement(this.app, ANIMATION_IDS.timelineTimeInput, HTMLInputElement);
+    this.frame = requireElement(this.app, ANIMATION_IDS.timelineFrameInput, HTMLInputElement);
+    this.frameControl = requireElement(this.app, ANIMATION_IDS.timelineFrameControl, HTMLElement);
+    this.follow = requireElement(this.app, ANIMATION_IDS.timelineFollow, HTMLInputElement);
     const options = { signal: this.abort.signal };
     this.zoomControl.addEventListener('change', () => this.setZoom(Number(this.zoomControl.value)), options);
     for (const [id, action] of [
-      ['timeline-zoom-in', () => this.zoomBy(2)],
-      ['timeline-zoom-out', () => this.zoomBy(0.5)],
-      ['timeline-fit-animation', () => this.fitAnimation()],
-      ['timeline-fit-selection', () => this.fitSelection()],
-      ['timeline-center-playhead', () => this.centerPlayhead()],
+      [ANIMATION_IDS.timelineZoomIn, () => this.zoomBy(2)],
+      [ANIMATION_IDS.timelineZoomOut, () => this.zoomBy(0.5)],
+      [ANIMATION_IDS.timelineFitAnimation, () => this.fitAnimation()],
+      [ANIMATION_IDS.timelineFitSelection, () => this.fitSelection()],
+      [ANIMATION_IDS.timelineCenterPlayhead, () => this.centerPlayhead()],
     ] as const)
-      this.element(`#${id}`).addEventListener('click', action, options);
+      requireElement(this.app, id, HTMLButtonElement).addEventListener('click', action, options);
     this.inset.addEventListener('scroll', () => this.changed(), options);
     this.inset.addEventListener(
       'wheel',
@@ -172,8 +174,11 @@ export class TimelineNavigationController {
     this.viewportWidth = Math.max(1, this.inset.clientWidth - labels);
     this.contentWidth = this.viewportWidth * this.zoom;
     this.inset.style.gridTemplateColumns = `min(var(--timeline-label-width), 50%) ${this.contentWidth}px`;
-    this.element('#timeline-label-divider').setAttribute('aria-valuenow', String(Math.round(labels)));
-    this.element('#timeline-label-divider').setAttribute(
+    requireElement(this.app, ANIMATION_IDS.timelineLabelDivider, HTMLElement).setAttribute(
+      'aria-valuenow',
+      String(Math.round(labels)),
+    );
+    requireElement(this.app, ANIMATION_IDS.timelineLabelDivider, HTMLElement).setAttribute(
       'aria-valuemax',
       String(Math.floor(Math.min(400, this.inset.clientWidth / 2))),
     );
@@ -250,7 +255,7 @@ export class TimelineNavigationController {
     this.renderTime();
     const hasSelection = !!state.selectedIKKeyframe || !!state.selectedEvent || state.selectedKeys.length > 0;
     setCommandAvailability(
-      this.element<HTMLButtonElement>('#timeline-fit-selection'),
+      requireElement(this.app, ANIMATION_IDS.timelineFitSelection, HTMLButtonElement),
       !state.workingAnimation
         ? 'Load a valid animation first.'
         : !hasSelection
@@ -258,12 +263,12 @@ export class TimelineNavigationController {
           : '',
       'Fit selected keyframes or event, including hidden selections',
     );
-    this.element<HTMLButtonElement>('#timeline-zoom-in').disabled =
+    requireElement(this.app, ANIMATION_IDS.timelineZoomIn, HTMLButtonElement).disabled =
       !state.workingAnimation || this.zoom >= MAX_TIMELINE_ZOOM;
-    this.element<HTMLButtonElement>('#timeline-zoom-out').disabled =
+    requireElement(this.app, ANIMATION_IDS.timelineZoomOut, HTMLButtonElement).disabled =
       !state.workingAnimation || this.zoom <= MIN_TIMELINE_ZOOM;
-    for (const id of ['timeline-fit-animation', 'timeline-center-playhead'])
-      this.element<HTMLButtonElement>(`#${id}`).disabled = !state.workingAnimation;
+    for (const id of [ANIMATION_IDS.timelineFitAnimation, ANIMATION_IDS.timelineCenterPlayhead])
+      requireElement(this.app, id, HTMLButtonElement).disabled = !state.workingAnimation;
     this.zoomControl.disabled = !state.workingAnimation;
   }
 

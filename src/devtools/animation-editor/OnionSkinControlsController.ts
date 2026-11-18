@@ -1,16 +1,18 @@
+import { requireElement } from '../shared/editorElements.js';
 import type { AnimationEditorScene } from './AnimationEditorScene.js';
+import { ANIMATION_IDS } from './elementIds.js';
 import type { OnionSkinSettings } from './onionSkinSettings.js';
 
 const numericControls = {
-  previousCount: 'animation-onion-previous-count',
-  nextCount: 'animation-onion-next-count',
-  frameSpacing: 'animation-onion-spacing',
-  previousOpacity: 'animation-onion-previous-opacity',
-  nextOpacity: 'animation-onion-next-opacity',
+  previousCount: ANIMATION_IDS.onionPreviousCount,
+  nextCount: ANIMATION_IDS.onionNextCount,
+  frameSpacing: ANIMATION_IDS.onionSpacing,
+  previousOpacity: ANIMATION_IDS.onionPreviousOpacity,
+  nextOpacity: ANIMATION_IDS.onionNextOpacity,
 } as const;
 const colorControls = {
-  previousTint: 'animation-onion-previous-color',
-  nextTint: 'animation-onion-next-color',
+  previousTint: ANIMATION_IDS.onionPreviousColor,
+  nextTint: ANIMATION_IDS.onionNextColor,
 } as const;
 
 /** Native preference inputs owned by this controller, independent of document transactions. */
@@ -23,7 +25,7 @@ export class OnionSkinControlsController {
     onChange: () => void = () => {},
   ) {
     const options = { signal: this.abort.signal };
-    const enable = app.querySelector<HTMLInputElement>('#animation-onion-skinning')!;
+    const enable = requireElement(app, ANIMATION_IDS.onionSkinning, HTMLInputElement);
     enable.checked = scene.getOnionSkinSettings().enabled;
     enable.addEventListener(
       'change',
@@ -36,7 +38,7 @@ export class OnionSkinControlsController {
 
     for (const [key, id] of Object.entries(numericControls)) {
       const property = key as keyof typeof numericControls;
-      const input = app.querySelector<HTMLInputElement>(`#${id}`)!;
+      const input = requireElement(app, id, HTMLInputElement);
       input.value = String(scene.getOnionSkinSettings()[property]);
       input.addEventListener(
         'input',
@@ -58,7 +60,7 @@ export class OnionSkinControlsController {
     }
     for (const [key, id] of Object.entries(colorControls)) {
       const property = key as keyof typeof colorControls;
-      const input = app.querySelector<HTMLInputElement>(`#${id}`)!;
+      const input = requireElement(app, id, HTMLInputElement);
       input.value = `#${scene.getOnionSkinSettings()[property].toString(16).padStart(6, '0')}`;
       input.addEventListener(
         'input',

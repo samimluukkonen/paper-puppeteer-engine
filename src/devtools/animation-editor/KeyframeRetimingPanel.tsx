@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { ANIMATION_IDS, focusAuthoringToolsMenu } from './elementIds.js';
 import type { KeyframeRetimingController } from './KeyframeRetimingController.js';
 
 export function KeyframeRetimingPanel({ controller }: { controller: KeyframeRetimingController }) {
@@ -6,7 +7,7 @@ export function KeyframeRetimingPanel({ controller }: { controller: KeyframeReti
   useEffect(() => () => controller.hidePreview(), [controller]);
   return (
     <details
-      id="animation-retime-panel"
+      id={ANIMATION_IDS.retimePanel}
       data-tool-panel
       className="animation-popover animation-retime-tools"
       onToggle={(event) => {
@@ -18,7 +19,7 @@ export function KeyframeRetimingPanel({ controller }: { controller: KeyframeReti
         event.stopPropagation();
         event.currentTarget.open = false;
         controller.hidePreview();
-        document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
+        focusAuthoringToolsMenu();
       }}
     >
       <summary>Retime selected keys</summary>

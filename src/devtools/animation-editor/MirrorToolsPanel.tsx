@@ -2,6 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { isTypingTarget } from '../../shared/keyboardShortcuts.js';
 import { GUIDE_TARGETS } from '../shared/guides/anchors.js';
 import type { MirrorDirection } from '../shared/poseMirroring.js';
+import { ANIMATION_IDS, focusAuthoringToolsMenu } from './elementIds.js';
 import type { MirrorToolsController } from './MirrorToolsController.js';
 
 export const MIRROR_DIRECTIONS: readonly { value: MirrorDirection; label: string; help: string }[] = [
@@ -65,7 +66,7 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
   ));
   return (
     <details
-      id="animation-mirror-panel"
+      id={ANIMATION_IDS.mirrorPanel}
       data-tool-panel
       ref={panel}
       className="animation-popover animation-mirror-tools"
@@ -79,7 +80,7 @@ export function MirrorToolsPanel({ controller }: { controller: MirrorToolsContro
           event.preventDefault();
           event.stopPropagation();
           event.currentTarget.open = false;
-          document.querySelector<HTMLElement>('#animation-authoring-tools > summary')?.focus();
+          focusAuthoringToolsMenu();
         }
       }}
       onToggle={(event) => {
