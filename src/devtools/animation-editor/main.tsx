@@ -39,6 +39,7 @@ import { AnimationVariationController } from './AnimationVariationController.js'
 import { AnimationWorkspaceController } from './AnimationWorkspaceController.js';
 import { BoneInspectorController } from './BoneInspectorController.js';
 import { browserCharacterDrafts } from './characterDocuments.js';
+import { characterScope } from './characterScope.js';
 import { AnimationEditorView } from './editorMarkup.js';
 import { ANIMATION_IDS, RIG_TWEAK_SESSION_IDS } from './elementIds.js';
 import { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
@@ -104,8 +105,6 @@ const rigTweak = new RigTweakController(attachments, { projectHosted: !!projectC
 const newAnimation = new NewAnimationController();
 const variations = new AnimationVariationController();
 const animationLibrary = new AnimationLibraryController();
-let releaseLibrarySelection: (() => void) | undefined;
-let releaseAnimationCreation: (() => void) | undefined;
 const retiming = new KeyframeRetimingController();
 const motionDiagnostics = new MotionDiagnosticsController();
 const mirrorTools = new MirrorToolsController((pose) => scene?.setMirrorPreview(pose));
@@ -303,36 +302,37 @@ const unmount = mountView(
       projectContext?.changed();
       autosave?.update();
     });
-    let releaseAnimationPackage: (() => void) | undefined;
-    let releaseWorkspaceSelection: (() => void) | undefined;
-    let releaseProject: (() => void) | undefined;
-    let detachAutosave: (() => void) | undefined;
-    const editorScene = new AnimationEditorScene(
-      (state, id) => {
+    // Everything bound to one loaded character is released through its scope: on the next ready,
+    // on a failed load (including a throw after ready) and at teardown.
+    const character = characterScope<[AnimationEditorState, string]>(
+      (scope, state, id) => {
         stateOwner = state;
+        scope.add(() => {
+          if (stateOwner === state) stateOwner = undefined;
+        });
         state.setReplacementGuard(
           projectContext ? (name) => projectContext.confirmReplacement('animation', name) : undefined,
         );
         if (!projectContext) editorScene.rigEditor!.state.skinReferences = undefined;
-        detachAutosave?.();
-        detachAutosave = undefined;
-        releaseProject?.();
-        releaseProject = projectContext?.bindCharacter(
-          () =>
-            editorScene.hasPendingArtworkProposal ||
-            artwork.getSnapshot().importing ||
-            !!editorScene.rigEditor?.state.validationPending ||
-            state.hasPendingAnimationEdits,
-          (view) => {
-            workspaceRoutes?.navigate(view);
-          },
-        );
-        previewPreferences?.dispose();
+        if (projectContext)
+          scope.add(
+            projectContext.bindCharacter(
+              () =>
+                editorScene.hasPendingArtworkProposal ||
+                artwork.getSnapshot().importing ||
+                !!editorScene.rigEditor?.state.validationPending ||
+                state.hasPendingAnimationEdits,
+              (view) => {
+                workspaceRoutes?.navigate(view);
+              },
+            ),
+          );
         if (projectContext) {
           groundGuide.bind(`project:${projectContext.projectId}:character:${id}`);
+          scope.add(() => groundGuide.bind(null));
           groundGuide.restore(defaultGroundGuide('animation-preview-world'));
         }
-        previewPreferences = new AnimationPreviewPreferencesBinding(
+        const preferences = new AnimationPreviewPreferencesBinding(
           environment,
           motionPreview,
           groundGuide,
@@ -342,29 +342,46 @@ const unmount = mountView(
             autosave?.update();
           },
         );
+        previewPreferences = preferences;
+        scope.add(() => {
+          preferences.dispose();
+          if (previewPreferences === preferences) previewPreferences = undefined;
+        });
         guides.refresh();
         newAnimation.bind(state);
+        scope.add(() => newAnimation.unbind());
         variations.bind(state);
+        scope.add(() => variations.unbind());
         animationLibrary.bind(state, id);
-        releaseLibrarySelection?.();
-        releaseLibrarySelection = projectContext?.bindAnimationSelection((name, copy) => {
-          if (copy) animationLibrary.copy(name);
-          else animationLibrary.select(name);
-        });
-        releaseAnimationCreation?.();
-        releaseAnimationCreation = projectContext?.bindAnimationCreation((clip) => state.createDerivedAnimation(clip));
+        scope.add(() => animationLibrary.unbind());
+        if (projectContext) {
+          scope.add(
+            projectContext.bindAnimationSelection((name, copy) => {
+              if (copy) animationLibrary.copy(name);
+              else animationLibrary.select(name);
+            }),
+          );
+          scope.add(projectContext.bindAnimationCreation((clip) => state.createDerivedAnimation(clip)));
+        }
         rigTweak.bind(state, editorScene.rigEditor!);
+        scope.add(() => rigTweak.unbind());
         rigWorkspace.render(editorScene.rigEditor!);
         editorScene.fitPreview();
         mirrorTools.bind(state, JSON.stringify([window.location.pathname, id]));
+        scope.add(() => mirrorTools.unbind());
         poseLibrary.bind(state);
+        scope.add(() => poseLibrary.unbind());
         ikBake.bind(state);
+        scope.add(() => ikBake.unbind());
         retiming.bind(state);
+        scope.add(() => retiming.unbind());
         motionDiagnostics.bind(state);
+        scope.add(() => motionDiagnostics.unbind());
         timeline.bind(state, id);
         inspector.bind(state);
+        scope.add(() => inspector.unbind());
         ikInspector.bind(state);
-        releaseWorkspaceSelection?.();
+        scope.add(() => ikInspector.unbind());
         let selectedIK = state.ik.selectedIKConstraintId;
         let selectedBone = state.selectedBoneId;
         let selectedEvent = state.selectedEvent;
@@ -372,51 +389,55 @@ const unmount = mountView(
         let selectedRootKey = state.rootMotion.selectedRootKey;
         let selectedKeys = state.selectedKeys;
         let authoringMode = state.editorMode;
-        releaseWorkspaceSelection = state.subscribe(() => {
-          guides.refresh();
-          if (state.editorMode !== authoringMode) {
-            authoringMode = state.editorMode;
-            mirrorTools.hidePreview();
-            ikBake.hidePreview();
-            for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
-          }
-          if (
-            (state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK) ||
-            (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
-            (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
-            (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
-            (state.rootMotion.rootMotionSelected &&
-              (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey))
-          )
-            workspace.revealInspector();
-          if (!app.hidden && state.editorMode !== 'rig-tweak') {
-            const id =
-              state.rootMotion.rootMotionSelected &&
-              (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey)
-                ? 'animation-inspector-root'
-                : state.selectedEvent && state.selectedEvent !== selectedEvent
-                  ? 'animation-inspector-selection'
-                  : state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK
-                    ? 'animation-inspector-ik'
-                    : state.selectedBoneId &&
-                        state.selectedBoneId !== selectedBone &&
-                        !requireElement(app, ANIMATION_IDS.bones, HTMLElement).matches(':focus-within')
-                      ? 'animation-inspector-selection'
-                      : undefined;
-            if (id)
-              app
-                .querySelector(`[data-editor-tab-panel="${id}"]`)
-                ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
-          }
-          selectedIK = state.ik.selectedIKConstraintId;
-          selectedBone = state.selectedBoneId;
-          selectedEvent = state.selectedEvent;
-          selectedRoot = state.rootMotion.rootMotionSelected;
-          selectedRootKey = state.rootMotion.selectedRootKey;
-          selectedKeys = state.selectedKeys;
-        });
-        if (!projectContext) recovery.bind(state, id);
-        else
+        scope.add(
+          state.subscribe(() => {
+            guides.refresh();
+            if (state.editorMode !== authoringMode) {
+              authoringMode = state.editorMode;
+              mirrorTools.hidePreview();
+              ikBake.hidePreview();
+              for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
+            }
+            if (
+              (state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK) ||
+              (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
+              (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
+              (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
+              (state.rootMotion.rootMotionSelected &&
+                (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey))
+            )
+              workspace.revealInspector();
+            if (!app.hidden && state.editorMode !== 'rig-tweak') {
+              const id =
+                state.rootMotion.rootMotionSelected &&
+                (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey)
+                  ? 'animation-inspector-root'
+                  : state.selectedEvent && state.selectedEvent !== selectedEvent
+                    ? 'animation-inspector-selection'
+                    : state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK
+                      ? 'animation-inspector-ik'
+                      : state.selectedBoneId &&
+                          state.selectedBoneId !== selectedBone &&
+                          !requireElement(app, ANIMATION_IDS.bones, HTMLElement).matches(':focus-within')
+                        ? 'animation-inspector-selection'
+                        : undefined;
+              if (id)
+                app
+                  .querySelector(`[data-editor-tab-panel="${id}"]`)
+                  ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
+            }
+            selectedIK = state.ik.selectedIKConstraintId;
+            selectedBone = state.selectedBoneId;
+            selectedEvent = state.selectedEvent;
+            selectedRoot = state.rootMotion.rootMotionSelected;
+            selectedRootKey = state.rootMotion.selectedRootKey;
+            selectedKeys = state.selectedKeys;
+          }),
+        );
+        if (!projectContext) {
+          recovery.bind(state, id);
+          scope.add(() => recovery.unbind());
+        } else
           requireElement(app, ANIMATION_IDS.draftStatus, HTMLElement).textContent =
             'Project session: export a project ZIP to keep your work.';
         packages.bind(() => {
@@ -425,6 +446,7 @@ const unmount = mountView(
             ? { ...snapshot, definition: projectContext.sourceDefinition }
             : snapshot;
         }, !!initialDraft);
+        scope.add(() => packages.unbind());
         if (!projectContext) {
           const fingerprints = new PackageFingerprints();
           const key = `character:${new URL('../', location.href).pathname}:${id}`;
@@ -457,49 +479,30 @@ const unmount = mountView(
                 ),
             };
           });
-          detachAutosave = attachLocalAutosave(autosave);
+          scope.add(attachLocalAutosave(autosave));
           showAutosave?.(autosave);
         }
-        releaseAnimationPackage?.();
-        releaseAnimationPackage = state.subscribe(() => {
-          packages.refresh();
-          projectContext?.changed();
-          autosave?.update();
-        });
+        scope.add(
+          state.subscribe(() => {
+            packages.refresh();
+            projectContext?.changed();
+            autosave?.update();
+          }),
+        );
         if (initialRigView) state.setEditorMode('rig');
         guides.refresh();
         movePreview?.();
       },
       (message) => {
-        previewPreferences?.dispose();
-        previewPreferences = undefined;
         projectContext?.characterLoadFailed();
-        stateOwner = undefined;
-        guides.refresh();
-        newAnimation.unbind();
-        variations.unbind();
-        releaseLibrarySelection?.();
-        releaseLibrarySelection = undefined;
-        releaseAnimationCreation?.();
-        releaseAnimationCreation = undefined;
-        animationLibrary.unbind();
         rigWorkspace.showError(message);
-        packages.unbind();
-        releaseAnimationPackage?.();
-        releaseAnimationPackage = undefined;
-        rigTweak.unbind();
-        releaseWorkspaceSelection?.();
-        releaseWorkspaceSelection = undefined;
-        recovery.unbind();
-        mirrorTools.unbind();
-        poseLibrary.unbind();
-        ikBake.unbind();
-        retiming.unbind();
-        motionDiagnostics.unbind();
-        ikInspector.unbind();
-        inspector.unbind();
         timeline.showError(message);
+        guides.refresh();
       },
+    );
+    const editorScene = new AnimationEditorScene(
+      character.ready,
+      character.failed,
       {
         characterUrl: `../characters/${encodeURIComponent(selectedCharacterId())}/character.json`,
         ...(projectContext
@@ -627,26 +630,20 @@ const unmount = mountView(
 
     return () => {
       releaseRenderer?.();
-      previewPreferences?.dispose();
-      detachAutosave?.();
-      detachAutosave = undefined;
+      character.close();
       workspaceRoutes?.dispose();
       releaseRigExport();
       releaseAnimationExport();
       window.removeEventListener('keydown', deleteRigSelection);
-      releaseProject?.();
       workspaceRoutes = undefined;
       releaseRigResize();
       rigLayout.dispose();
       rigWorkspace.dispose();
-      stateOwner = undefined;
       movePreview = undefined;
       releaseArtworkPackage();
-      releaseAnimationPackage?.();
       packages.dispose();
       recovery.dispose();
       rigTweak.dispose();
-      releaseWorkspaceSelection?.();
       mirrorTools.dispose();
       poseLibrary.dispose();
       ikBake.dispose();
@@ -654,8 +651,6 @@ const unmount = mountView(
       motionDiagnostics.dispose();
       newAnimation.dispose();
       variations.dispose();
-      releaseLibrarySelection?.();
-      releaseAnimationCreation?.();
       animationLibrary.dispose();
       workspace.dispose();
       recoveryControls.dispose();
