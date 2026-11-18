@@ -14,7 +14,7 @@ export class RetargetComparisonPlayback {
     this.time = Math.max(0, Math.min(this.duration, time));
     for (const puppet of this.puppets) {
       // The clock uses clamped local time even for an authored looping clip.
-      const displacement = puppet.posePipeline.player.sampleRootMotion(this.time);
+      const displacement = puppet.sampleRootMotion(this.time);
       puppet.container.setPosition(displacement.x, displacement.y);
       puppet.sampleAnimation(this.time, { mode: 'playback' });
     }

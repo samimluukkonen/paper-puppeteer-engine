@@ -16,7 +16,12 @@ function fixture(definition: RigDefinition) {
     rig,
     getBone: (id: string) => joints.get(id)!,
     posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
-    attachPoseSource: vi.fn(() => vi.fn()),
+    editPose: vi.fn((edit?: () => void) => {
+      puppet.posePipeline.preparePose();
+      edit?.();
+      puppet.posePipeline.syncPose();
+    }),
+    attachPoseSource: vi.fn<Puppet['attachPoseSource']>(() => vi.fn()),
     setRenderOrder: vi.fn<Puppet['setRenderOrder']>(),
     setSlotTransform: vi.fn(),
     getSlotImage: vi.fn(),
@@ -141,4 +146,32 @@ test('slot depth changes update placement while slot transforms retain cached de
   assert.equal(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'), 25);
   editor.redo();
   assert.isUndefined(puppet.setRenderOrder.mock.lastCall?.[1]?.get('visual'));
+});
+
+test('re-applying the rig under a preview detaches the old source before editing and attaches after the sync', () => {
+  const { editor, joints, puppet } = fixture({
+    root: 'root',
+    bones: [{ id: 'root' }, { id: 'arm', parent: 'root', y: 10 }],
+  });
+  const log: string[] = [];
+  puppet.editPose.mockImplementation((edit?: () => void) => {
+    log.push('prepare');
+    edit?.();
+    log.push('sync');
+  });
+  puppet.attachPoseSource.mockImplementation((source) => {
+    // Like the real pipeline, attaching projects the source pose onto the live joints.
+    for (const [id, values] of source?.pose ?? []) Object.assign(joints.get(id)!.pose, values);
+    log.push('attach');
+    return () => {
+      log.push('detach');
+    };
+  });
+  editor.setWeightPreview(true, 'arm', 0.5);
+  assert.closeTo(joints.get('arm')!.pose.rotation, 0.5, 1e-12);
+
+  log.length = 0;
+  editor.editBone('arm', 'rotation', 0.25);
+  assert.deepEqual(log, ['detach', 'prepare', 'sync', 'attach']);
+  assert.closeTo(joints.get('arm')!.pose.rotation, 0.75, 1e-12, 'the bend layers over the edited rig pose');
 });

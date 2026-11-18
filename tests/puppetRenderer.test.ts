@@ -411,6 +411,8 @@ test('editor restores omitted slot transform defaults through undo and reset', (
     getBone: (id: string) => joints.get(id)!,
     posePipeline: pipeline,
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+    editPose: Puppet.prototype.editPose,
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setRenderOrder: Puppet.prototype.setRenderOrder,
     // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
     setSlotTransform: Puppet.prototype.setSlotTransform,
@@ -579,6 +581,8 @@ test.each([undefined, 0, -5, 40])(
       renderer,
       getBone: (id: string) => joints.get(id)!,
       posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+      editPose: Puppet.prototype.editPose,
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
       setRenderOrder: Puppet.prototype.setRenderOrder,
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.

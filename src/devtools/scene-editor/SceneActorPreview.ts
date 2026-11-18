@@ -58,7 +58,7 @@ export class SceneActorPreview {
         }
         if (!entry) {
           const puppet = new Puppet(this.scene, { definition, autoUpdate: false });
-          puppet.posePipeline.player.setPreviewMode(true);
+          puppet.setPreviewMode(true);
           try {
             entry = { actor: new Actor({ id: data.id, puppet, puppetOwnership: 'owned' }), data, definition };
             this.instances.set(data.id, entry);

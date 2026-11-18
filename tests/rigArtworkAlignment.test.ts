@@ -12,7 +12,7 @@ import { compileClip, type CompiledClip } from '../src/engine/AnimationClip.js';
 import { parseRigDefinition } from '../src/engine/externalData.js';
 import { Joint } from '../src/engine/Joint.js';
 import type { PoseSource } from '../src/engine/PosePipeline.js';
-import type { Puppet } from '../src/engine/Puppet.js';
+import { Puppet } from '../src/engine/Puppet.js';
 import { Rig } from '../src/engine/Rig.js';
 
 vi.mock('phaser', () => ({ default: {} }));
@@ -135,6 +135,8 @@ function fixture(mode: EditMode = 'sprite', attachment = false, facing = 1) {
     getSlotImage: () => (attachment ? image : undefined),
     getSlotMesh: () => undefined,
     posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
+    // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+    editPose: Puppet.prototype.editPose,
     // Mimic the pipeline's attach projection: merge the source pose onto the mock bones.
     attachPoseSource: (source?: PoseSource) => {
       for (const [id, values] of source?.pose ?? []) {

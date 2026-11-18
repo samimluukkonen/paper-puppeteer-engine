@@ -45,7 +45,7 @@ function PlaybackObservation({ playback, actorId }: { playback: SceneEditorPlayb
           <dt>Animation</dt>
           <dd>{live.currentAnimation ?? 'Bind pose'}</dd>
           <dt>Clip time</dt>
-          <dd>{(live.puppet.posePipeline.player.elapsedTime / 1000).toFixed(3)} s</dd>
+          <dd>{(live.puppet.elapsedTime / 1000).toFixed(3)} s</dd>
         </dl>
       ) : (
         <p>Play or scrub, then select an Actor track to inspect its runtime transform and pose.</p>

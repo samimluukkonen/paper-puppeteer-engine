@@ -68,7 +68,7 @@
     "test:package": "node scripts/check-package.mjs",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "lint": "oxlint && node scripts/check-subscribers.mjs && node scripts/check-project-context.mjs",
+    "lint": "oxlint && node scripts/check-subscribers.mjs && node scripts/check-project-context.mjs && node scripts/check-engine-internals.mjs",
     "lint:fix": "oxlint --fix",
     "check:release": "npm run check && npm run check:version && npm run test && npm run build && npm run check:demo && npm run test:package"
   },

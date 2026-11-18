@@ -290,6 +290,13 @@ export async function useActor(puppet: Puppet): Promise<PlaybackWaitResult> {
 
 export function sync(puppet: Puppet): void {
   puppet.sampleAnimation(500, { mode: 'playback' }).sampleAnimation(250);
+  puppet.editPose(() => {
+    puppet.getBone(puppet.rig.root).pose.rotation += 0.1;
+  }, { updateDebug: true });
+  puppet.setPreviewMode(true, { applyRootMotion: true });
+  const elapsed: number = puppet.elapsedTime;
+  const offset: { x: number; y: number } = puppet.sampleRootMotion(elapsed);
+  void offset;
 }
 `,
   );

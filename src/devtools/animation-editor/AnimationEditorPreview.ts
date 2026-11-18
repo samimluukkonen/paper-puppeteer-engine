@@ -28,7 +28,7 @@ export class AnimationEditorPreview {
 
   constructor(
     private readonly state: AnimationEditorState,
-    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'attachPoseSource' | 'posePipeline'> &
+    private readonly puppet: Pick<Puppet, 'rig' | 'getBone' | 'attachPoseSource' | 'editPose'> &
       Partial<Pick<Puppet, 'container'>>,
     private readonly motion?: MotionPreviewController,
   ) {
@@ -65,7 +65,7 @@ export class AnimationEditorPreview {
     if (this.state.editorMode === 'rig') {
       this.detachPoseSource?.();
       this.detachPoseSource = undefined;
-      if (force) this.puppet.posePipeline.syncPose();
+      if (force) this.puppet.editPose();
       return;
     }
     const rig = this.state.rig ?? this.puppet.rig;

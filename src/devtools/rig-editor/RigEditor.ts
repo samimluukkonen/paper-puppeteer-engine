@@ -175,13 +175,14 @@ export class RigEditor {
     // Activation must project retained edits before drawing or capturing IK targets.
     this.refresh(false);
     if (this.state.ikPreview && !this.evaluateContext) {
-      for (const chain of this.ikChains) {
-        const constraint = this.puppet.getIK(chain.name);
-        if (this.hasExternalTarget(constraint)) continue;
-        if (!chain.target && !constraint.target) this.pinPreviewTarget(constraint);
-        constraint.enabled = chain.enabled !== false;
-      }
-      this.puppet.posePipeline.syncPose();
+      this.puppet.editPose(() => {
+        for (const chain of this.ikChains) {
+          const constraint = this.puppet.getIK(chain.name);
+          if (this.hasExternalTarget(constraint)) continue;
+          if (!chain.target && !constraint.target) this.pinPreviewTarget(constraint);
+          constraint.enabled = chain.enabled !== false;
+        }
+      });
       this.overlay.invalidate();
       this.update();
     }
@@ -349,68 +350,66 @@ export class RigEditor {
   }
 
   private applyRig(rig: RigDefinition): void {
-    const pipeline = this.puppet.posePipeline;
-    pipeline.preparePose();
-    // Preview the same logical joint positions that an exported rig loads with.
-    // Authored rig-bone edits stay direct edits; they are not a preview.
-    const definitions = new Map(rig.bones.map((bone) => [bone.id, bone]));
-    for (const edited of rig.bones) {
-      const runtime = this.puppet.getBone(edited.id);
-      Object.assign(runtime.pose, {
-        ...createTransform(edited),
-        ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
-      });
-      if (runtime.sprite && edited.sprite) {
-        runtime.sprite.setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0);
-        this.puppet.setArtworkOrigin(
-          `bone:${edited.id}`,
-          edited.sprite.texture,
-          runtime.sprite,
-          edited.sprite.originX ?? 0.5,
-          edited.sprite.originY ?? 0.5,
-        );
-      }
-    }
-    // The clip preview (and test bend) project through an attached pose source
-    // instead of hand-copying sampled transforms into the live bones.
-    const previewPose: AnimationPose = new Map();
-    if (this.previewClip) {
-      for (const [id, transform] of evaluateClip(this.previewClip, this.previewTime))
-        if (definitions.has(id)) previewPose.set(id, transform);
-    }
-    if (this.weightPreviewEnabled && definitions.has(this.weightPreviewBoneId)) {
-      const bone = this.puppet.getBone(this.weightPreviewBoneId);
-      const clipValues = previewPose.get(this.weightPreviewBoneId);
-      previewPose.set(this.weightPreviewBoneId, {
-        ...clipValues,
-        rotation: (clipValues?.rotation ?? bone.pose.rotation) + this.weightPreviewRotation,
-      });
-    }
-    for (const slot of rig.slots ?? []) {
-      this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
-      const image = this.puppet.getSlotImage(slot.id);
-      const attachmentId = this.puppet.getAttachment(slot.id);
-      if (image && attachmentId) {
-        const attachment = this.state.getAttachment(attachmentId);
-        image.setPosition(attachment.x ?? 0, attachment.y ?? 0);
-        this.puppet.setArtworkOrigin(
-          `attachment:${attachment.id}`,
-          attachment.texture,
-          image,
-          attachment.originX ?? 0.5,
-          attachment.originY ?? 0.5,
-        );
-      }
-    }
-    this.updateRenderOrder(rig);
+    // Detach first so the edit's sync never runs with the previous preview source attached.
     this.detachPreviewPoseSource?.();
-    if (previewPose.size) {
-      // attachPoseSource owns prepare -> attach -> project, so the preview needs no manual sync here.
-      this.detachPreviewPoseSource = this.puppet.attachPoseSource({ pose: previewPose });
-    } else {
-      this.detachPreviewPoseSource = undefined;
-      pipeline.syncPose();
-    }
+    this.detachPreviewPoseSource = undefined;
+    const definitions = new Map(rig.bones.map((bone) => [bone.id, bone]));
+    const previewPose: AnimationPose = new Map();
+    this.puppet.editPose(() => {
+      // Preview the same logical joint positions that an exported rig loads with.
+      // Authored rig-bone edits stay direct edits; they are not a preview.
+      for (const edited of rig.bones) {
+        const runtime = this.puppet.getBone(edited.id);
+        Object.assign(runtime.pose, {
+          ...createTransform(edited),
+          ...computeBonePosition(edited, edited.parent === undefined ? undefined : definitions.get(edited.parent)),
+        });
+        if (runtime.sprite && edited.sprite) {
+          runtime.sprite.setPosition(edited.sprite.x ?? 0, edited.sprite.y ?? 0);
+          this.puppet.setArtworkOrigin(
+            `bone:${edited.id}`,
+            edited.sprite.texture,
+            runtime.sprite,
+            edited.sprite.originX ?? 0.5,
+            edited.sprite.originY ?? 0.5,
+          );
+        }
+      }
+      // The clip preview (and test bend) project through an attached pose source
+      // instead of hand-copying sampled transforms into the live bones. The bend reads
+      // the edited rig pose, so it is built after the prepare and the rig-bone edits.
+      if (this.previewClip) {
+        for (const [id, transform] of evaluateClip(this.previewClip, this.previewTime))
+          if (definitions.has(id)) previewPose.set(id, transform);
+      }
+      if (this.weightPreviewEnabled && definitions.has(this.weightPreviewBoneId)) {
+        const bone = this.puppet.getBone(this.weightPreviewBoneId);
+        const clipValues = previewPose.get(this.weightPreviewBoneId);
+        previewPose.set(this.weightPreviewBoneId, {
+          ...clipValues,
+          rotation: (clipValues?.rotation ?? bone.pose.rotation) + this.weightPreviewRotation,
+        });
+      }
+      for (const slot of rig.slots ?? []) {
+        this.puppet.setSlotTransform(slot.id, createTransform(slot), false);
+        const image = this.puppet.getSlotImage(slot.id);
+        const attachmentId = this.puppet.getAttachment(slot.id);
+        if (image && attachmentId) {
+          const attachment = this.state.getAttachment(attachmentId);
+          image.setPosition(attachment.x ?? 0, attachment.y ?? 0);
+          this.puppet.setArtworkOrigin(
+            `attachment:${attachment.id}`,
+            attachment.texture,
+            image,
+            attachment.originX ?? 0.5,
+            attachment.originY ?? 0.5,
+          );
+        }
+      }
+      this.updateRenderOrder(rig);
+    });
+    // attachPoseSource owns prepare -> attach -> project for the preview pose.
+    if (previewPose.size) this.detachPreviewPoseSource = this.puppet.attachPoseSource({ pose: previewPose });
   }
 
   private updateRenderOrder(rig: RigDefinition): void {
@@ -670,14 +669,14 @@ export class RigEditor {
     this.cancelGesture();
     this.state.ikPreview = enabled;
     this.state.visibility.ik = enabled;
-    this.puppet.posePipeline.preparePose();
-    for (const chain of this.ikChains) {
-      const constraint = this.puppet.getIK(chain.name);
-      if (this.hasExternalTarget(constraint)) continue;
-      if (enabled && !chain.target) this.pinPreviewTarget(constraint);
-      constraint.enabled = enabled && chain.enabled !== false;
-    }
-    this.puppet.posePipeline.syncPose();
+    this.puppet.editPose(() => {
+      for (const chain of this.ikChains) {
+        const constraint = this.puppet.getIK(chain.name);
+        if (this.hasExternalTarget(constraint)) continue;
+        if (enabled && !chain.target) this.pinPreviewTarget(constraint);
+        constraint.enabled = enabled && chain.enabled !== false;
+      }
+    });
     this.refresh();
   }
 

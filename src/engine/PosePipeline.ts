@@ -1,4 +1,4 @@
-import { type AnimationClip, type CompiledClip, compileClip } from './AnimationClip.js';
+import type { CompiledClip } from './AnimationClip.js';
 import { AnimationPlayer, type PoseHooks } from './AnimationPlayer.js';
 import type { Bone } from './Bone.js';
 import type { IKAnimationPose } from './ik/AnimationIKPose.js';
@@ -9,7 +9,7 @@ import type { MeshDeformationPose } from './meshDeformation.js';
 import { applyPoseToJoints, type PoseDefinition, serializePose } from './Pose.js';
 import type { Rig } from './Rig.js';
 import type { RootMotionApplication } from './rootMotion.js';
-import { assertFinite, type JointTransform } from './types.js';
+import type { JointTransform } from './types.js';
 
 export interface SyncPoseOptions {
   /** Defer overlays during repeated solves; call refreshDebugViews() after the final pass. */
@@ -100,26 +100,6 @@ export class PosePipeline {
       if (this.poseSource === source) this.poseSource = undefined;
       this.markPoseDirty();
     };
-  }
-
-  /** Preview a clip at milliseconds: prepare → sample → project, without moving runtime clocks. */
-  previewClip(clip: AnimationClip | CompiledClip, timeMs: number): void {
-    if (this.destroyed) throw new Error('Puppet has been destroyed.');
-    assertFinite(timeMs, 'Preview time');
-    const compiled = (
-      Array.isArray(clip.tracks) ? clip : compileClip(clip as AnimationClip, this.options.rig)
-    ) as CompiledClip;
-    this.preparePose();
-    const player = new AnimationPlayer(this.options.rig, this.bones, [compiled]);
-    player.setPreviewMode(true);
-    try {
-      player.play(compiled.name);
-      player.pause();
-      player.sample(timeMs, { mode: 'playback' });
-    } finally {
-      player.dispose();
-    }
-    this.syncPose();
   }
 
   setActivePose(pose: PoseDefinition, mix: number): void {

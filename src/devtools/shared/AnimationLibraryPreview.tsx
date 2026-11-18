@@ -36,7 +36,7 @@ export class AnimationLibraryRuntimeScene extends Phaser.Scene {
         if (!definition.animations.some((clip) => clip.name === this.animation))
           throw new Error('Animation is missing from its source character.');
         this.puppet = new Puppet(this, { definition, x: 380, y: 435, autoUpdate: false });
-        this.puppet.posePipeline.player.setPreviewMode(true, { applyRootMotion: true });
+        this.puppet.setPreviewMode(true, { applyRootMotion: true });
         this.stopPreview();
         const bounds = this.puppet.container.getBounds();
         if (bounds.width > 0 && bounds.height > 0) {

@@ -1,5 +1,4 @@
 import { assert, test, vi } from 'vitest';
-import { type AnimationClip, compileClip } from '../src/engine/AnimationClip.js';
 import type { IKAnimationValues } from '../src/engine/ik/AnimationIKPose.js';
 import type { MeshDeformationPose } from '../src/engine/meshDeformation.js';
 import { Puppet } from '../src/engine/Puppet.js';
@@ -19,18 +18,6 @@ const rigDefinition = {
   ik: [{ name: 'arm', rootBone: 'root', middleBone: 'arm', endBone: 'hand', target: { x: 65, y: 20 }, mix: 1 }],
 } as const;
 
-const swing: AnimationClip = {
-  name: 'swing',
-  duration: 1000,
-  loop: false,
-  tracks: {
-    arm: [
-      { time: 0, rotation: 0 },
-      { time: 1000, rotation: 1 },
-    ],
-  },
-};
-
 function fixture(ikEnabled = false) {
   const rig = new Rig(rigDefinition);
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
@@ -38,66 +25,6 @@ function fixture(ikEnabled = false) {
   puppet.update(0);
   return puppet;
 }
-
-test('previewClip owns prepare → sample → project without moving runtime clocks or firing events', () => {
-  const puppet = fixture();
-  const events = vi.fn();
-  puppet.onAnimationEvent(events);
-  try {
-    puppet.previewClip(swing, 500);
-    assert.approximately(puppet.getBone('arm').pose.rotation, 0.5, 1e-12, 'sampled pose lands on the bone');
-    assert.approximately(puppet.getBone('arm').container.rotation, 0.5, 1e-12, 'rendering is projected');
-    assert.equal(puppet.posePipeline.player.elapsedTime, 0, 'the runtime clock never advances');
-    assert.isUndefined(puppet.currentAnimation);
-    assert.equal(events.mock.calls.length, 0, 'previews never dispatch gameplay events');
-
-    puppet.previewClip(compileClip({ ...swing, name: 'swing-compiled' }, puppet.rig), 250);
-    assert.approximately(puppet.getBone('arm').pose.rotation, 0.25, 1e-12, 'compiled clips preview too');
-
-    assert.throws(() => puppet.previewClip(swing, Number.NaN), /finite/);
-  } finally {
-    puppet.destroy();
-  }
-});
-
-test('previewClip restores the runtime pose on the next update while playback is active', () => {
-  const puppet = fixture();
-  try {
-    puppet.addAnimation({ name: 'idle', duration: 1000, loop: true, tracks: { arm: [{ time: 0, rotation: 0.2 }] } });
-    puppet.play('idle');
-    puppet.update(100);
-    assert.approximately(puppet.getBone('arm').pose.rotation, 0.2, 1e-12);
-    puppet.previewClip(swing, 500);
-    assert.approximately(puppet.getBone('arm').pose.rotation, 0.5, 1e-12);
-    puppet.update(16);
-    assert.approximately(
-      puppet.getBone('arm').pose.rotation,
-      0.2,
-      1e-12,
-      'runtime playback re-evaluates after a preview',
-    );
-    assert.approximately(puppet.posePipeline.player.elapsedTime, 116, 1e-12);
-  } finally {
-    puppet.destroy();
-  }
-});
-
-test('previewClip solves IK against the freshly sampled pose (prepare → sample → project order)', () => {
-  const puppet = fixture(true);
-  try {
-    const constraint = puppet.getIK('arm');
-    let observed: number | undefined;
-    constraint.setTargetProvider(() => {
-      observed = puppet.getBone('arm').pose.rotation;
-      return { x: 20, y: 15 };
-    });
-    puppet.previewClip(swing, 500);
-    assert.approximately(observed!, 0.5, 1e-12, 'the IK provider observes the previewed pose before solving');
-    assert.equal(constraint.status, 'solved');
-  } finally {
-    puppet.destroy();
-  }
-});
 
 test('attachPoseSource projects a sampled pose once and keeps direct edits until re-attached or detached', () => {
   const puppet = fixture();
@@ -185,9 +112,60 @@ test('a stale detach never clears a newer source', () => {
   }
 });
 
-test('attachPoseSource and previewClip reject use after destroy', () => {
+test('attachPoseSource and editPose reject use after destroy', () => {
   const puppet = fixture();
   puppet.destroy();
   assert.throws(() => puppet.attachPoseSource({}), /destroyed/);
-  assert.throws(() => puppet.previewClip(swing, 0), /destroyed/);
+  assert.throws(() => puppet.editPose(), /destroyed/);
+});
+
+test('editPose restores the pre-IK pose before the edit and solves IK against the edited pose', () => {
+  const puppet = fixture(true);
+  try {
+    assert.isAbove(Math.abs(puppet.getBone('root').pose.rotation), 1e-6, 'IK has rotated the chain root');
+    const constraint = puppet.getIK('arm');
+    let observed: number | undefined;
+    constraint.setTargetProvider(() => {
+      observed = puppet.getBone('arm').pose.rotation;
+      return { x: 20, y: 15 };
+    });
+    let duringEdit: number | undefined;
+    puppet.editPose(() => {
+      duringEdit = puppet.getBone('root').pose.rotation;
+      puppet.getBone('arm').pose.rotation = 0.3;
+    });
+    assert.approximately(duringEdit!, 0, 1e-12, 'the edit sees the restored pre-IK pose');
+    assert.approximately(observed!, 0.3, 1e-12, 'IK solves against the edited pose');
+    assert.equal(constraint.status, 'solved');
+  } finally {
+    puppet.destroy();
+  }
+});
+
+test('editPose still syncs when the edit throws and rethrows the error', () => {
+  const puppet = fixture(true);
+  try {
+    const solvedRoot = puppet.getBone('root').pose.rotation;
+    assert.throws(
+      () =>
+        puppet.editPose(() => {
+          throw new Error('edit failed');
+        }),
+      /edit failed/,
+    );
+    assert.approximately(puppet.getBone('root').pose.rotation, solvedRoot, 1e-12, 'IK is re-solved after the failure');
+  } finally {
+    puppet.destroy();
+  }
+});
+
+test('editPose with no edit re-syncs a dirty pose', () => {
+  const puppet = fixture();
+  try {
+    puppet.getBone('arm').pose.rotation = 0.4;
+    puppet.editPose();
+    assert.approximately(puppet.getBone('arm').container.rotation, 0.4, 1e-12, 'the direct edit is rendered');
+  } finally {
+    puppet.destroy();
+  }
 });

@@ -249,3 +249,52 @@ test('standalone IK owns immutable resolved targets and disposal prevents callba
     constraint.bendDirection = -1;
   }, /disposed/);
 });
+
+test('Puppet exposes preview mode, root-motion sampling and elapsed time without the pose pipeline', () => {
+  const rig = new runtime.Rig({ root: 'root', bones: [{ id: 'root' }] });
+  const walk = {
+    name: 'walk',
+    duration: 1000,
+    loop: false,
+    tracks: { root: [{ time: 0, rotation: 0 }] },
+    rootMotion: {
+      translationKeys: [
+        { time: 0, x: 0, y: 0 },
+        { time: 1000, x: 80, y: 10 },
+      ],
+    },
+    events: [{ time: 100, name: 'step' }],
+  };
+  const run = (configure: (puppet: runtime.Puppet) => void) => {
+    const puppet = new runtime.Puppet(puppetScene(), { rig, animations: [walk], autoUpdate: false });
+    try {
+      configure(puppet);
+      const events: string[] = [];
+      puppet.onAnimationEvent((event) => events.push(event.name));
+      puppet.play('walk', { rootMotion: 'apply' });
+      puppet.update(500);
+      return {
+        events,
+        x: puppet.container.x,
+        elapsed: puppet.elapsedTime,
+        sampled: puppet.sampleRootMotion(250),
+      };
+    } finally {
+      puppet.destroy();
+    }
+  };
+  const runtimePlayback = run(() => {});
+  assert.deepEqual(runtimePlayback.events, ['step']);
+  assert.equal(runtimePlayback.x, 40);
+  assert.equal(runtimePlayback.elapsed, 500);
+  assert.deepEqual(runtimePlayback.sampled, { x: 20, y: 2.5 });
+
+  const preview = run((puppet) => puppet.setPreviewMode(true));
+  assert.deepEqual(preview.events, [], 'preview mode suppresses authored events');
+  assert.equal(preview.x, 0, 'ordinary previews do not move the puppet');
+  assert.equal(preview.elapsed, 500);
+
+  const scenePreview = run((puppet) => puppet.setPreviewMode(true, { applyRootMotion: true }));
+  assert.deepEqual(scenePreview.events, []);
+  assert.equal(scenePreview.x, 40, 'scene previews can keep root-motion translation');
+});

@@ -211,6 +211,8 @@ test.each(dragCases)(
       resetToBindPose: vi.fn().mockReturnThis(),
       setFacing: vi.fn().mockReturnThis(),
       posePipeline: { preparePose: vi.fn(), syncPose: vi.fn(), markPoseDirty: vi.fn() },
+      // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.
+      editPose: Puppet.prototype.editPose,
       attachPoseSource: vi.fn(() => vi.fn()),
       setRenderOrder: vi.fn(),
       // oxlint-disable-next-line typescript/unbound-method -- The test deliberately reuses this method with an explicit fixture receiver.

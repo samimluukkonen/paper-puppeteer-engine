@@ -28,7 +28,7 @@ import type {
   PlaybackWaitResult,
 } from './PlaybackLifecycle.js';
 import { type PoseDefinition, parsePoseDefinition } from './Pose.js';
-import { PosePipeline, type PoseSource } from './PosePipeline.js';
+import { PosePipeline, type PoseSource, type SyncPoseOptions } from './PosePipeline.js';
 import { PuppetAttachments } from './PuppetAttachments.js';
 import { PuppetDebug } from './PuppetDebug.js';
 import { PuppetRenderer } from './PuppetRenderer.js';
@@ -69,7 +69,7 @@ export type PuppetOptions = PuppetSettings &
 export class Puppet {
   readonly rig: Rig;
   readonly container: Phaser.GameObjects.Container;
-  /** @internal Editor/test access to the pose pipeline; the public seam is attachPoseSource/previewClip.
+  /** @internal Editor/test access to the pose pipeline; the public seam is editPose/attachPoseSource.
    * The runtime AnimationPlayer stays private — player access routes through the pipeline.
    */
   readonly posePipeline: PosePipeline;
@@ -900,19 +900,39 @@ export class Puppet {
     this.update(delta);
   }
 
+  /** Preview playback suppresses authored events and, unless `applyRootMotion` is set, root-motion translation. */
+  setPreviewMode(enabled: boolean, options: { readonly applyRootMotion?: boolean } = {}): this {
+    this.posePipeline.player.setPreviewMode(enabled, options);
+    return this;
+  }
+
+  /** Root-motion displacement of the active base clip at `timeMs`, without changing playback or placement. */
+  sampleRootMotion(timeMs: number): RootMotionOffset {
+    return this.posePipeline.player.sampleRootMotion(timeMs);
+  }
+
+  /** Elapsed milliseconds of the active base clip within its current cycle. */
+  get elapsedTime(): number {
+    return this.posePipeline.player.elapsedTime;
+  }
+
+  /** Restore the pre-IK pose, apply `edit`, then re-project and solve IK. With no `edit`, re-sync the pose. */
+  editPose(edit?: () => void, options?: SyncPoseOptions): void {
+    if (this.destroyed) throw new Error('Puppet has been destroyed.');
+    this.posePipeline.preparePose();
+    try {
+      edit?.();
+    } finally {
+      this.posePipeline.syncPose(options);
+    }
+  }
+
   /** Attach external pose channels for previews; the pipeline owns prepare → attach → project.
    * The returned function detaches them. Absent channels fall back to the runtime player,
    * so detaching restores runtime behavior.
    */
   attachPoseSource(source?: PoseSource): () => void {
     return this.posePipeline.attachPoseSource(source);
-  }
-
-  /** Preview a clip at milliseconds: the pipeline owns prepare → sample → project internally.
-   * Runtime clocks, events and root motion are never advanced.
-   */
-  previewClip(clip: AnimationClip | CompiledClip, timeMs: number): void {
-    this.posePipeline.previewClip(clip, timeMs);
   }
 
   get meshDeformation() {

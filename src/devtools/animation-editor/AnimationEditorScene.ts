@@ -533,30 +533,30 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.ikPreviewEnabled = enabled;
     const puppet = this.puppet;
     if (!puppet) return;
-    puppet.posePipeline.preparePose();
-    for (const chain of this.options.ikChains ?? []) {
-      const constraint = puppet.getIK(chain.name);
-      // The fixed-preview control may replace only its own callbacks. Specialized
-      // providers and explicit runtime targets retain the runtime precedence model.
-      if (
-        constraint.target ||
-        (constraint.targetProvider && constraint.targetProvider !== this.previewTargetProviders.get(chain.name))
-      )
-        continue;
-      if (enabled) {
-        const point = ikPreviewTarget(puppet, constraint);
-        const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
-        const provider = () => this.puppet?.container.getWorldTransformMatrix().transformPoint(local.x, local.y);
-        this.previewTargetProviders.set(chain.name, provider);
-        constraint.setTargetProvider(provider);
-      } else {
-        constraint.setTargetProvider(undefined);
-        this.previewTargetProviders.delete(chain.name);
+    puppet.editPose(() => {
+      for (const chain of this.options.ikChains ?? []) {
+        const constraint = puppet.getIK(chain.name);
+        // The fixed-preview control may replace only its own callbacks. Specialized
+        // providers and explicit runtime targets retain the runtime precedence model.
+        if (
+          constraint.target ||
+          (constraint.targetProvider && constraint.targetProvider !== this.previewTargetProviders.get(chain.name))
+        )
+          continue;
+        if (enabled) {
+          const point = ikPreviewTarget(puppet, constraint);
+          const local = puppet.container.getWorldTransformMatrix().applyInverse(point.x, point.y);
+          const provider = () => this.puppet?.container.getWorldTransformMatrix().transformPoint(local.x, local.y);
+          this.previewTargetProviders.set(chain.name, provider);
+          constraint.setTargetProvider(provider);
+        } else {
+          constraint.setTargetProvider(undefined);
+          this.previewTargetProviders.delete(chain.name);
+        }
+        const authored = puppet.rig.ik?.find((definition) => definition.name === chain.name);
+        constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
       }
-      const authored = puppet.rig.ik?.find((definition) => definition.name === chain.name);
-      constraint.enabled = enabled || (authored ? (authored.enabled ?? true) : false);
-    }
-    puppet.posePipeline.syncPose();
+    });
     this.ikHandles?.refreshAvailability();
   }
 
