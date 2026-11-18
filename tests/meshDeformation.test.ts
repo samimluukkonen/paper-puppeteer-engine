@@ -353,22 +353,22 @@ test('editor edits, provisional cancellation, atomic history, copy/paste, duplic
   const state = new AnimationEditorState(rig, [clip]);
   state.selectAnimation(clip.name);
   const baseline = state.exportJson();
-  state.selectDeformation('mesh', 0.5);
-  assert.isTrue(state.setMeshOffsets({ 'top-left': { x: 8, y: -6 } }));
+  state.deformation.selectDeformation('mesh', 0.5);
+  assert.isTrue(state.deformation.setMeshOffsets({ 'top-left': { x: 8, y: -6 } }));
   assert.equal(state.historyLength, 1);
   assert.deepEqual(state.workingAnimation!.tracks, clip.tracks);
   assert.deepEqual(state.workingAnimation!.deformationTracks!.mesh![1]!.offsets['bottom-right'], { x: -2, y: 3 });
   const authored = state.exportJson();
-  state.beginDeformationEdit();
-  state.previewMeshOffsets({ 'top-left': { x: 99, y: 0 } });
+  state.deformation.beginDeformationEdit();
+  state.deformation.previewMeshOffsets({ 'top-left': { x: 99, y: 0 } });
   assert.equal(state.exportJson(), authored);
   assert.notStrictEqual(state.previewAnimation, state.workingAnimation);
-  state.cancelDeformationEdit();
+  state.deformation.cancelDeformationEdit();
   assert.equal(state.exportJson(), authored);
-  state.beginDeformationEdit();
-  state.previewMeshOffsets({ 'top-left': { x: 9, y: 0 } });
-  state.previewMeshOffsets({ 'top-left': { x: 10, y: 0 } });
-  state.commitDeformationEdit();
+  state.deformation.beginDeformationEdit();
+  state.deformation.previewMeshOffsets({ 'top-left': { x: 9, y: 0 } });
+  state.deformation.previewMeshOffsets({ 'top-left': { x: 10, y: 0 } });
+  state.deformation.commitDeformationEdit();
   assert.equal(state.historyLength, 2);
   state.undo();
   assert.equal(state.exportJson(), authored);
@@ -376,7 +376,7 @@ test('editor edits, provisional cancellation, atomic history, copy/paste, duplic
   assert.equal(state.exportJson(), baseline);
   state.redo();
   assert.equal(state.exportJson(), authored);
-  state.selectDeformation('mesh', 0.5);
+  state.deformation.selectDeformation('mesh', 0.5);
   assert.isTrue(state.copyTimelineSelection());
   state.setCurrentTime(0.75);
   assert.isTrue(state.pasteTimelineClipboard());
@@ -491,9 +491,9 @@ test('bone masks exclude partially weighted meshes; invalid topology remains rev
   };
   const nextRig = new Rig({ root: rig.root, bones: rig.bones, slots: rig.slots, ik: rig.ik!, attachments: [changed] });
   state.updatePreviewRig(nextRig);
-  assert.equal(state.deformationTopologyIssues.length, 1);
+  assert.equal(state.deformation.deformationTopologyIssues.length, 1);
   assert.isFalse(state.exportAnimation().success);
-  assert.isTrue(state.removeIncompatibleDeformationTracks());
+  assert.isTrue(state.deformation.removeIncompatibleDeformationTracks());
   assert.deepEqual(state.workingAnimation!.deformationTracks, {});
   assert.isTrue(state.exportAnimation().success);
   // The old snapshot is incompatible until the original mesh IDs are restored.
@@ -538,12 +538,15 @@ test('prototype-named mesh and vertex IDs never inherit phantom correction track
   const nextRig = new Rig({ root: rig.root, bones: rig.bones, slots: rig.slots, attachments: [renamed] });
   const state = new AnimationEditorState(nextRig, [{ ...clip, deformationTracks: {} }]);
   state.selectAnimation(clip.name);
-  state.selectDeformation('constructor');
-  assert.isTrue(state.setMeshOffsets({ toString: { x: 3, y: 5 } }));
-  assert.deepEqual(Object.entries(state.selectedDeformationKey!.offsets).find(([id]) => id === 'toString')?.[1], {
-    x: 3,
-    y: 5,
-  });
+  state.deformation.selectDeformation('constructor');
+  assert.isTrue(state.deformation.setMeshOffsets({ toString: { x: 3, y: 5 } }));
+  assert.deepEqual(
+    Object.entries(state.deformation.selectedDeformationKey!.offsets).find(([id]) => id === 'toString')?.[1],
+    {
+      x: 3,
+      y: 5,
+    },
+  );
   const compiled = compileClip(parseAnimationClip(JSON.parse(state.exportJson()), nextRig), nextRig);
   assert.deepEqual(evaluateMeshDeformation(compiled, 0).get('constructor')!.get('toString'), { x: 3, y: 5 });
 });

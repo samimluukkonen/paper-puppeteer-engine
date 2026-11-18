@@ -1,12 +1,4 @@
-import {
-  commitIKBake,
-  getMeshDeformationTrack,
-  transformProperties,
-  type MeshDeformationKey,
-  type VertexOffset,
-  type JointTransform,
-  type TransformProperty,
-} from '../../engine/core.js';
+import { commitIKBake, transformProperties, type JointTransform, type TransformProperty } from '../../engine/core.js';
 import type {
   Point,
   AnimationClip,
@@ -27,7 +19,10 @@ import {
   validateBoneSymmetryMapping,
 } from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
-import { AnimationEditorDeformationCommands } from './AnimationEditorDeformationCommands.js';
+import {
+  AnimationEditorDeformationCommands,
+  type AnimationEditorDeformationHandle,
+} from './AnimationEditorDeformationCommands.js';
 import {
   AnimationEditorDocument,
   type AnimationEditorStateOptions,
@@ -113,63 +108,6 @@ export class AnimationEditorState {
     this.notify();
   }
 
-  meshDiagnosticsEnabled = false;
-  deformationEditing = false;
-  deformationSelected = false;
-  selectedMeshId: string | null = null;
-  selectedDeformationTime: number | null = null;
-  get deformationEditActive(): boolean {
-    return this.deformation.deformationEditActive;
-  }
-  get selectedDeformationKey(): MeshDeformationKey | null {
-    return this.deformation.selectedDeformationKey;
-  }
-  get deformationTopologyIssues(): readonly ValidationIssue[] {
-    return this.deformation.deformationTopologyIssues;
-  }
-  beginDeformationEdit(): boolean {
-    return this.deformation.beginDeformationEdit();
-  }
-  previewMeshOffsets(changes: Readonly<Record<string, VertexOffset>>): boolean {
-    return this.deformation.previewMeshOffsets(changes);
-  }
-  previewDeformationMove(key: MeshDeformationKey, time: number): boolean {
-    return this.deformation.previewDeformationMove(key, time);
-  }
-  cancelDeformationEdit(): boolean {
-    return this.deformation.cancelDeformationEdit();
-  }
-  commitDeformationEdit(time = this.currentTime): boolean {
-    return this.deformation.commitDeformationEdit(time);
-  }
-  setMeshDiagnostics(enabled: boolean): void {
-    this.deformation.setMeshDiagnostics(enabled);
-  }
-  setDeformationEditing(enabled: boolean): void {
-    this.deformation.setDeformationEditing(enabled);
-  }
-  selectDeformation(meshId: string, time?: number): boolean {
-    return this.deformation.selectDeformation(meshId, time);
-  }
-  setMeshOffsets(changes: Readonly<Record<string, VertexOffset>> | null, time = this.currentTime): boolean {
-    return this.deformation.setMeshOffsets(changes, time);
-  }
-  changeDeformationKey(key: MeshDeformationKey | null, previousTime = this.selectedDeformationKey?.time): boolean {
-    return this.deformation.changeDeformationKey(key, previousTime);
-  }
-  duplicateDeformationKey(): boolean {
-    return this.deformation.duplicateDeformationKey();
-  }
-  removeIncompatibleDeformationTracks(): boolean {
-    return this.deformation.removeIncompatibleDeformationTracks();
-  }
-  private copyDeformationKey(): boolean {
-    return this.deformation.copyDeformationKey();
-  }
-  private pasteDeformationKey(): boolean {
-    return this.deformation.pasteDeformationKey();
-  }
-
   get previewElapsedTimeMilliseconds(): number {
     return this.previewAnimation === this.workingAnimation || this.previews.trajectoryCopyActive
       ? this.playback.elapsedTimeMilliseconds
@@ -177,9 +115,11 @@ export class AnimationEditorState {
   }
   private clearRootSelection(): void {
     const changed =
-      this.rootMotion.rootMotionSelected || this.rootMotion.selectedRootKey !== null || this.deformationSelected;
-    this.deformationSelected = false;
-    this.selectedDeformationTime = null;
+      this.rootMotion.rootMotionSelected ||
+      this.rootMotion.selectedRootKey !== null ||
+      this.deformation.deformationSelected;
+    this.deformation.deformationSelected = false;
+    this.deformation.selectedDeformationTime = null;
     this.rootMotion.rootMotionSelected = false;
     this.rootMotion.selectedRootKey = null;
     if (changed) this.notify();
@@ -190,7 +130,7 @@ export class AnimationEditorState {
     return (
       this.previewCommands.trajectoryAnimation ??
       this.previewCommands.cleanupAnimation ??
-      this.deformation.previewAnimation ??
+      this.deformationCommands.previewAnimation ??
       this.previewCommands.variationAnimation ??
       this.rootMotionCommands.previewAnimation ??
       this.graphGestures.previewAnimation ??
@@ -281,7 +221,9 @@ export class AnimationEditorState {
   private readonly previewCommands: AnimationEditorPreviewCommands;
   /** Detached trajectory, cleanup, variation and pose-library previews outside document history. */
   readonly previews: AnimationEditorPreviewHandle;
-  private readonly deformation: AnimationEditorDeformationCommands;
+  private readonly deformationCommands: AnimationEditorDeformationCommands;
+  /** Mesh deformation selection, provisional mesh edits and deformation key commands. */
+  readonly deformation: AnimationEditorDeformationHandle;
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly snapping: AnimationEditorTimelineSnapping;
@@ -345,8 +287,8 @@ export class AnimationEditorState {
       clearBoneSelection: () => this.selection.selectBone(null),
       clearOtherSelection: () => {
         this.selection.selectBone(null);
-        this.deformationSelected = false;
-        this.selectedDeformationTime = null;
+        this.deformation.deformationSelected = false;
+        this.deformation.selectedDeformationTime = null;
       },
       selectCommittedKey: (channel, time) => {
         if (channel.kind === 'root')
@@ -360,7 +302,12 @@ export class AnimationEditorState {
     this.graphGestures = new AnimationEditorGraphGestures(this, this.session);
     this.previews = this.previewCommands = new AnimationEditorPreviewCommands(this, this.document, this.session);
     this.selection = new AnimationEditorSelection(rig);
-    this.deformation = new AnimationEditorDeformationCommands(this, this.document, this.clipboard, this.session);
+    this.deformation = this.deformationCommands = new AnimationEditorDeformationCommands(
+      this,
+      this.document,
+      this.clipboard,
+      this.session,
+    );
     this.snapping = new AnimationEditorTimelineSnapping(
       () => this.workingAnimation,
       () => this.notify(),
@@ -398,7 +345,7 @@ export class AnimationEditorState {
           this.ik.ikTargetDrag ||
           this.graphEditActive ||
           this.rootMotion.rootMotionDragActive ||
-          this.deformationEditActive
+          this.deformation.deformationEditActive
         ),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, this.session);
@@ -522,25 +469,25 @@ export class AnimationEditorState {
     return this.clipboard.content;
   }
   copyTimelineSelection(): boolean {
-    if (this.deformationSelected) return this.copyDeformationKey();
+    if (this.deformation.deformationSelected) return this.deformationCommands.copyDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.events.copySelectedEvent() : this.keyframes.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
-    if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
+    if (this.clipboard.content?.kind === 'deformation') return this.deformationCommands.pasteDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
     return this.clipboard.content?.kind === 'event' ? this.events.pasteEvent() : this.keyframes.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
-    if (this.deformationSelected) return this.duplicateDeformationKey();
+    if (this.deformation.deformationSelected) return this.deformation.duplicateDeformationKey();
     if (this.rootMotion.rootMotionSelected) return this.rootMotion.duplicateRootKey();
     if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.events.duplicateSelectedEvent() : this.keyframes.duplicateSelectedKeyframes();
   }
   private cancelTimelineDrag(): boolean {
-    const deformation = this.cancelDeformationEdit();
+    const deformation = this.deformation.cancelDeformationEdit();
     const root = this.rootMotion.cancelRootMotionDrag();
     const cleanup = this.previews.cancelCleanupPreview();
     const variation = this.previews.cancelVariationPreview();
@@ -587,11 +534,11 @@ export class AnimationEditorState {
     });
   }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
-    if (this.deformationSelected) {
-      const key = this.selectedDeformationKey;
+    if (this.deformation.deformationSelected) {
+      const key = this.deformation.selectedDeformationKey;
       return (
         !!key &&
-        this.changeDeformationKey({
+        this.deformation.changeDeformationKey({
           ...key,
           time: key.time + (direction * (large ? 10 : 1) * 1000) / this.keyframes.keyframeFPS,
         })
@@ -618,8 +565,8 @@ export class AnimationEditorState {
   }
   clearKeyframeSelection(): void {
     return this.batchNotifications(() => {
-      if (this.selectedDeformationTime !== null) {
-        this.selectedDeformationTime = null;
+      if (this.deformation.selectedDeformationTime !== null) {
+        this.deformation.selectedDeformationTime = null;
         this.notify();
       }
       if (this.rootMotion.selectedRootKey) {
@@ -645,7 +592,7 @@ export class AnimationEditorState {
   }
   /** The toolbar and keyboard share the same typed selection dispatch. */
   deleteTimelineSelection(): boolean {
-    if (this.deformationSelected) return this.changeDeformationKey(null);
+    if (this.deformation.deformationSelected) return this.deformation.changeDeformationKey(null);
     if (this.rootMotion.rootMotionSelected) return this.animationAuthoringEnabled && this.rootMotion.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.events.deleteSelectedEvent();
@@ -667,17 +614,10 @@ export class AnimationEditorState {
   getAdjacentKeyframe(direction: -1 | 1): KeyframeSelection | undefined {
     return this.selectionCommands.getAdjacentKeyframe(direction);
   }
-  getAdjacentDeformationKey(direction: -1 | 1): MeshDeformationKey | undefined {
-    if (!this.deformationSelected || !this.working || !this.selectedMeshId) return undefined;
-    const keys = getMeshDeformationTrack(this.working, this.selectedMeshId);
-    return direction < 0
-      ? [...keys].reverse().find((key) => key.time / 1000 < this.currentTime)
-      : keys.find((key) => key.time / 1000 > this.currentTime);
-  }
   selectAdjacentKeyframe(direction: -1 | 1): boolean {
-    if (this.deformationSelected && this.selectedMeshId) {
-      const key = this.getAdjacentDeformationKey(direction);
-      return !!key && this.selectDeformation(this.selectedMeshId, key.time / 1000);
+    if (this.deformation.deformationSelected && this.deformation.selectedMeshId) {
+      const key = this.deformation.getAdjacentDeformationKey(direction);
+      return !!key && this.deformation.selectDeformation(this.deformation.selectedMeshId, key.time / 1000);
     }
     return this.batchNotifications(() => this.selectionCommands.selectAdjacentKeyframe(direction));
   }
@@ -834,7 +774,7 @@ export class AnimationEditorState {
       !!this.ik.ikTargetDrag ||
       this.graphEditActive ||
       this.rootMotion.rootMotionDragActive ||
-      this.deformationEditActive
+      this.deformation.deformationEditActive
     );
   }
 
@@ -1119,8 +1059,8 @@ export class AnimationEditorState {
   }
 
   private resetAnimationSession(clearBone = false): void {
-    this.cancelDeformationEdit();
-    this.deformationEditing = false;
+    this.deformation.cancelDeformationEdit();
+    this.deformation.deformationEditing = false;
     this.rootMotion.cancelRootMotionDrag();
     this.clearRootSelection();
     this.rootMotion.rootMotionEditing = false;

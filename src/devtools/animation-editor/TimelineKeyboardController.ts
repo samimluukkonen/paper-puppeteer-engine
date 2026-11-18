@@ -238,7 +238,7 @@ export class TimelineKeyboardController {
         !state.selectedEvent &&
         !state.ik.selectedIKKeyframe &&
         !state.rootMotion.selectedRootKey &&
-        !state.selectedDeformationKey) ||
+        !state.deformation.selectedDeformationKey) ||
       event.altKey ||
       event.ctrlKey ||
       event.metaKey

@@ -338,8 +338,8 @@ test('mesh deformation guide checks live mesh availability and links to setup wi
   animation.updatePreviewRig(new Rig(rig.workingCopy, rig.skins));
   launcher.refresh();
   assert.isTrue(launcher.getAvailability(id).available);
-  assert.isNull(animation.selectedMeshId);
-  assert.isFalse(animation.deformationEditing);
+  assert.isNull(animation.deformation.selectedMeshId);
+  assert.isFalse(animation.deformation.deformationEditing);
   animation.updatePreviewRig(originalRig);
   launcher.refresh();
   assert.isFalse(launcher.getAvailability(id).available);
@@ -366,10 +366,10 @@ test.each([false, true])(
     animation.updatePreviewRig(new Rig(rig.workingCopy, rig.skins));
     if (configured) {
       const mesh = rig.selectedMesh!;
-      animation.setDeformationEditing(true);
-      animation.selectDeformation(mesh.id);
-      animation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 4, y: -3 } });
-      animation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 8, y: -6 } });
+      animation.deformation.setDeformationEditing(true);
+      animation.deformation.selectDeformation(mesh.id);
+      animation.deformation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 4, y: -3 } });
+      animation.deformation.setMeshOffsets({ [mesh.vertices[0]!.id]: { x: 8, y: -6 } });
       animation.undo();
     }
     animation.setCurrentTime(0.3);
@@ -385,10 +385,10 @@ test.each([false, true])(
       dirty: animation.dirty,
       time: animation.currentTime,
       playing: animation.isPlaying,
-      mode: animation.deformationEditing,
-      mesh: animation.selectedMeshId,
-      selected: animation.deformationSelected,
-      key: animation.selectedDeformationKey,
+      mode: animation.deformation.deformationEditing,
+      mesh: animation.deformation.selectedMeshId,
+      selected: animation.deformation.deformationSelected,
+      key: animation.deformation.selectedDeformationKey,
       bone: animation.selectedBoneId,
       rig: rig.workingCopy,
       rigHistory: rig.historyLength,

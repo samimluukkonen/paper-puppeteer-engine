@@ -206,11 +206,11 @@ export class TimelineSessionController {
     if ((authoredChanged || fps !== this.authoredFPS || document.activeElement !== this.fps) && this.fps.value !== fps)
       this.fps.value = fps;
     this.authoredFPS = fps;
-    const previousDisabled = !(state.deformationSelected
-      ? state.getAdjacentDeformationKey(-1)
+    const previousDisabled = !(state.deformation.deformationSelected
+      ? state.deformation.getAdjacentDeformationKey(-1)
       : state.getAdjacentKeyframe(-1));
-    const nextDisabled = !(state.deformationSelected
-      ? state.getAdjacentDeformationKey(1)
+    const nextDisabled = !(state.deformation.deformationSelected
+      ? state.deformation.getAdjacentDeformationKey(1)
       : state.getAdjacentKeyframe(1));
     if (this.previousKey.disabled !== previousDisabled) this.previousKey.disabled = previousDisabled;
     if (this.nextKey.disabled !== nextDisabled) this.nextKey.disabled = nextDisabled;
@@ -235,8 +235,8 @@ export class TimelineSessionController {
       state.selectedTarget,
       state.ik.selectedIKKeyframe,
       state.rootMotion.selectedRootKey,
-      state.selectedDeformationKey,
-      state.deformationSelected,
+      state.deformation.selectedDeformationKey,
+      state.deformation.deformationSelected,
       state.rootMotion.rootMotionSelected,
       state.selectedEvent,
       state.timelineClipboard,
@@ -269,7 +269,7 @@ export class TimelineSessionController {
       !state.ik.selectedIKKeyframe &&
       !state.selectedEvent &&
       !state.rootMotion.selectedRootKey &&
-      !state.selectedDeformationKey;
+      !state.deformation.selectedDeformationKey;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     setCommandAvailability(
       this.deleteKey,
@@ -304,7 +304,7 @@ export class TimelineSessionController {
       state.selectedKeys.length +
       (state.ik.selectedIKKeyframe ? 1 : 0) +
       (state.rootMotion.selectedRootKey ? 1 : 0) +
-      (state.selectedDeformationKey ? 1 : 0);
+      (state.deformation.selectedDeformationKey ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
       this.deleteKey,
@@ -314,8 +314,8 @@ export class TimelineSessionController {
           ? `Delete ${count} Selected Key${count === 1 ? '' : 's'}${hidden ? ` (${hidden} hidden)` : ''}`
           : 'Delete Selected Keys',
     );
-    const copyDisabled = state.deformationSelected
-      ? !state.selectedDeformationKey
+    const copyDisabled = state.deformation.deformationSelected
+      ? !state.deformation.selectedDeformationKey
       : state.rootMotion.rootMotionSelected ||
         !!state.ik.selectedIKConstraintId ||
         (deleteDisabled && !state.selectedEvent);
@@ -333,14 +333,14 @@ export class TimelineSessionController {
     const pasteDisabled =
       state.timelineClipboard?.kind === 'deformation'
         ? !animation
-        : state.deformationSelected ||
+        : state.deformation.deformationSelected ||
           state.rootMotion.rootMotionSelected ||
           !!state.ik.selectedIKConstraintId ||
           !animation ||
           !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
-    const clipboardReason = state.deformationSelected
-      ? state.selectedDeformationKey
+    const clipboardReason = state.deformation.deformationSelected
+      ? state.deformation.selectedDeformationKey
         ? ''
         : 'Select a deformation key first.'
       : state.rootMotion.rootMotionSelected
@@ -366,7 +366,7 @@ export class TimelineSessionController {
         ? !animation
           ? 'Load a valid animation first.'
           : ''
-        : state.deformationSelected
+        : state.deformation.deformationSelected
           ? 'Copy a deformation key first.'
           : state.rootMotion.rootMotionSelected
             ? 'Select a bone or event track to paste.'

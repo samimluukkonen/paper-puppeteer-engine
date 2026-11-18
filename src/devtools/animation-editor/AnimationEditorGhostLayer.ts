@@ -167,7 +167,7 @@ export class AnimationEditorGhostLayer {
   /** Also called each scene frame to follow skin, frame, visibility, facing and preview layout changes. */
   sync(): void {
     if (this.disposed || !this.settings.enabled || this.frameDepth > 0) return;
-    if (this.state.editorMode !== 'animation' || this.state.deformationTopologyIssues.length) {
+    if (this.state.editorMode !== 'animation' || this.state.deformation.deformationTopologyIssues.length) {
       for (const ghost of this.instances.values()) ghost.hide();
       this.animation = undefined;
       return;

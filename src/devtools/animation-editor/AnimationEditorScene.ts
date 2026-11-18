@@ -242,10 +242,10 @@ export class AnimationEditorScene extends Phaser.Scene {
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
     this.motionLayer?.render();
-    if (!this.rigMode && this.puppet && this.state?.meshDiagnosticsEnabled) {
+    if (!this.rigMode && this.puppet && this.state?.deformation.meshDiagnosticsEnabled) {
       this.meshDiagnostics ??= new MeshDiagnosticsOverlay(this);
       const mesh = this.state.rig?.attachments.find(
-        (entry) => entry.type === 'mesh' && entry.id === this.state?.selectedMeshId,
+        (entry) => entry.type === 'mesh' && entry.id === this.state?.deformation.selectedMeshId,
       );
       const message = this.meshDiagnostics.render(this.puppet, mesh?.type === 'mesh' ? mesh : undefined);
       const status = requireElement(document, ANIMATION_IDS.meshDiagnosticsStatus, HTMLElement);

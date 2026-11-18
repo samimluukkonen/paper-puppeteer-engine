@@ -91,12 +91,15 @@ function fixture() {
   rig.redo();
   animation.updatePreviewRig(new Rig({ ...rig.workingCopy, skins: rig.skins }));
   assert.isTrue(animation.createAnimation({ name: 'bend', durationSeconds: 1, loop: false }));
-  animation.selectDeformation('cloth');
-  animation.setMeshOffsets({ 'top-left': { x: 0, y: 0 } });
+  animation.deformation.selectDeformation('cloth');
+  animation.deformation.setMeshOffsets({ 'top-left': { x: 0, y: 0 } });
   animation.setCurrentTime(0.5);
-  animation.setMeshOffsets({ 'top-left': { x: 0.3, y: -0.2 }, [mesh.vertices.at(-1)!.id]: { x: 0.1, y: 0.2 } });
+  animation.deformation.setMeshOffsets({
+    'top-left': { x: 0.3, y: -0.2 },
+    [mesh.vertices.at(-1)!.id]: { x: 0.1, y: 0.2 },
+  });
   animation.setCurrentTime(1);
-  animation.setMeshOffsets({ 'top-left': { x: 0, y: 0 }, [mesh.vertices.at(-1)!.id]: { x: 0, y: 0 } });
+  animation.deformation.setMeshOffsets({ 'top-left': { x: 0, y: 0 }, [mesh.vertices.at(-1)!.id]: { x: 0, y: 0 } });
   animation.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0, 0);
   animation.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0.8, 1);
   animation.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
@@ -152,8 +155,8 @@ test('live rig edits and history protect deformation attachment/vertex dependenc
   rig.subdivideSelectedMeshEdge();
   const added = rig.selectedMeshVertexId;
   animation.updatePreviewRig(new Rig({ ...rig.workingCopy, skins: rig.skins }));
-  animation.selectDeformation('cloth', 0.5);
-  animation.setMeshOffsets({ [added]: { x: 0.1, y: 0 } });
+  animation.deformation.selectDeformation('cloth', 0.5);
+  animation.deformation.setMeshOffsets({ [added]: { x: 0.1, y: 0 } });
   const held = rig.exportJson(false);
   assert.throws(() => rig.undo(), /invalidate.*bend/);
   assert.equal(rig.exportJson(false), held);

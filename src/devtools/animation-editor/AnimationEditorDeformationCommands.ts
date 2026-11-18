@@ -14,20 +14,26 @@ import { validateEditedAnimation } from './validatedAnimation.js';
 
 type DeformationState = Pick<
   AnimationEditorState,
-  | 'animationAuthoringEnabled'
-  | 'selectedMeshId'
-  | 'currentTimeMilliseconds'
-  | 'currentTime'
-  | 'selectedDeformationTime'
-  | 'meshDiagnosticsEnabled'
-  | 'deformationEditing'
-  | 'deformationSelected'
-  | 'rootMotion'
-  | 'keyframes'
+  'animationAuthoringEnabled' | 'currentTimeMilliseconds' | 'currentTime' | 'rootMotion' | 'keyframes'
 >;
 
-/** Own provisional mesh corrections and key commands; the session owns the commit ordering and history. */
+/**
+ * The public `state.deformation` domain handle. Only the facade reads the provisional preview, and the
+ * deformation clipboard is reached through the shared timeline copy and paste commands.
+ */
+export type AnimationEditorDeformationHandle = Omit<
+  AnimationEditorDeformationCommands,
+  'previewAnimation' | 'copyDeformationKey' | 'pasteDeformationKey'
+>;
+
+/** Own mesh deformation selection, provisional mesh corrections and key commands; the session owns the commit ordering and history. */
 export class AnimationEditorDeformationCommands {
+  meshDiagnosticsEnabled = false;
+  deformationEditing = false;
+  deformationSelected = false;
+  selectedMeshId: string | null = null;
+  selectedDeformationTime: number | null = null;
+
   constructor(
     private readonly state: DeformationState,
     private readonly document: AnimationEditorDocument,
@@ -52,7 +58,7 @@ export class AnimationEditorDeformationCommands {
       !this.state.animationAuthoringEnabled ||
       !this.document.workingAnimation ||
       !this.document.rig ||
-      !this.state.selectedMeshId
+      !this.selectedMeshId
     )
       return false;
     this.session.batch(() => {
@@ -60,12 +66,12 @@ export class AnimationEditorDeformationCommands {
       this.session.clearBoneSelection();
       this.state.rootMotion.rootMotionSelected = false;
       this.state.rootMotion.selectedRootKey = null;
-      this.state.deformationSelected = true;
+      this.deformationSelected = true;
       this.deformationGesture = {
         base: this.document.workingAnimation!,
         preview: this.document.workingAnimation!,
         rig: this.document.rig!,
-        meshId: this.state.selectedMeshId!,
+        meshId: this.selectedMeshId!,
         time: this.state.currentTimeMilliseconds,
       };
       this.session.notify();
@@ -105,24 +111,31 @@ export class AnimationEditorDeformationCommands {
       return false;
     }
     return this.session.batch(() => {
-      this.state.selectedDeformationTime = time;
+      this.selectedDeformationTime = time;
       return this.session.commit(() => gesture.preview, { pause: false });
     });
   }
 
+  /** Previous/next key on the selected mesh's deformation track, relative to the playhead. */
+  getAdjacentDeformationKey(direction: -1 | 1): MeshDeformationKey | undefined {
+    if (!this.deformationSelected || !this.document.workingAnimation || !this.selectedMeshId) return undefined;
+    const keys = getMeshDeformationTrack(this.document.workingAnimation, this.selectedMeshId);
+    return direction < 0
+      ? [...keys].reverse().find((key) => key.time / 1000 < this.state.currentTime)
+      : keys.find((key) => key.time / 1000 > this.state.currentTime);
+  }
+
   setMeshDiagnostics(enabled: boolean): void {
-    this.state.meshDiagnosticsEnabled = enabled;
+    this.meshDiagnosticsEnabled = enabled;
     this.session.notify();
   }
 
   get selectedDeformationKey(): MeshDeformationKey | null {
-    return this.state.deformationSelected &&
-      this.state.selectedMeshId !== null &&
-      this.state.selectedDeformationTime !== null
+    return this.deformationSelected && this.selectedMeshId !== null && this.selectedDeformationTime !== null
       ? ((this.document.workingAnimation
-          ? getMeshDeformationTrack(this.document.workingAnimation, this.state.selectedMeshId)
+          ? getMeshDeformationTrack(this.document.workingAnimation, this.selectedMeshId)
           : []
-        ).find((key) => key.time / 1000 === this.state.selectedDeformationTime) ?? null)
+        ).find((key) => key.time / 1000 === this.selectedDeformationTime) ?? null)
       : null;
   }
   private topologyCache:
@@ -146,7 +159,7 @@ export class AnimationEditorDeformationCommands {
   setDeformationEditing(enabled: boolean): void {
     this.session.batch(() => {
       this.cancelDeformationEdit();
-      this.state.deformationEditing = enabled;
+      this.deformationEditing = enabled;
       if (enabled) {
         this.session.stopPlayback();
       }
@@ -169,9 +182,9 @@ export class AnimationEditorDeformationCommands {
       this.session.clearBoneSelection();
       this.state.rootMotion.rootMotionSelected = false;
       this.state.rootMotion.selectedRootKey = null;
-      this.state.deformationSelected = true;
-      this.state.selectedMeshId = meshId;
-      this.state.selectedDeformationTime = time ?? null;
+      this.deformationSelected = true;
+      this.selectedMeshId = meshId;
+      this.selectedDeformationTime = time ?? null;
       if (time !== undefined) {
         this.session.stopPlayback();
         this.session.updateTime(time);
@@ -185,10 +198,10 @@ export class AnimationEditorDeformationCommands {
       !this.state.animationAuthoringEnabled ||
       !this.document.workingAnimation ||
       !this.document.rig ||
-      !this.state.selectedMeshId
+      !this.selectedMeshId
     )
       return false;
-    const id = this.state.selectedMeshId;
+    const id = this.selectedMeshId;
     return this.commitDeformationProposal(
       () => setDeformationOffsets(this.document.workingAnimation!, this.document.rig!, id, time * 1000, changes),
       time,
@@ -199,7 +212,7 @@ export class AnimationEditorDeformationCommands {
       !this.state.animationAuthoringEnabled ||
       !this.document.workingAnimation ||
       !this.document.rig ||
-      !this.state.selectedMeshId ||
+      !this.selectedMeshId ||
       previousTime === undefined
     )
       return false;
@@ -208,7 +221,7 @@ export class AnimationEditorDeformationCommands {
         editDeformationKey(
           this.document.workingAnimation!,
           this.document.rig!,
-          this.state.selectedMeshId!,
+          this.selectedMeshId!,
           key,
           previousTime,
         ),
@@ -221,7 +234,7 @@ export class AnimationEditorDeformationCommands {
       !key ||
       !this.document.workingAnimation ||
       !this.document.rig ||
-      !this.state.selectedMeshId ||
+      !this.selectedMeshId ||
       !this.state.animationAuthoringEnabled
     )
       return false;
@@ -231,7 +244,7 @@ export class AnimationEditorDeformationCommands {
         : key.time + 1000 / this.state.keyframes.keyframeFPS;
     return this.commitDeformationProposal(
       () =>
-        editDeformationKey(this.document.workingAnimation!, this.document.rig!, this.state.selectedMeshId!, {
+        editDeformationKey(this.document.workingAnimation!, this.document.rig!, this.selectedMeshId!, {
           ...key,
           time: destination,
         }),
@@ -241,7 +254,7 @@ export class AnimationEditorDeformationCommands {
   private commitDeformationProposal(
     create: () => ReadonlyAnimation,
     time: number | null,
-    meshId = this.state.selectedMeshId,
+    meshId = this.selectedMeshId,
   ): boolean {
     return this.session.batch(() => {
       const committed = this.session.commit(create, { pause: false });
@@ -249,9 +262,9 @@ export class AnimationEditorDeformationCommands {
       this.session.clearBoneSelection();
       this.state.rootMotion.rootMotionSelected = false;
       this.state.rootMotion.selectedRootKey = null;
-      this.state.selectedMeshId = meshId;
-      this.state.deformationSelected = true;
-      this.state.selectedDeformationTime = time;
+      this.selectedMeshId = meshId;
+      this.deformationSelected = true;
+      this.selectedDeformationTime = time;
       this.session.notify();
       return true;
     });
@@ -281,8 +294,8 @@ export class AnimationEditorDeformationCommands {
   }
   copyDeformationKey(): boolean {
     const key = this.selectedDeformationKey;
-    if (!key || !this.state.selectedMeshId) return false;
-    this.clipboard.content = { kind: 'deformation', data: { meshId: this.state.selectedMeshId, key } };
+    if (!key || !this.selectedMeshId) return false;
+    this.clipboard.content = { kind: 'deformation', data: { meshId: this.selectedMeshId, key } };
     this.session.notify();
     return true;
   }
