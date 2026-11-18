@@ -242,8 +242,7 @@ test('authoring guard blocks commits without touching any dependency', () => {
   const listener = vi.fn();
   session.subscribe(listener);
   assert.isFalse(session.commit(() => ({}) as unknown as ReadonlyAnimation));
-  assert.isFalse(session.install({} as unknown as ReadonlyAnimation));
-  assert.deepEqual(calls, ['authoringEnabled', 'authoringEnabled']);
+  assert.deepEqual(calls, ['authoringEnabled']);
   assert.equal(listener.mock.calls.length, 0);
 });
 
@@ -293,7 +292,7 @@ test('install failure notifies once and returns false without reconciling select
   const session = new AnimationEditSession(deps);
   const listener = vi.fn();
   session.subscribe(listener);
-  assert.isFalse(session.install({} as unknown as ReadonlyAnimation));
+  assert.isFalse(session.commit(() => ({}) as unknown as ReadonlyAnimation, { pause: false }));
   assert.deepEqual(calls, ['authoringEnabled', 'cancelActiveDrags', 'install', 'beforeNotify']);
   assert.equal(listener.mock.calls.length, 1);
 });
@@ -358,7 +357,59 @@ test('command modules reach only transaction operations through AnimationEditAct
   // @ts-expect-error endScrub is reachable only through stopPlayback, beginGesture or commit.
   assert.isUndefined(actions.endScrub);
   // @ts-expect-error command modules install through commit.
-  assert.isFunction(actions.install);
+  assert.isUndefined(actions.install);
   actions.beginGesture();
   assert.deepEqual(calls, ['cancelActiveDrags', 'pause', 'endScrub']);
+});
+
+test('the session has no install outside commit: the facade commits like every command module', () => {
+  const { deps } = mockDeps();
+  const session = new AnimationEditSession(deps);
+  // @ts-expect-error every authored edit goes through commit.
+  assert.isUndefined(session.install);
+});
+
+test('run returns denied without running the command when authoring is disabled', () => {
+  const { deps, calls } = mockDeps({ authoring: false });
+  const session = new AnimationEditSession(deps);
+  const listener = vi.fn();
+  session.subscribe(listener);
+  const command = vi.fn(() => {
+    session.notify();
+    return 'ran';
+  });
+  assert.equal(session.run('denied', command), 'denied');
+  assert.equal(command.mock.calls.length, 0);
+  assert.deepEqual(calls, ['authoringEnabled']);
+  assert.equal(listener.mock.calls.length, 0);
+});
+
+test('nested run and batch calls publish exactly one notification', () => {
+  const { deps } = mockDeps();
+  const session = new AnimationEditSession(deps);
+  const listener = vi.fn();
+  session.subscribe(listener);
+  const result = session.run(false, () => {
+    session.notify();
+    session.batch(() => session.run(undefined, () => session.notify()));
+    session.commit(() => ({}) as unknown as ReadonlyAnimation, { pause: false });
+    assert.equal(listener.mock.calls.length, 0);
+    return true;
+  });
+  assert.isTrue(result);
+  assert.equal(listener.mock.calls.length, 1);
+});
+
+test('an unguarded batch path still runs when authoring is disabled', () => {
+  const { deps } = mockDeps({ authoring: false });
+  const session = new AnimationEditSession(deps);
+  const listener = vi.fn();
+  session.subscribe(listener);
+  const cancel = vi.fn(() => {
+    session.notify();
+    return true;
+  });
+  assert.isTrue(session.batch(cancel));
+  assert.equal(cancel.mock.calls.length, 1);
+  assert.equal(listener.mock.calls.length, 1);
 });

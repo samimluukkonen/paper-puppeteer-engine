@@ -39,6 +39,7 @@ export interface AnimationEditCommitOptions extends AnimationEditInstallOptions 
  */
 export interface AnimationEditActions {
   batch<Result>(command: () => Result): Result;
+  run<Result>(denied: Result, command: () => Result): Result;
   notify(): void;
   cancelActiveDrags(): boolean;
   stopPlayback(): void;
@@ -123,6 +124,15 @@ export class AnimationEditSession implements AnimationEditActions {
         this.notify();
       }
     }
+  }
+
+  /**
+   * The one authoring guard: return `denied` while authoring is disabled, otherwise run the
+   * command inside one notification batch. Cancels and other always-allowed paths use `batch`.
+   */
+  run<Result>(denied: Result, command: () => Result): Result {
+    if (!this.deps.authoringEnabled()) return denied;
+    return this.batch(command);
   }
 
   notify(): void {
@@ -212,18 +222,7 @@ export class AnimationEditSession implements AnimationEditActions {
     });
   }
 
-  /**
-   * Facade-only install for snapshots the facade validated itself (pose apply, interpolation,
-   * inspected input, library edits). Not on `AnimationEditActions`: command modules install
-   * through `commit`.
-   */
-  install(next: ReadonlyAnimation, opts: AnimationEditInstallOptions = {}): boolean {
-    if (!this.deps.authoringEnabled()) return false;
-    this.cancelActiveDrags();
-    return this.installCore(next, opts);
-  }
-
-  /** Install after the caller already guarded and cancelled drags; owns freeze, history, reconcile and notify. */
+  /** Install after `commit` guarded and cancelled drags; owns freeze, history, reconcile and notify. */
   private installCore(next: ReadonlyAnimation, opts: AnimationEditInstallOptions): boolean {
     if (!this.deps.document.install(freezeData(next))) {
       this.notify();

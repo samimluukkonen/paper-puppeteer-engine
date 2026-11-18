@@ -374,15 +374,9 @@ export class AnimationEditorState {
 
   /** One validated keyframe batch and one document history entry, using editor milliseconds. */
   applyLibraryPose(id: string): boolean {
-    if (
-      !this.animationAuthoringEnabled ||
-      !this.working ||
-      !this.rig ||
-      this.hasPendingAnimationEdits ||
-      this.poseLibrary.compatibility(id, this.rig)
-    )
-      return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
+      if (!this.working || !this.rig || this.hasPendingAnimationEdits || this.poseLibrary.compatibility(id, this.rig))
+        return false;
       const pose = this.poseLibrary.get(id).pose;
       const edits = Object.entries(pose.bones).flatMap(([boneId, values]) =>
         transformProperties.flatMap((property) =>
@@ -392,10 +386,16 @@ export class AnimationEditorState {
         ),
       );
       if (!edits.length) return false;
-      const next = setBonePropertyKeyframes(this.working!, this.rig!, edits, { preserveTiming: true });
-      this.pause();
-      this.previews.clearPose();
-      return this.installWorkingAnimation(next);
+      // Computed before commit so an invalid pose still throws to the caller instead of being reported.
+      const next = setBonePropertyKeyframes(this.working, this.rig, edits, { preserveTiming: true });
+      // Pose apply pauses without ending a scrub, then drops the pose preview before the install.
+      return this.session.commit(() => next, {
+        pause: false,
+        after: () => {
+          this.pause();
+          this.previews.clearPose();
+        },
+      });
     });
   }
   /** Loaded character rig, retained independently of restored drafts and preview tweaks. */
@@ -1295,16 +1295,18 @@ export class AnimationEditorState {
 
   /** Clip-level declaration only; undefined restores the implicit linear default. */
   setAuthoredInterpolation(mode: Interpolation | undefined): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.working || !this.rig) return false;
+      let next: ReadonlyAnimation;
       try {
-        const next = setAnimationInterpolation(this.working, this.rig, mode);
-        if (next === this.working) return true;
-        return this.installWorkingAnimation(next);
+        next = setAnimationInterpolation(this.working, this.rig, mode);
       } catch {
+        // Invalid declarations fail silently, without a reported issue.
         return false;
       }
+      // An unchanged declaration succeeds without clearing the draft, seeking or notifying.
+      if (next === this.working) return true;
+      return this.session.commit(() => next, { pause: false });
     });
   }
 
@@ -1461,22 +1463,20 @@ export class AnimationEditorState {
 
   /** Authored edit boundary: validate atomically, own a fresh JSON copy, and record one history entry. */
   replaceWorkingAnimation(input: unknown): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.working) return false;
       const next = this.document.inspect(input);
       if (!next) {
         this.notify();
         return false;
       }
-      return this.installWorkingAnimation(next);
+      return this.session.commit(() => next, { pause: false });
     });
   }
 
   /** Commit a validated full-clip IK proposal as one authored history operation. */
   commitIKBake(plan: IKBakePlan): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.working || !this.rig) return false;
       const result = commitIKBake(this.working, plan, this.rig);
       if (!result.success) {
@@ -1489,19 +1489,11 @@ export class AnimationEditorState {
         this.notify();
         return false;
       }
-      const installed = this.installWorkingAnimation(next);
+      const installed = this.session.commit(() => next, { pause: false });
+      // Install clears the document issues, so the bake warnings are reported again afterwards.
       if (installed) this.document.reportIssues(result.issues);
       return installed;
     });
-  }
-
-  /** Internal edits have already validated their changes and retain immutable unchanged branches. */
-  private installWorkingAnimation(
-    next: ReadonlyAnimation,
-    retainDraft = false,
-    selectedKeys?: readonly KeyframeSelection[],
-  ): boolean {
-    return this.session.install(next, { retainDraft, ...(selectedKeys ? { selectedKeys } : {}) });
   }
 
   /** Advances only for successful imports/reloads, so adapters can distinguish them from selection. */
@@ -1544,14 +1536,14 @@ export class AnimationEditorState {
 
   /** Lightweight artist labels use the ordinary authored history and persistence boundary. */
   setLibraryMetadata(library: AnimationLibraryMetadata): boolean {
-    if (!this.animationAuthoringEnabled || this.hasPendingAnimationEdits || !this.working) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
+      if (this.hasPendingAnimationEdits || !this.working) return false;
       const next = this.document.inspect({ ...this.working, library });
       if (!next) {
         this.notify();
         return false;
       }
-      return this.installWorkingAnimation(next);
+      return this.session.commit(() => next, { pause: false });
     });
   }
 
