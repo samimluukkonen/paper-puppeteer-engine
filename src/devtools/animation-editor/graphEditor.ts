@@ -53,7 +53,7 @@ export const graphPropertyLabels: Record<TransformProperty | IKAnimationProperty
   mix: 'IK influence',
 };
 export function graphChannels(state: AnimationEditorState): readonly GraphChannel[] {
-  if (state.rootMotionSelected)
+  if (state.rootMotion.rootMotionSelected)
     return (['x', 'y'] as const).map((property) => ({ kind: 'root', id: 'Root Motion', property }));
   if (state.ik.selectedIKConstraintId)
     return ikAnimationProperties.map((property) => ({ kind: 'ik', id: state.ik.selectedIKConstraintId!, property }));
@@ -68,7 +68,7 @@ export function selectedGraphChannel(state: AnimationEditorState): GraphChannel 
       (channel) =>
         channel.property ===
         (channel.kind === 'root'
-          ? state.rootMotionProperty
+          ? state.rootMotion.rootMotionProperty
           : channel.kind === 'ik'
             ? state.ik.selectedIKProperty
             : state.selectedTimelineProperty),

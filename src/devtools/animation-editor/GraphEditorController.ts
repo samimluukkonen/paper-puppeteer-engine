@@ -88,7 +88,7 @@ export class GraphEditorController {
         this.cancelGesture();
         const state = this.getState();
         const channel = graphChannels(state).find((entry) => entry.property === this.property.value);
-        if (channel?.kind === 'root') state.selectRootMotion(channel.property);
+        if (channel?.kind === 'root') state.rootMotion.selectRootMotion(channel.property);
         else if (channel?.kind === 'bone') state.selectTimelineProperty(channel.id, channel.property);
         else if (channel) state.ik.selectIKConstraint(channel.id, channel.property);
       },
@@ -210,7 +210,9 @@ export class GraphEditorController {
   private selectedTime(channel: GraphChannel): number | undefined {
     const state = this.getState();
     if (channel.kind === 'root')
-      return state.selectedRootKey?.property === channel.property ? state.selectedRootKey.time : undefined;
+      return state.rootMotion.selectedRootKey?.property === channel.property
+        ? state.rootMotion.selectedRootKey.time
+        : undefined;
     if (channel.kind === 'ik') {
       const key = state.ik.selectedIKKeyframe;
       return key?.constraintId === channel.id && key.property === channel.property ? key.time : undefined;
@@ -291,7 +293,7 @@ export class GraphEditorController {
   }
   private select(ref: GraphKeyRef): void {
     const state = this.getState();
-    if (ref.channel.kind === 'root') state.selectRootMotion(ref.channel.property, ref.time);
+    if (ref.channel.kind === 'root') state.rootMotion.selectRootMotion(ref.channel.property, ref.time);
     else if (ref.channel.kind === 'bone')
       state.selectKeyframe({ boneId: ref.channel.id, property: ref.channel.property, time: ref.time });
     else
@@ -463,7 +465,7 @@ export class GraphEditorController {
       view,
       state.selectedKeys,
       state.ik.selectedIKKeyframe,
-      state.selectedRootKey,
+      state.rootMotion.selectedRootKey,
       state.editorMode,
       this.width,
       this.height,

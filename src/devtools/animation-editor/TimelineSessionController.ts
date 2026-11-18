@@ -234,10 +234,10 @@ export class TimelineSessionController {
       state.selectedKeys,
       state.selectedTarget,
       state.ik.selectedIKKeyframe,
-      state.selectedRootKey,
+      state.rootMotion.selectedRootKey,
       state.selectedDeformationKey,
       state.deformationSelected,
-      state.rootMotionSelected,
+      state.rootMotion.rootMotionSelected,
       state.selectedEvent,
       state.timelineClipboard,
       state.timelineVisibility,
@@ -268,7 +268,7 @@ export class TimelineSessionController {
       state.selectedKeys.length === 0 &&
       !state.ik.selectedIKKeyframe &&
       !state.selectedEvent &&
-      !state.selectedRootKey &&
+      !state.rootMotion.selectedRootKey &&
       !state.selectedDeformationKey;
     if (this.deleteKey.disabled !== deleteDisabled) this.deleteKey.disabled = deleteDisabled;
     setCommandAvailability(
@@ -303,7 +303,7 @@ export class TimelineSessionController {
     const count =
       state.selectedKeys.length +
       (state.ik.selectedIKKeyframe ? 1 : 0) +
-      (state.selectedRootKey ? 1 : 0) +
+      (state.rootMotion.selectedRootKey ? 1 : 0) +
       (state.selectedDeformationKey ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
     setText(
@@ -316,10 +316,17 @@ export class TimelineSessionController {
     );
     const copyDisabled = state.deformationSelected
       ? !state.selectedDeformationKey
-      : state.rootMotionSelected || !!state.ik.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
+      : state.rootMotion.rootMotionSelected ||
+        !!state.ik.selectedIKConstraintId ||
+        (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
-    if (this.duplicateKeys.disabled !== (state.rootMotionSelected ? !state.selectedRootKey : copyDisabled))
-      this.duplicateKeys.disabled = state.rootMotionSelected ? !state.selectedRootKey : copyDisabled;
+    if (
+      this.duplicateKeys.disabled !==
+      (state.rootMotion.rootMotionSelected ? !state.rootMotion.selectedRootKey : copyDisabled)
+    )
+      this.duplicateKeys.disabled = state.rootMotion.rootMotionSelected
+        ? !state.rootMotion.selectedRootKey
+        : copyDisabled;
     setText(this.copyKeys, state.selectedEvent ? 'Copy Event' : 'Copy Keys');
     setText(this.duplicateKeys, state.selectedEvent ? 'Duplicate Event' : 'Duplicate Keys');
     setText(this.pasteKeys, state.timelineClipboard?.kind === 'event' ? 'Paste Event' : 'Paste Keys');
@@ -327,7 +334,7 @@ export class TimelineSessionController {
       state.timelineClipboard?.kind === 'deformation'
         ? !animation
         : state.deformationSelected ||
-          state.rootMotionSelected ||
+          state.rootMotion.rootMotionSelected ||
           !!state.ik.selectedIKConstraintId ||
           !animation ||
           !state.timelineClipboard;
@@ -336,7 +343,7 @@ export class TimelineSessionController {
       ? state.selectedDeformationKey
         ? ''
         : 'Select a deformation key first.'
-      : state.rootMotionSelected
+      : state.rootMotion.rootMotionSelected
         ? 'Root clipboard is unavailable; use Duplicate key.'
         : state.ik.selectedIKConstraintId
           ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
@@ -346,7 +353,11 @@ export class TimelineSessionController {
     setCommandAvailability(this.copyKeys, clipboardReason, 'Copy selection (Ctrl/Cmd+C in timeline)');
     setCommandAvailability(
       this.duplicateKeys,
-      state.rootMotionSelected ? (state.selectedRootKey ? '' : 'Select a root key first.') : clipboardReason,
+      state.rootMotion.rootMotionSelected
+        ? state.rootMotion.selectedRootKey
+          ? ''
+          : 'Select a root key first.'
+        : clipboardReason,
       'Duplicate selection (Ctrl/Cmd+D in timeline)',
     );
     setCommandAvailability(
@@ -357,7 +368,7 @@ export class TimelineSessionController {
           : ''
         : state.deformationSelected
           ? 'Copy a deformation key first.'
-          : state.rootMotionSelected
+          : state.rootMotion.rootMotionSelected
             ? 'Select a bone or event track to paste.'
             : state.ik.selectedIKConstraintId
               ? 'Select a bone track or event track to paste.'

@@ -22,8 +22,7 @@ type DeformationState = Pick<
   | 'meshDiagnosticsEnabled'
   | 'deformationEditing'
   | 'deformationSelected'
-  | 'rootMotionSelected'
-  | 'selectedRootKey'
+  | 'rootMotion'
   | 'keyframeFPS'
 >;
 
@@ -59,8 +58,8 @@ export class AnimationEditorDeformationCommands {
     this.session.batch(() => {
       this.session.beginGesture();
       this.session.clearBoneSelection();
-      this.state.rootMotionSelected = false;
-      this.state.selectedRootKey = null;
+      this.state.rootMotion.rootMotionSelected = false;
+      this.state.rootMotion.selectedRootKey = null;
       this.state.deformationSelected = true;
       this.deformationGesture = {
         base: this.document.workingAnimation!,
@@ -168,8 +167,8 @@ export class AnimationEditorDeformationCommands {
     return this.session.batch(() => {
       this.session.cancelActiveDrags();
       this.session.clearBoneSelection();
-      this.state.rootMotionSelected = false;
-      this.state.selectedRootKey = null;
+      this.state.rootMotion.rootMotionSelected = false;
+      this.state.rootMotion.selectedRootKey = null;
       this.state.deformationSelected = true;
       this.state.selectedMeshId = meshId;
       this.state.selectedDeformationTime = time ?? null;
@@ -248,8 +247,8 @@ export class AnimationEditorDeformationCommands {
       const committed = this.session.commit(create, { pause: false });
       if (!committed) return false;
       this.session.clearBoneSelection();
-      this.state.rootMotionSelected = false;
-      this.state.selectedRootKey = null;
+      this.state.rootMotion.rootMotionSelected = false;
+      this.state.rootMotion.selectedRootKey = null;
       this.state.selectedMeshId = meshId;
       this.state.deformationSelected = true;
       this.state.selectedDeformationTime = time;

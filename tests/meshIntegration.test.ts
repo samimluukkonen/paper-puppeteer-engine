@@ -99,8 +99,8 @@ function fixture() {
   animation.setMeshOffsets({ 'top-left': { x: 0, y: 0 }, [mesh.vertices.at(-1)!.id]: { x: 0, y: 0 } });
   animation.setBonePropertyKeyframe('lower', 'rotation', 0, 0);
   animation.setBonePropertyKeyframe('lower', 'rotation', 0.8, 1);
-  animation.setRootPosition({ x: 0, y: 0 }, 0);
-  animation.setRootPosition({ x: 40, y: 10 }, 1);
+  animation.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
+  animation.rootMotion.setRootPosition({ x: 40, y: 10 }, 1);
   const image = artworkFixture().documents['images/paper.png'];
   assert.instanceOf(image, Uint8Array);
   const files = new Map([['images/paper.png', image]]);

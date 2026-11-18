@@ -71,10 +71,10 @@ test('ground reference stays in preview world through scaling, facing, clip swit
     assert.isFalse(rig.dirty);
     const originalContainerX = puppet.container.x;
     const rootBefore = state.workingAnimation!;
-    state.setRootPosition({ x: 80, y: -20 });
+    state.rootMotion.setRootPosition({ x: 80, y: -20 });
     assert.equal(puppet.container.x, originalContainerX, 'the first sample defines the displacement origin');
     state.setCurrentTime(0.5);
-    state.setRootPosition({ x: 160, y: -20 });
+    state.rootMotion.setRootPosition({ x: 160, y: -20 });
     assert.equal(puppet.container.x, originalContainerX + 80);
     assert.equal(scene.groundGuide.getSnapshot().guide.y, 500);
     assert.strictEqual(state.workingAnimation!.tracks, rootBefore.tracks);
@@ -1065,8 +1065,8 @@ test('background drag places the character over a fixed world, including root mo
   await vi.waitFor(() => assert.equal(ready.mock.calls.length, 1));
   try {
     const state = Reflect.get(scene, 'state') as AnimationEditorState;
-    state.setRootPosition({ x: 0, y: 0 }, 0);
-    state.setRootPosition({ x: 80, y: 0 }, 1);
+    state.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
+    state.rootMotion.setRootPosition({ x: 80, y: 0 }, 1);
     state.setCurrentTime(0.5);
     const original = state.exportJson();
     const history = state.historyLength;
@@ -1080,11 +1080,11 @@ test('background drag places the character over a fixed world, including root mo
     assert.deepEqual(state.previewPlacementOffset, { x: 30, y: -20 });
     assert.equal(puppet.container.x, 450);
     assert.equal(puppet.container.y, 415);
-    state.setRootMotionView({ editing: true });
+    state.rootMotion.setRootMotionView({ editing: true });
     drag();
     assert.deepEqual(state.previewPlacementOffset, { x: 60, y: -40 });
-    assert.isFalse(state.rootMotionDragActive);
-    state.setRootMotionView({ editing: false });
+    assert.isFalse(state.rootMotion.rootMotionDragActive);
+    state.rootMotion.setRootMotionView({ editing: false });
     // This scene harness has no Rig Editor screen renderer; exercise its real placement/history bridge.
     vi.spyOn(scene.rigEditor!, 'enable').mockImplementation(() => {});
     state.setEditorMode('rig');

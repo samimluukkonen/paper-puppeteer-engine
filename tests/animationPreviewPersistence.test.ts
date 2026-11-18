@@ -290,17 +290,17 @@ test('exclusive modes and root loop behavior survive clip switches and metadata 
   const f = fixture();
   try {
     const original = f.state.workingAnimation;
-    f.state.setWorldDisplacementView('none', 'continuous');
+    f.state.rootMotion.setWorldDisplacementView('none', 'continuous');
     const saved = animationPreviewPreferencesSchema.parse(f.binding.preferences);
     f.state.selectAnimation('jump');
-    assert.equal(f.state.worldDisplacementMode, 'authored');
-    assert.equal(f.state.rootLoopMode, 'reset');
+    assert.equal(f.state.rootMotion.worldDisplacementMode, 'authored');
+    assert.equal(f.state.rootMotion.rootLoopMode, 'reset');
     f.state.selectAnimation('cut');
-    assert.equal(f.state.worldDisplacementMode, 'none');
-    assert.equal(f.state.rootLoopMode, 'continuous');
+    assert.equal(f.state.rootMotion.worldDisplacementMode, 'none');
+    assert.equal(f.state.rootMotion.rootLoopMode, 'continuous');
     f.motion.restorePreferences(saved.animations);
-    assert.equal(f.state.worldDisplacementMode, 'none');
-    assert.equal(f.state.rootLoopMode, 'continuous');
+    assert.equal(f.state.rootMotion.worldDisplacementMode, 'none');
+    assert.equal(f.state.rootMotion.rootLoopMode, 'continuous');
     f.motion.restorePreferences({
       cut: {
         loop: true,
@@ -313,11 +313,11 @@ test('exclusive modes and root loop behavior survive clip switches and metadata 
       },
     });
     assert.equal(
-      f.state.worldDisplacementMode,
+      f.state.rootMotion.worldDisplacementMode,
       'preview',
       'legacy enabled trajectories never add authored root travel',
     );
-    assert.equal(f.state.rootLoopMode, 'reset');
+    assert.equal(f.state.rootMotion.rootLoopMode, 'reset');
     assert.isTrue(f.state.previewLoop);
     const capture = f.motion.capturePreferences();
     f.state.play();

@@ -368,8 +368,8 @@ const unmount = mountView(
         let selectedIK = state.ik.selectedIKConstraintId;
         let selectedBone = state.selectedBoneId;
         let selectedEvent = state.selectedEvent;
-        let selectedRoot = state.rootMotionSelected;
-        let selectedRootKey = state.selectedRootKey;
+        let selectedRoot = state.rootMotion.rootMotionSelected;
+        let selectedRootKey = state.rootMotion.selectedRootKey;
         let selectedKeys = state.selectedKeys;
         let authoringMode = state.editorMode;
         releaseWorkspaceSelection = state.subscribe(() => {
@@ -385,12 +385,14 @@ const unmount = mountView(
             (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
             (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
             (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
-            (state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey))
+            (state.rootMotion.rootMotionSelected &&
+              (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey))
           )
             workspace.revealInspector();
           if (!app.hidden && state.editorMode !== 'rig-tweak') {
             const id =
-              state.rootMotionSelected && (!selectedRoot || state.selectedRootKey !== selectedRootKey)
+              state.rootMotion.rootMotionSelected &&
+              (!selectedRoot || state.rootMotion.selectedRootKey !== selectedRootKey)
                 ? 'animation-inspector-root'
                 : state.selectedEvent && state.selectedEvent !== selectedEvent
                   ? 'animation-inspector-selection'
@@ -409,8 +411,8 @@ const unmount = mountView(
           selectedIK = state.ik.selectedIKConstraintId;
           selectedBone = state.selectedBoneId;
           selectedEvent = state.selectedEvent;
-          selectedRoot = state.rootMotionSelected;
-          selectedRootKey = state.selectedRootKey;
+          selectedRoot = state.rootMotion.rootMotionSelected;
+          selectedRootKey = state.rootMotion.selectedRootKey;
           selectedKeys = state.selectedKeys;
         });
         if (!projectContext) recovery.bind(state, id);

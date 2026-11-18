@@ -20,7 +20,9 @@ export class MotionPreviewController {
   private observedLoop = false;
   private synchronizing = false;
   private placement: (() => Affine) | undefined;
-  private copy: { placement: Affine; previousMode: AnimationEditorState['worldDisplacementMode'] } | undefined;
+  private copy:
+    | { placement: Affine; previousMode: AnimationEditorState['rootMotion']['worldDisplacementMode'] }
+    | undefined;
   private readonly clips = new Map<string, MotionPreviewSettings>();
   private readonly subscribers = new Subscribers({ label: 'Motion preview subscribers failed.' });
   private snapshot: Readonly<{
@@ -60,14 +62,15 @@ export class MotionPreviewController {
         const settings = this.snapshot.settings;
         if (
           clipId &&
-          (state.worldDisplacementMode !== (settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored')) ||
-            state.rootLoopMode !== (settings.rootLoopMode ?? 'reset'))
+          (state.rootMotion.worldDisplacementMode !==
+            (settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored')) ||
+            state.rootMotion.rootLoopMode !== (settings.rootLoopMode ?? 'reset'))
         ) {
           const next = Object.freeze({
             ...settings,
-            displacementMode: state.worldDisplacementMode,
-            rootLoopMode: state.rootLoopMode,
-            enabled: state.worldDisplacementMode === 'preview',
+            displacementMode: state.rootMotion.worldDisplacementMode,
+            rootLoopMode: state.rootMotion.rootLoopMode,
+            enabled: state.rootMotion.worldDisplacementMode === 'preview',
           });
           this.clips.set(clipId, next);
           this.publish({ settings: next });
@@ -98,7 +101,7 @@ export class MotionPreviewController {
   private applyView(settings: MotionPreviewSettings): void {
     this.synchronizing = true;
     try {
-      this.state?.setWorldDisplacementView(
+      this.state?.rootMotion.setWorldDisplacementView(
         settings.displacementMode ?? (settings.enabled ? 'preview' : 'authored'),
         settings.rootLoopMode ?? 'reset',
       );
@@ -123,7 +126,7 @@ export class MotionPreviewController {
     try {
       const settings = this.snapshot.settings;
       const root = previewTrajectoryToRootMotion(settings, state.workingAnimation.duration, placement);
-      const previousMode = state.worldDisplacementMode;
+      const previousMode = state.rootMotion.worldDisplacementMode;
       if (!state.previewTrajectoryCopy(root)) {
         this.publish({ message: 'Commit or cancel temporary animation edits before previewing a trajectory copy.' });
         return false;
@@ -146,7 +149,7 @@ export class MotionPreviewController {
     if (!copy) return;
     const owned = this.state?.trajectoryCopyActive;
     this.state?.cancelTrajectoryCopy();
-    if (owned) this.state?.setWorldDisplacementView(copy.previousMode);
+    if (owned) this.state?.rootMotion.setWorldDisplacementView(copy.previousMode);
     this.publish({ copying: false, message: '' });
   }
   commitCopy(): boolean {

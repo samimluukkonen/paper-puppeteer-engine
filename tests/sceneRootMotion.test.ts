@@ -312,10 +312,10 @@ test('portable scene exports retain root tracks, policy, evaluated travel and as
   assert.isTrue(editor.createAnimation({ name: 'wave', durationSeconds: 1, loop: false }));
   editor.setBonePropertyKeyframe('root', 'rotation', -0.3, 0.25);
   editor.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.6);
-  editor.setRootPosition({ x: 0, y: 0 }, 0);
-  editor.setRootPosition({ x: 0, y: 0 }, 0.25);
-  editor.setRootPosition({ x: 80, y: 0 }, 0.6);
-  editor.setRootPosition({ x: 80, y: 0 }, 1);
+  editor.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
+  editor.rootMotion.setRootPosition({ x: 0, y: 0 }, 0.25);
+  editor.rootMotion.setRootPosition({ x: 80, y: 0 }, 0.6);
+  editor.rootMotion.setRootPosition({ x: 80, y: 0 }, 1);
   editor.editGraphKey(
     { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.25 },
     {

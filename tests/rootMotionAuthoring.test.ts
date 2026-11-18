@@ -65,20 +65,20 @@ const x = { kind: 'root', id: 'Root Motion', property: 'x' } as const;
 
 test('root and graph owners hand off previews and publish committed selection with the document atomically', () => {
   const state = fixture();
-  state.setRootMotionView({ editing: true });
+  state.rootMotion.setRootMotionView({ editing: true });
   const base = state.workingAnimation;
-  state.beginRootMotionDrag();
-  state.previewRootMotionDrag({ x: 15, y: 20 });
+  state.rootMotion.beginRootMotionDrag();
+  state.rootMotion.previewRootMotionDrag({ x: 15, y: 20 });
   assert.notStrictEqual(state.previewAnimation, base);
   state.beginGraphEdit({ channel: x, time: 0 });
-  assert.isFalse(state.rootMotionDragActive);
+  assert.isFalse(state.rootMotion.rootMotionDragActive);
   assert.strictEqual(state.previewAnimation, base, 'graph begins from authored data, discarding the XY proposal');
   state.previewGraphEdit({ time: 0.25, value: 30 });
   const observations: unknown[] = [];
   const unsubscribe = state.subscribe(() =>
     observations.push({
       active: state.hasPendingAnimationEdits,
-      selected: state.selectedRootKey,
+      selected: state.rootMotion.selectedRootKey,
       time: rootKeys(state.workingAnimation!, 'x')[0]!.time,
       preview: state.previewAnimation === state.workingAnimation,
     }),
@@ -96,10 +96,10 @@ test('root and graph owners hand off previews and publish committed selection wi
 test('old clips stay without root data until an explicit atomic XY creation; skeletal and IK branches retain identity', () => {
   const state = fixture(false);
   const before = state.workingAnimation!;
-  state.selectRootMotion();
+  state.rootMotion.selectRootMotion();
   assert.deepEqual(graphChannels(state), [x, { ...x, property: 'y' }]);
   assert.isUndefined(state.workingAnimation!.rootMotion);
-  state.addRootPositionKey();
+  state.rootMotion.addRootPositionKey();
   assert.deepEqual(state.workingAnimation!.rootMotion, { translationKeys: [{ time: 0, x: 0, y: 0 }] });
   assert.equal(state.historyLength, 1);
   assert.strictEqual(state.workingAnimation!.tracks, before.tracks);
@@ -113,16 +113,16 @@ test('old clips stay without root data until an explicit atomic XY creation; ske
 test('root selection, numeric XY, retiming, duplication and sparse-axis deletion share document history', () => {
   const state = fixture();
   const before = state.workingAnimation!;
-  state.setRootPosition({ x: 40, y: -20 }, 0.5);
-  state.selectRootMotion('x', 0.5);
+  state.rootMotion.setRootPosition({ x: 40, y: -20 }, 0.5);
+  state.rootMotion.selectRootMotion('x', 0.5);
   assert.equal(state.currentTime, 0.5);
   state.editGraphKey({ channel: x, time: 0.5 }, { time: 0.6, value: 55 });
-  assert.deepEqual(state.selectedRootKey, { property: 'x', time: 0.6 });
+  assert.deepEqual(state.rootMotion.selectedRootKey, { property: 'x', time: 0.6 });
   assert.deepEqual(
     rootKeys(state.workingAnimation!, 'y').map((key) => key.time),
     [0, 500, 1000],
   );
-  assert.isTrue(state.duplicateRootKey(0.8));
+  assert.isTrue(state.rootMotion.duplicateRootKey(0.8));
   assert.equal(rootKeys(state.workingAnimation!, 'x').find((key) => key.time === 800)!.value, 55);
   state.deleteTimelineSelection();
   assert.isFalse(rootKeys(state.workingAnimation!, 'x').some((key) => key.time === 800));
@@ -136,7 +136,7 @@ test.each([{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GR
   'root graph uses runtime $mode interpolation and existing history/tangent engine',
   (curve) => {
     const state = fixture();
-    state.selectRootMotion('x', 0);
+    state.rootMotion.selectRootMotion('x', 0);
     const base = state.workingAnimation!;
     state.beginGraphEdit({ channel: x, time: 0 });
     for (let i = 0; i < 20; i++) state.previewGraphEdit({ curve });
@@ -152,7 +152,7 @@ test.each([{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GR
     state.commitGraphEdit();
     assert.equal(state.historyLength, 1);
     assert.deepEqual(rootKeys(state.workingAnimation!, 'x')[0]!.curve, curve);
-    state.duplicateRootKey(0.25);
+    state.rootMotion.duplicateRootKey(0.25);
     assert.deepEqual(rootKeys(state.workingAnimation!, 'x')[1]!.curve, curve);
     state.undo();
     state.undo();
@@ -162,28 +162,28 @@ test.each([{ mode: 'linear' } as const, { mode: 'stepped' } as const, DEFAULT_GR
 
 test('graph collision, invalid values and terminal interpolation fail without changing authored data', () => {
   const state = fixture();
-  state.setRootPosition({ x: 40 }, 0.5);
+  state.rootMotion.setRootPosition({ x: 40 }, 0.5);
   const before = state.workingAnimation;
   for (const edit of [{ time: 1 }, { time: -1 }, { value: NaN }, { value: Infinity }])
     assert.throws(() => state.editGraphKey({ channel: x, time: 0.5 }, edit));
   assert.throws(() => state.editGraphKey({ channel: x, time: 1 }, { curve: DEFAULT_GRAPH_CURVE }));
   assert.strictEqual(state.workingAnimation, before);
   assert.isFalse(state.graphEditActive);
-  assert.throws(() => state.setRootPosition({ y: Infinity }));
+  assert.throws(() => state.rootMotion.setRootPosition({ y: Infinity }));
   assert.strictEqual(state.workingAnimation, before);
 });
 
 test('selection switches between root, bones and IK without rewriting either animation', () => {
   const state = fixture();
   const before = state.workingAnimation;
-  state.selectRootMotion('y', 0);
+  state.rootMotion.selectRootMotion('y', 0);
   assert.isNull(state.selectedBoneId);
   assert.isNull(state.ik.selectedIKConstraintId);
   state.selectBone('pelvis');
-  assert.isFalse(state.rootMotionSelected);
-  state.selectRootMotion('x', 0);
+  assert.isFalse(state.rootMotion.rootMotionSelected);
+  state.rootMotion.selectRootMotion('x', 0);
   state.ik.selectIKConstraint('legIK');
-  assert.isFalse(state.rootMotionSelected);
+  assert.isFalse(state.rootMotion.rootMotionSelected);
   assert.deepEqual(
     graphChannels(state).map((key) => key.kind),
     ['ik', 'ik', 'ik'],
@@ -260,7 +260,7 @@ test.each(['right', 'left'] as const)(
       puppet.setFacing(facing);
       puppet.container.setScale(facing === 'left' ? -2 : 2, 2);
       state.setCurrentTime(0.5);
-      state.setRootMotionView({ editing: true });
+      state.rootMotion.setRootMotionView({ editing: true });
       const before = state.workingAnimation!;
       const root = { x: puppet.container.x, y: puppet.container.y };
       const cameraBefore = { ...camera };
@@ -276,7 +276,7 @@ test.each(['right', 'left'] as const)(
       assert.equal(state.currentTime, 0.5);
       input.emit('pointerupoutside', f.pointer(root.x + (facing === 'left' ? -80 : 80), root.y - 40));
       assert.equal(state.historyLength, 1);
-      assert.isFalse(state.rootMotionDragActive);
+      assert.isFalse(state.rootMotion.rootMotionDragActive);
       assert.deepEqual(sampleRootMotion(state.workingAnimation!, 500), { x: 80, y: -20 });
       assert.strictEqual(state.workingAnimation!.tracks, before.tracks);
       assert.strictEqual(state.workingAnimation!.ikTracks, before.ikTracks);
@@ -285,7 +285,7 @@ test.each(['right', 'left'] as const)(
       state.undo();
       assert.strictEqual(state.workingAnimation, before);
       state.redo();
-      assert.deepEqual(state.rootPosition, { x: 80, y: -20 });
+      assert.deepEqual(state.rootMotion.rootPosition, { x: 80, y: -20 });
       const exported = state.exportJson();
       state.reloadCurrentExport({ confirmDiscard: () => true });
       assert.equal(state.exportJson(), exported);
@@ -301,21 +301,21 @@ test.each(['escape', 'blur', 'seek', 'mode', 'switch', 'dispose'] as const)(
     const f = viewport();
     try {
       const { state, handle, input, puppet } = f;
-      state.setRootMotionView({ editing: true });
+      state.rootMotion.setRootMotionView({ editing: true });
       state.setCurrentTime(0.5);
       const before = state.exportJson();
       handle.pointerDown(f.pointer(puppet.container.x, puppet.container.y));
       input.emit('pointermove', f.pointer(200, 150, 2));
       assert.isFalse(state.hasUnsavedChanges);
       input.emit('pointermove', f.pointer(200, 150));
-      assert.isTrue(state.rootMotionDragActive);
+      assert.isTrue(state.rootMotion.rootMotionDragActive);
       if (boundary === 'escape') window.dispatchEvent(Object.assign(new Event('keydown'), { key: 'Escape' }));
       else if (boundary === 'blur') window.dispatchEvent(new Event('blur'));
       else if (boundary === 'seek') state.setCurrentTime(0.7);
       else if (boundary === 'mode') state.setEditorMode('rig-tweak');
       else if (boundary === 'switch') state.selectAnimation(null);
       else handle.dispose();
-      assert.isFalse(state.rootMotionDragActive);
+      assert.isFalse(state.rootMotion.rootMotionDragActive);
       assert.equal(state.historyLength, 0);
       if (boundary !== 'switch') assert.equal(state.exportJson(), before);
       input.emit('pointerup', f.pointer(200, 150));
@@ -337,9 +337,9 @@ test('scrubs, stepped frames, loop playback and visibility toggles use absolute 
       assert.closeTo(puppet.container.x, 100 + (time === 1 ? 80 : Math.floor(time * 4) * 20), 1e-9);
     }
     const history = state.historyLength;
-    state.setRootMotionView({ visible: false });
+    state.rootMotion.setRootMotionView({ visible: false });
     assert.equal(puppet.container.x, 100);
-    state.setRootMotionView({ visible: true, trajectory: false });
+    state.rootMotion.setRootMotionView({ visible: true, trajectory: false });
     assert.equal(puppet.container.x, 120);
     assert.equal(state.historyLength, history);
     state.setPreviewLoop(true);
@@ -357,12 +357,12 @@ test('root mode does not pick another tool, disabled interaction cannot drag, an
   const f = viewport();
   try {
     assert.isFalse(f.handle.pointerDown(f.pointer(100, 200)));
-    f.state.setRootMotionView({ editing: true });
+    f.state.rootMotion.setRootMotionView({ editing: true });
     assert.isTrue(f.handle.pointerDown(f.pointer(1000, 1000)));
-    assert.isFalse(f.state.rootMotionDragActive);
+    assert.isFalse(f.state.rootMotion.rootMotionDragActive);
     f.handle.setInteractive(false);
     f.handle.pointerDown(f.pointer(100, 200));
-    assert.isFalse(f.state.rootMotionDragActive);
+    assert.isFalse(f.state.rootMotion.rootMotionDragActive);
     f.handle.dispose();
     f.handle.dispose();
     assert.equal(f.input.listenerCount('pointermove'), 0);

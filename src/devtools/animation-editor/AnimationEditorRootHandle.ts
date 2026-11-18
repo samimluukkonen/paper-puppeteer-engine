@@ -3,6 +3,12 @@ import { sampleRootMotion } from '../../engine/core.js';
 import type { Affine, Point } from '../../engine/data.js';
 import type { Puppet } from '../../engine/runtime.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+
+/** The root handle drives the root-motion handle; the rest is the session and the evaluated preview. */
+type RootHandleState = Pick<
+  AnimationEditorState,
+  'rootMotion' | 'subscribe' | 'animationAuthoringEnabled' | 'previewAnimation'
+>;
 import { pointerToRootPosition, rootMotionMatrix, rootPositionToWorld } from './rootMotionCoordinates.js';
 
 /** Editor-only square/diamond handle, independent of skeleton, IK and ground gesture owners. */
@@ -18,7 +24,7 @@ export class AnimationEditorRootHandle {
   }
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly state: AnimationEditorState,
+    private readonly state: RootHandleState,
     private readonly puppet: Puppet,
     private readonly backgroundDrag?: (pointer: Phaser.Input.Pointer) => void,
   ) {
@@ -31,12 +37,12 @@ export class AnimationEditorRootHandle {
     window.addEventListener?.('pagehide', this.cancel);
     globalThis.document?.addEventListener?.('visibilitychange', this.visibility);
     this.unsubscribe = state.subscribe(() => {
-      if (!state.rootMotionDragActive) this.drag = undefined;
+      if (!state.rootMotion.rootMotionDragActive) this.drag = undefined;
     });
   }
   private matrix(): Affine {
     const matrix = this.puppet.container.getWorldTransformMatrix();
-    const root = this.state.rootPosition;
+    const root = this.state.rootMotion.rootPosition;
     return rootMotionMatrix(matrix, {
       x: matrix.tx - matrix.a * root.x - matrix.c * root.y,
       y: matrix.ty - matrix.b * root.x - matrix.d * root.y,
@@ -49,12 +55,17 @@ export class AnimationEditorRootHandle {
     g.clear();
     const state = this.state;
     const animation = state.previewAnimation;
-    if (!animation || !state.animationAuthoringEnabled || !state.rootMotionVisible || !this.puppet.container.visible)
+    if (
+      !animation ||
+      !state.animationAuthoringEnabled ||
+      !state.rootMotion.rootMotionVisible ||
+      !this.puppet.container.visible
+    )
       return;
     const matrix = this.matrix();
     const zoom = this.scene.cameras.main.zoom;
     const world = (time: number) => rootPositionToWorld(sampleRootMotion(animation, time), matrix);
-    if (state.rootTrajectoryVisible && animation.rootMotion?.translationKeys.length) {
+    if (state.rootMotion.rootTrajectoryVisible && animation.rootMotion?.translationKeys.length) {
       // Fixed-size sampling uses the existing evaluator, including property curves.
       let previous = world(0);
       for (let i = 1; i <= 128; i++) {
@@ -64,12 +75,12 @@ export class AnimationEditorRootHandle {
       }
       for (const key of animation.rootMotion?.translationKeys ?? []) {
         const point = world(key.time);
-        const selected = state.selectedRootKey?.time === key.time / 1000;
+        const selected = state.rootMotion.selectedRootKey?.time === key.time / 1000;
         g.fillStyle(selected ? 0xffffff : 0xbf8bff, 1).fillCircle(point.x, point.y, (selected ? 5 : 3) / zoom);
       }
     }
-    if (!state.rootMotionEditing && !state.rootMotionSelected) return;
-    const point = rootPositionToWorld(state.rootPosition, matrix);
+    if (!state.rootMotion.rootMotionEditing && !state.rootMotion.rootMotionSelected) return;
+    const point = rootPositionToWorld(state.rootMotion.rootPosition, matrix);
     const r = 12 / zoom;
     g.fillStyle(0x191123, 0.9).fillRoundedRect(point.x - r, point.y - r, r * 2, r * 2, 0);
     g.lineStyle(4 / zoom, 0xffffff).strokeRect(point.x - r, point.y - r, r * 2, r * 2);
@@ -80,13 +91,14 @@ export class AnimationEditorRootHandle {
       .lineBetween(point.x, point.y + r / 2, point.x - r / 2, point.y);
   }
   pointerDown(pointer: Phaser.Input.Pointer): boolean {
-    if (this.disposed || !this.state.rootMotionEditing || !this.state.animationAuthoringEnabled) return false;
+    if (this.disposed || !this.state.rootMotion.rootMotionEditing || !this.state.animationAuthoringEnabled)
+      return false;
     if (this.drag) return true;
     if (pointer.button !== 0) return false;
     // Root mode consumes left clicks before ground, contact, IK or bone picking.
-    if (this.drag || !this.state.rootMotionVisible || !this.puppet.container.visible) return true;
+    if (this.drag || !this.state.rootMotion.rootMotionVisible || !this.puppet.container.visible) return true;
     const matrix = this.matrix();
-    const root = this.state.rootPosition;
+    const root = this.state.rootMotion.rootPosition;
     const point = rootPositionToWorld(root, matrix);
     const camera = this.scene.cameras.main;
     const world = camera.getWorldPoint(pointer.x, pointer.y);
@@ -96,7 +108,7 @@ export class AnimationEditorRootHandle {
     }
     if (!this.interactive) return true;
     const start = pointerToRootPosition(pointer, camera, matrix);
-    if (!start || !this.state.beginRootMotionDrag()) return true;
+    if (!start || !this.state.rootMotion.beginRootMotionDrag()) return true;
     this.drag = { id: pointer.id, matrix, offset: { x: root.x - start.x, y: root.y - start.y }, moved: false };
     return true;
   }
@@ -109,20 +121,23 @@ export class AnimationEditorRootHandle {
       return;
     }
     const next = { x: point.x + drag.offset.x, y: point.y + drag.offset.y };
-    if (!drag.moved && Math.hypot(next.x - this.state.rootPosition.x, next.y - this.state.rootPosition.y) < 1e-8)
+    if (
+      !drag.moved &&
+      Math.hypot(next.x - this.state.rootMotion.rootPosition.x, next.y - this.state.rootMotion.rootPosition.y) < 1e-8
+    )
       return;
     drag.moved = true;
-    this.state.previewRootMotionDrag(next);
+    this.state.rootMotion.previewRootMotionDrag(next);
   };
   private up = (pointer: Phaser.Input.Pointer): void => {
     if (pointer.id !== this.drag?.id) return;
     this.move(pointer);
     this.drag = undefined;
-    this.state.commitRootMotionDrag();
+    this.state.rootMotion.commitRootMotionDrag();
   };
   private cancel = (): void => {
     this.drag = undefined;
-    this.state.cancelRootMotionDrag();
+    this.state.rootMotion.cancelRootMotionDrag();
   };
   private visibility = (): void => {
     if (document.visibilityState === 'hidden') this.cancel();

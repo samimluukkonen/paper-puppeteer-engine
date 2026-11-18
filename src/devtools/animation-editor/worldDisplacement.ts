@@ -21,14 +21,18 @@ export function evaluateWorldDisplacement(
   const animation = state.previewAnimation;
   if (!animation || !state.animationAuthoringEnabled) return { x: 0, y: 0 };
   const time = motionPreviewSampleTime(animation, state.previewTimeMilliseconds);
-  if (state.worldDisplacementMode === 'preview')
+  if (state.rootMotion.worldDisplacementMode === 'preview')
     return settings ? evaluatePreviewDisplacement(settings, time) : { x: 0, y: 0 };
-  if (state.worldDisplacementMode !== 'authored') return { x: 0, y: 0 };
+  if (state.rootMotion.worldDisplacementMode !== 'authored') return { x: 0, y: 0 };
   let root = evaluateRootMotion(animation, time);
-  if (state.rootMotionDragActive) {
+  if (state.rootMotion.rootMotionDragActive) {
     const initial = sampleRootMotion(animation, 0);
-    root = { x: state.rootPosition.x - initial.x, y: state.rootPosition.y - initial.y };
-  } else if (state.rootLoopMode === 'continuous' && state.previewLoop && !state.rootMotionEditing) {
+    root = { x: state.rootMotion.rootPosition.x - initial.x, y: state.rootMotion.rootPosition.y - initial.y };
+  } else if (
+    state.rootMotion.rootLoopMode === 'continuous' &&
+    state.previewLoop &&
+    !state.rootMotion.rootMotionEditing
+  ) {
     // Keep the pose clock's exact held phase: summing unwrapped floating-point time can otherwise
     // quantize a root one frame ahead of the skeleton after many fractional updates.
     const cycles = Math.max(

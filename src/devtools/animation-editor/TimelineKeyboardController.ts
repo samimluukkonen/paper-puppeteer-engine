@@ -237,7 +237,7 @@ export class TimelineKeyboardController {
       (!state.selectedKeyframe &&
         !state.selectedEvent &&
         !state.ik.selectedIKKeyframe &&
-        !state.selectedRootKey &&
+        !state.rootMotion.selectedRootKey &&
         !state.selectedDeformationKey) ||
       event.altKey ||
       event.ctrlKey ||

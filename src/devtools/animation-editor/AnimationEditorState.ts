@@ -22,8 +22,6 @@ import type {
   PoseDefinition,
   DeepReadonly,
   Rig,
-  RootMotionProperty,
-  RootMotionOffset,
 } from '../../engine/data.js';
 import {
   type BoneSymmetryIssue,
@@ -48,7 +46,7 @@ import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
 import { AnimationEditorPreviewCommands } from './AnimationEditorPreviewCommands.js';
-import { AnimationEditorRootMotion } from './AnimationEditorRootMotion.js';
+import { AnimationEditorRootMotion, type AnimationEditorRootMotionHandle } from './AnimationEditorRootMotion.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
 import { AnimationEditSession } from './AnimationEditSession.js';
@@ -85,14 +83,13 @@ import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { PoseLibrary } from './PoseLibrary.js';
-import { rootKeys, type RootKeySelection } from './rootMotionEdits.js';
+import { rootKeys } from './rootMotionEdits.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
 import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
 import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
 import type { Milliseconds, Seconds } from './timeUnits.js';
-import type { RootLoopMode, WorldDisplacementMode } from './worldDisplacement.js';
 
 export { PREVIEW_PLAYBACK_SPEEDS } from './AnimationEditorPlayback.js';
 export { AUTHORED_FPS_MIN, AUTHORED_FPS_MAX, DEFAULT_AUTHORED_FPS } from './AnimationEditorPlaybackCommands.js';
@@ -179,98 +176,20 @@ export class AnimationEditorState {
     return this.deformation.pasteDeformationKey();
   }
 
-  get rootMotionSelected(): boolean {
-    return this.rootMotion.rootMotionSelected;
-  }
-  set rootMotionSelected(value: boolean) {
-    this.rootMotion.rootMotionSelected = value;
-  }
-  get rootMotionProperty(): RootMotionProperty {
-    return this.rootMotion.rootMotionProperty;
-  }
-  set rootMotionProperty(value: RootMotionProperty) {
-    this.rootMotion.rootMotionProperty = value;
-  }
-  get selectedRootKey(): RootKeySelection | null {
-    return this.rootMotion.selectedRootKey;
-  }
-  set selectedRootKey(value: RootKeySelection | null) {
-    this.rootMotion.selectedRootKey = value;
-  }
-  get rootMotionEditing(): boolean {
-    return this.rootMotion.rootMotionEditing;
-  }
-  set rootMotionEditing(value: boolean) {
-    this.rootMotion.rootMotionEditing = value;
-  }
-  get rootTrajectoryVisible(): boolean {
-    return this.rootMotion.rootTrajectoryVisible;
-  }
-  set rootTrajectoryVisible(value: boolean) {
-    this.rootMotion.rootTrajectoryVisible = value;
-  }
-  get worldDisplacementMode(): WorldDisplacementMode {
-    return this.rootMotion.worldDisplacementMode;
-  }
-  get rootLoopMode(): RootLoopMode {
-    return this.rootMotion.rootLoopMode;
-  }
-  get rootMotionVisible(): boolean {
-    return this.rootMotion.rootMotionVisible;
-  }
-  get rootMotionDragActive(): boolean {
-    return this.rootMotion.rootMotionDragActive;
-  }
-  get rootPosition(): RootMotionOffset {
-    return this.rootMotion.rootPosition;
-  }
   get previewElapsedTimeMilliseconds(): number {
     return this.previewAnimation === this.workingAnimation || this.trajectoryCopyActive
       ? this.playback.elapsedTimeMilliseconds
       : this.previewTimeMilliseconds;
   }
-  setWorldDisplacementView(mode: WorldDisplacementMode, loop = this.rootLoopMode): void {
-    this.rootMotion.setWorldDisplacementView(mode, loop);
-  }
-  setRootMotionView(patch: { editing?: boolean; visible?: boolean; trajectory?: boolean }): void {
-    this.rootMotion.setRootMotionView(patch);
-  }
-  selectRootMotion(property: RootMotionProperty = 'x', time?: number): boolean {
-    return this.rootMotion.selectRootMotion(property, time);
-  }
   private clearRootSelection(): void {
-    const changed = this.rootMotionSelected || this.selectedRootKey !== null || this.deformationSelected;
+    const changed =
+      this.rootMotion.rootMotionSelected || this.rootMotion.selectedRootKey !== null || this.deformationSelected;
     this.deformationSelected = false;
     this.selectedDeformationTime = null;
-    this.rootMotionSelected = false;
-    this.selectedRootKey = null;
+    this.rootMotion.rootMotionSelected = false;
+    this.rootMotion.selectedRootKey = null;
     if (changed) this.notify();
   }
-  setRootPosition(values: Partial<RootMotionOffset>, time = this.currentTime): boolean {
-    return this.rootMotion.setRootPosition(values, time);
-  }
-  addRootPositionKey(): boolean {
-    return this.rootMotion.addRootPositionKey();
-  }
-  deleteRootKey(): boolean {
-    return this.rootMotion.deleteRootKey();
-  }
-  duplicateRootKey(time = this.currentTime): boolean {
-    return this.rootMotion.duplicateRootKey(time);
-  }
-  beginRootMotionDrag(): boolean {
-    return this.rootMotion.beginRootMotionDrag();
-  }
-  previewRootMotionDrag(point: RootMotionOffset): boolean {
-    return this.rootMotion.previewRootMotionDrag(point);
-  }
-  cancelRootMotionDrag(): boolean {
-    return this.rootMotion.cancelRootMotionDrag();
-  }
-  commitRootMotionDrag(): boolean {
-    return this.rootMotion.commitRootMotionDrag();
-  }
-
   get trajectoryCopyActive(): boolean {
     return this.previews.trajectoryCopyActive;
   }
@@ -315,7 +234,7 @@ export class AnimationEditorState {
       this.previews.cleanupAnimation ??
       this.deformation.previewAnimation ??
       this.previews.variationAnimation ??
-      this.rootMotion.previewAnimation ??
+      this.rootMotionCommands.previewAnimation ??
       this.graphGestures.previewAnimation ??
       this.working
     );
@@ -408,7 +327,9 @@ export class AnimationEditorState {
     () => this.working?.duration ?? 0,
     () => this.working?.events ?? [],
   );
-  private readonly rootMotion: AnimationEditorRootMotion;
+  private readonly rootMotionCommands: AnimationEditorRootMotion;
+  /** Root selection, world-displacement view preferences, root keys and the provisional XY drag. */
+  readonly rootMotion: AnimationEditorRootMotionHandle;
   private readonly graphGestures: AnimationEditorGraphGestures;
   private readonly previews: AnimationEditorPreviewCommands;
   private readonly deformation: AnimationEditorDeformationCommands;
@@ -458,12 +379,12 @@ export class AnimationEditorState {
       reconcileSelection: () => this.selectionCommands.reconcile(),
       reconcileRootKey: () => {
         if (
-          this.selectedRootKey &&
-          !rootKeys(this.working!, this.selectedRootKey.property).some(
-            (key) => key.time / 1000 === this.selectedRootKey!.time,
+          this.rootMotion.selectedRootKey &&
+          !rootKeys(this.working!, this.rootMotion.selectedRootKey.property).some(
+            (key) => key.time / 1000 === this.rootMotion.selectedRootKey!.time,
           )
         )
-          this.selectedRootKey = null;
+          this.rootMotion.selectedRootKey = null;
       },
       clearRootSelection: () => this.clearRootSelection(),
       selectKeyframe: (key, modifiers) => this.selectionCommands.selectKeyframe(key, modifiers),
@@ -475,13 +396,14 @@ export class AnimationEditorState {
         this.selectedDeformationTime = null;
       },
       selectCommittedKey: (channel, time) => {
-        if (channel.kind === 'root') this.selectedRootKey = Object.freeze({ property: channel.property, time });
+        if (channel.kind === 'root')
+          this.rootMotion.selectedRootKey = Object.freeze({ property: channel.property, time });
         if (channel.kind === 'ik')
           this.selection.setIKKey({ kind: 'ik', constraintId: channel.id, property: channel.property, time });
       },
       reconcilePreviews: () => this.previews.reconcile(),
     });
-    this.rootMotion = new AnimationEditorRootMotion(this, this.session);
+    this.rootMotion = this.rootMotionCommands = new AnimationEditorRootMotion(this, this.session);
     this.graphGestures = new AnimationEditorGraphGestures(this, this.session);
     this.previews = new AnimationEditorPreviewCommands(this, this.document, this.session);
     this.selection = new AnimationEditorSelection(rig);
@@ -521,7 +443,7 @@ export class AnimationEditorState {
           this.eventDrag ||
           this.ik.ikTargetDrag ||
           this.graphEditActive ||
-          this.rootMotionDragActive ||
+          this.rootMotion.rootMotionDragActive ||
           this.deformationEditActive
         ),
     });
@@ -571,7 +493,7 @@ export class AnimationEditorState {
   /** Same-topology rig edits invalidate sampling, without installing animation snapshots. */
   updatePreviewRig(rig: Rig): void {
     if (rig === this.rig) return;
-    this.cancelRootMotionDrag();
+    this.rootMotion.cancelRootMotionDrag();
     this.cancelGraphEdit();
     this.document.rig = rig;
     this.selection.updateRig(rig);
@@ -644,8 +566,8 @@ export class AnimationEditorState {
   }
   clearTimelineSelection(): void {
     return this.batchNotifications(() => {
-      if (this.selectedRootKey) {
-        this.selectedRootKey = null;
+      if (this.rootMotion.selectedRootKey) {
+        this.rootMotion.selectedRootKey = null;
         this.notify();
       }
       if (this.selection.clearIKKey()) this.notify();
@@ -691,19 +613,19 @@ export class AnimationEditorState {
   }
   copyTimelineSelection(): boolean {
     if (this.deformationSelected) return this.copyDeformationKey();
-    if (this.rootMotionSelected) return false;
+    if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
     if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
-    if (this.rootMotionSelected) return false;
+    if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
     return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
     if (this.deformationSelected) return this.duplicateDeformationKey();
-    if (this.rootMotionSelected) return this.duplicateRootKey();
+    if (this.rootMotion.rootMotionSelected) return this.rootMotion.duplicateRootKey();
     if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
@@ -739,7 +661,7 @@ export class AnimationEditorState {
   }
   private cancelTimelineDrag(): boolean {
     const deformation = this.cancelDeformationEdit();
-    const root = this.cancelRootMotionDrag();
+    const root = this.rootMotion.cancelRootMotionDrag();
     const cleanup = this.cancelCleanupPreview();
     const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
@@ -839,8 +761,8 @@ export class AnimationEditorState {
         this.changeDeformationKey({ ...key, time: key.time + (direction * (large ? 10 : 1) * 1000) / this.keyframeFPS })
       );
     }
-    if (this.rootMotionSelected && this.selectedRootKey) {
-      const key = this.selectedRootKey;
+    if (this.rootMotion.rootMotionSelected && this.rootMotion.selectedRootKey) {
+      const key = this.rootMotion.selectedRootKey;
       try {
         return this.editGraphKey(
           { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
@@ -865,8 +787,8 @@ export class AnimationEditorState {
         this.selectedDeformationTime = null;
         this.notify();
       }
-      if (this.selectedRootKey) {
-        this.selectedRootKey = null;
+      if (this.rootMotion.selectedRootKey) {
+        this.rootMotion.selectedRootKey = null;
         this.notify();
       }
       if (this.selection.clearIKKey()) this.notify();
@@ -889,7 +811,7 @@ export class AnimationEditorState {
   /** The toolbar and keyboard share the same typed selection dispatch. */
   deleteTimelineSelection(): boolean {
     if (this.deformationSelected) return this.changeDeformationKey(null);
-    if (this.rootMotionSelected) return this.animationAuthoringEnabled && this.deleteRootKey();
+    if (this.rootMotion.rootMotionSelected) return this.animationAuthoringEnabled && this.rootMotion.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.deleteSelectedEvent();
     if (this.ik.selectedIKKeyframe) return this.ik.deleteSelectedIKKeyframe();
@@ -1076,7 +998,7 @@ export class AnimationEditorState {
       !!this.eventDrag ||
       !!this.ik.ikTargetDrag ||
       this.graphEditActive ||
-      this.rootMotionDragActive ||
+      this.rootMotion.rootMotionDragActive ||
       this.deformationEditActive
     );
   }
@@ -1404,9 +1326,9 @@ export class AnimationEditorState {
   private resetAnimationSession(clearBone = false): void {
     this.cancelDeformationEdit();
     this.deformationEditing = false;
-    this.cancelRootMotionDrag();
+    this.rootMotion.cancelRootMotionDrag();
     this.clearRootSelection();
-    this.rootMotionEditing = false;
+    this.rootMotion.rootMotionEditing = false;
     this.previews.reset();
     this.cancelGraphEdit();
     this.ik.cancelIKTargetDrag();
@@ -1544,12 +1466,12 @@ export class AnimationEditorState {
     if (changed) {
       this.updateTime(this.currentTime);
       if (
-        this.selectedRootKey &&
-        !rootKeys(this.working!, this.selectedRootKey.property).some(
-          (key) => key.time / 1000 === this.selectedRootKey!.time,
+        this.rootMotion.selectedRootKey &&
+        !rootKeys(this.working!, this.rootMotion.selectedRootKey.property).some(
+          (key) => key.time / 1000 === this.rootMotion.selectedRootKey!.time,
         )
       )
-        this.selectedRootKey = null;
+        this.rootMotion.selectedRootKey = null;
       this.selectionCommands.reconcile();
     }
     if (changed || cancelled) this.notify();

@@ -237,7 +237,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.state?.rootMotionEditing) this.environmentCamera?.render();
+    if (!this.state?.rootMotion.rootMotionEditing) this.environmentCamera?.render();
     const advance = (): void => this.state?.advancePlayback(toSeconds(delta));
     if (this.ghosts) this.ghosts.updateFrame(advance);
     else advance();
@@ -385,7 +385,7 @@ export class AnimationEditorScene extends Phaser.Scene {
     this.rootHandle.setInteractive(this.ikHandlesInteractive && !this.rigMode);
     return new AnimationEditorIKHandles(this, state, puppet, {
       guide: () => this.groundGuide.getSnapshot().guide,
-      dragging: () => !!this.groundHandle?.dragging || state.rootMotionDragActive,
+      dragging: () => !!this.groundHandle?.dragging || state.rootMotion.rootMotionDragActive,
     });
   }
   private refreshArtwork(): void {
@@ -415,7 +415,7 @@ export class AnimationEditorScene extends Phaser.Scene {
   setFacing(facing: Facing): void {
     this.facing = facing;
     if (this.rigEditor) this.rigEditor.state.facing = facing;
-    this.state?.cancelRootMotionDrag();
+    this.state?.rootMotion.cancelRootMotionDrag();
     this.puppet?.setFacing(facing);
     this.preview?.refresh(true);
     this.ghosts?.sync();

@@ -523,8 +523,8 @@ test.each(['left', 'right'] as const)(
     try {
       f.puppet.container.setScale(2);
       f.puppet.setFacing(facing);
-      f.state.setRootPosition({ x: 0, y: 0 }, 0);
-      f.state.setRootPosition({ x: 80, y: 0 }, 1);
+      f.state.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
+      f.state.rootMotion.setRootPosition({ x: 80, y: 0 }, 1);
       f.state.setCurrentTime(0.5);
       f.state.selectBone('upper');
       f.handles.setVisible(false);

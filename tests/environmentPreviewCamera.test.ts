@@ -302,7 +302,7 @@ test('authored, temporary and no travel are exclusive over static artwork/ground
     const background = environmentPreviewImages(f.environment.getSnapshot().settings);
     f.motion.update({ positionKeys: [point(0, 0), point(1000, 400, -60)] });
     for (const mode of ['authored', 'preview', 'none'] as const) {
-      f.state.setWorldDisplacementView(mode);
+      f.state.rootMotion.setWorldDisplacementView(mode);
       for (const cameraMode of ['fixed', 'follow'] as const) {
         f.environment.updateCamera({ mode: cameraMode, x: 400, y: 450, zoom: 0.7 });
         for (const facing of [1, -1]) {
@@ -349,7 +349,7 @@ test('authored continuous loops retain total travel across full cycles, pause an
   try {
     f.environment.update({ enabled: true });
     f.environment.updateCamera({ mode: 'follow' });
-    f.state.setWorldDisplacementView('authored', 'continuous');
+    f.state.rootMotion.setWorldDisplacementView('authored', 'continuous');
     f.state.play();
     f.state.advancePlayback(2);
     assert.equal(f.puppet.container.x, 460, 'nonlooping clamps to the complete step');
@@ -375,7 +375,7 @@ test('authored continuous loops retain total travel across full cycles, pause an
     assert.approximately(f.puppet.container.x, 1204, 1e-9, 'scrub release alone does not reset travel');
     f.state.setCurrentTime(0.375);
     assert.equal(f.puppet.container.x, 404, 'explicit seek restarts in cycle zero even at the same local timestamp');
-    f.state.setWorldDisplacementView('authored', 'reset');
+    f.state.rootMotion.setWorldDisplacementView('authored', 'reset');
     f.state.restart();
     f.state.advancePlayback(2.375);
     assert.approximately(f.puppet.container.x, 404, 1e-9);
@@ -449,7 +449,7 @@ test.each(['linear', 'stepped'] as const)(
         assert.approximately(f.puppet.container.y, samples[index]!.y, 1e-8);
       }
       f.motion.cancelCopy();
-      assert.equal(f.state.worldDisplacementMode, 'preview');
+      assert.equal(f.state.rootMotion.worldDisplacementMode, 'preview');
       assert.strictEqual(f.state.workingAnimation, base);
       assert.isTrue(f.motion.previewCopy());
       assert.isTrue(f.motion.commitCopy());
@@ -457,7 +457,7 @@ test.each(['linear', 'stepped'] as const)(
       const copied = f.state.workingAnimation;
       assert.deepEqual(copied!.tracks, base!.tracks);
       assert.deepEqual(copied!.ikTracks, base!.ikTracks);
-      assert.equal(f.state.worldDisplacementMode, 'authored');
+      assert.equal(f.state.rootMotion.worldDisplacementMode, 'authored');
       assert.strictEqual(f.motion.getSnapshot().settings.positionKeys, points);
       f.state.undo();
       assert.deepEqual(f.state.workingAnimation, base);
@@ -505,7 +505,7 @@ test('continuous root and follow camera share the skeletal held phase after frac
     f.preview.refresh(true);
     f.environment.update({ enabled: true });
     f.environment.updateCamera({ mode: 'follow' });
-    f.state.setWorldDisplacementView('authored', 'continuous');
+    f.state.rootMotion.setWorldDisplacementView('authored', 'continuous');
     f.state.setPreviewLoop(true);
     f.state.play();
     for (let i = 1; i <= 240; i++) {
@@ -526,21 +526,21 @@ test('entering root editing frames the first cycle once, freezes follow and can 
   try {
     f.environment.update({ enabled: true });
     f.environment.updateCamera({ mode: 'follow' });
-    f.state.setWorldDisplacementView('authored', 'continuous');
+    f.state.rootMotion.setWorldDisplacementView('authored', 'continuous');
     f.state.setPreviewLoop(true);
     f.state.play();
     f.state.advancePlayback(4.5);
     assert.equal(f.center().x, 740);
-    f.state.setRootMotionView({ editing: true });
+    f.state.rootMotion.setRootMotionView({ editing: true });
     assert.equal(f.center().x, 420, 'the handle remains in the viewport when accumulated cycles are hidden');
     f.state.setCurrentTime(0.75);
     assert.equal(f.center().x, 420, 'authoring does not follow every pose update');
     f.environment.update({ enabled: false });
     assert.deepEqual([f.camera.scrollX, f.camera.scrollY, f.camera.zoom], [42, -30, 1.2]);
     f.motion.update({ positionKeys: [point(0), point(1000, 80)] });
-    assert.isTrue(f.state.rootMotionEditing);
+    assert.isTrue(f.state.rootMotion.rootMotionEditing);
     assert.isTrue(f.motion.previewCopy());
-    assert.isFalse(f.state.rootMotionEditing);
+    assert.isFalse(f.state.rootMotion.rootMotionEditing);
     assert.isTrue(f.state.trajectoryCopyActive);
     f.motion.cancelCopy();
     assert.equal(f.state.historyLength, 0);

@@ -12,12 +12,10 @@ type PreviewState = Pick<
   AnimationEditorState,
   | 'animationAuthoringEnabled'
   | 'hasPendingAnimationEdits'
-  | 'rootMotionEditing'
-  | 'rootMotionVisible'
+  | 'rootMotion'
   | 'isPlaying'
   | 'currentTimeMilliseconds'
   | 'poseLibrary'
-  | 'setWorldDisplacementView'
 >;
 
 /** Own detached trajectory, cleanup, variation and pose comparisons outside authored document history. */
@@ -73,9 +71,9 @@ export class AnimationEditorPreviewCommands {
       this.session.stopPlayback();
       this.cancelCleanupPreview();
       this.cancelVariationPreview();
-      this.state.rootMotionEditing = false;
+      this.state.rootMotion.rootMotionEditing = false;
       this.trajectoryCopy = { base: this.document.workingAnimation!, rig: this.document.rig!, animation };
-      this.state.setWorldDisplacementView('authored');
+      this.state.rootMotion.setWorldDisplacementView('authored');
       this.session.notify();
     });
     return true;
@@ -240,8 +238,8 @@ export class AnimationEditorPreviewCommands {
       (!this.trajectoryCopyActive ||
         !this.state.animationAuthoringEnabled ||
         this.state.hasPendingAnimationEdits ||
-        !this.state.rootMotionVisible ||
-        this.state.rootMotionEditing)
+        !this.state.rootMotion.rootMotionVisible ||
+        this.state.rootMotion.rootMotionEditing)
     )
       this.trajectoryCopy = null;
     if (

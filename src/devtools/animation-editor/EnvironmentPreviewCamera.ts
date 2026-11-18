@@ -47,8 +47,8 @@ export class EnvironmentPreviewCamera {
       return;
     }
     // Frame the local authoring cycle once on entry, then release the camera while editing.
-    if (this.state.rootMotionEditing && this.editing) return;
-    this.editing = this.state.rootMotionEditing;
+    if (this.state.rootMotion.rootMotionEditing && this.editing) return;
+    this.editing = this.state.rootMotion.rootMotionEditing;
     const camera = this.camera;
     this.saved ??= { x: camera.scrollX, y: camera.scrollY, zoom: camera.zoom };
     const center = previewCameraCenter(config, this.state.previewAnimation ? this.displacement() : { x: 0, y: 0 });
@@ -66,7 +66,7 @@ export class EnvironmentPreviewCamera {
 
   /** Retain native pan/wheel navigation as preview configuration, including a follow offset. */
   render(): void {
-    if (this.disposed || this.state.rootMotionEditing || !this.applied) return;
+    if (this.disposed || this.state.rootMotion.rootMotionEditing || !this.applied) return;
     const camera = this.camera;
     const previous = this.applied;
     if (camera.width !== previous.width || camera.height !== previous.height) {

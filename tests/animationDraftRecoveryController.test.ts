@@ -175,8 +175,8 @@ test.each(['field', 'graph', 'root-graph', 'root-handle'] as const)(
       state.setAuthoredPlaybackMode('stepped');
       state.setAuthoredFPS(17);
       if (preview.startsWith('root-')) {
-        state.setRootPosition({ x: 0, y: 0 }, 0);
-        state.setRootPosition({ x: 80, y: -20 }, 1);
+        state.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
+        state.rootMotion.setRootPosition({ x: 80, y: -20 }, 1);
         state.editGraphKey(
           { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0 },
           { curve: { mode: 'bezier', control1: { x: 0.2, y: 0 }, control2: { x: 0.8, y: 1 } } },
@@ -187,9 +187,9 @@ test.each(['field', 'graph', 'root-graph', 'root-handle'] as const)(
         state.selectBone('root');
         state.setTemporaryBoneProperty('x', 123);
       } else if (preview === 'root-handle') {
-        state.setRootMotionView({ editing: true });
-        assert.isTrue(state.beginRootMotionDrag());
-        state.previewRootMotionDrag({ x: 123, y: -456 });
+        state.rootMotion.setRootMotionView({ editing: true });
+        assert.isTrue(state.rootMotion.beginRootMotionDrag());
+        state.rootMotion.previewRootMotionDrag({ x: 123, y: -456 });
       } else {
         const channel =
           preview === 'root-graph'

@@ -18,6 +18,9 @@ export interface RootMotionContext {
   readonly previewTimeMilliseconds: number;
 }
 
+/** The public `state.rootMotion` domain handle; the preview snapshot is read only by the facade. */
+export type AnimationEditorRootMotionHandle = Omit<AnimationEditorRootMotion, 'previewAnimation'>;
+
 /** Own root selection, view preferences and provisional XY edits; commits through the shared edit session. */
 export class AnimationEditorRootMotion {
   constructor(

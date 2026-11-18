@@ -40,7 +40,7 @@ export class RootMotionController {
       button.className = 'timeline-track-select';
       button.textContent = property === null ? 'Root Motion' : `Position ${property.toUpperCase()}`;
       button.setAttribute('aria-label', `Select root motion${property ? ' position ' + property.toUpperCase() : ''}`);
-      button.addEventListener('click', () => this.state?.selectRootMotion(property ?? 'x'), {
+      button.addEventListener('click', () => this.state?.rootMotion.selectRootMotion(property ?? 'x'), {
         signal: this.abort.signal,
       });
       if (property) {
@@ -53,9 +53,9 @@ export class RootMotionController {
     }
     const options = { signal: this.abort.signal };
     for (const [id, action] of [
-      [ANIMATION_IDS.rootAddKey, () => this.state?.addRootPositionKey()],
-      [ANIMATION_IDS.rootDeleteKey, () => this.state?.deleteRootKey()],
-      [ANIMATION_IDS.rootDuplicateKey, () => this.state?.duplicateRootKey()],
+      [ANIMATION_IDS.rootAddKey, () => this.state?.rootMotion.addRootPositionKey()],
+      [ANIMATION_IDS.rootDeleteKey, () => this.state?.rootMotion.deleteRootKey()],
+      [ANIMATION_IDS.rootDuplicateKey, () => this.state?.rootMotion.duplicateRootKey()],
     ] as const)
       requireElement(this.app, id, HTMLButtonElement).addEventListener('click', () => this.run(action), options);
     for (const [id, setting] of [
@@ -64,7 +64,7 @@ export class RootMotionController {
     ] as const)
       requireElement(this.app, id, HTMLInputElement).addEventListener(
         'change',
-        (event) => this.state?.setRootMotionView({ [setting]: (event.target as HTMLInputElement).checked }),
+        (event) => this.state?.rootMotion.setRootMotionView({ [setting]: (event.target as HTMLInputElement).checked }),
         options,
       );
     for (const id of [ANIMATION_IDS.rootDisplacementMode, ANIMATION_IDS.rootLoopMode])
@@ -77,7 +77,7 @@ export class RootMotionController {
             (mode === 'authored' || mode === 'preview' || mode === 'none') &&
             (loop === 'reset' || loop === 'continuous')
           )
-            this.state?.setWorldDisplacementView(mode, loop);
+            this.state?.rootMotion.setWorldDisplacementView(mode, loop);
         },
         options,
       );
@@ -86,7 +86,10 @@ export class RootMotionController {
       (event) => {
         event.preventDefault();
         this.run(() =>
-          this.state?.setRootPosition({ x: this.number(ANIMATION_IDS.rootX), y: this.number(ANIMATION_IDS.rootY) }),
+          this.state?.rootMotion.setRootPosition({
+            x: this.number(ANIMATION_IDS.rootX),
+            y: this.number(ANIMATION_IDS.rootY),
+          }),
         );
       },
       options,
@@ -95,7 +98,7 @@ export class RootMotionController {
       'submit',
       (event) => {
         event.preventDefault();
-        const key = this.state?.selectedRootKey;
+        const key = this.state?.rootMotion.selectedRootKey;
         if (key)
           this.run(() =>
             this.state?.editGraphKey(
@@ -142,7 +145,7 @@ export class RootMotionController {
     if (event.button !== 0 || !this.state?.animationAuthoringEnabled) return;
     event.preventDefault();
     this.cancel();
-    this.state.selectRootMotion(property, time);
+    this.state.rootMotion.selectRootMotion(property, time);
     const ref = { channel: { kind: 'root', id: 'Root Motion', property }, time } as const;
     if (!this.state.beginGraphEdit(ref)) return;
     this.drag = { pointer: event.pointerId, startX: event.clientX, ref, marker, moved: false };
@@ -207,7 +210,7 @@ export class RootMotionController {
           marker.setAttribute('aria-label', `Select Root Motion ${property} key at ${time} s`);
           marker.addEventListener('pointerdown', (event) => this.begin(event, property, time, marker));
           marker.addEventListener('click', (event) => {
-            if (!event.detail) this.state?.selectRootMotion(property, time);
+            if (!event.detail) this.state?.rootMotion.selectRootMotion(property, time);
           });
           marker.addEventListener('lostpointercapture', () => {
             if (this.drag?.marker === marker) this.cancel();
@@ -218,42 +221,44 @@ export class RootMotionController {
       }
     }
     for (const [index, property] of ([null, 'x', 'y'] as const).entries()) {
-      const selected = state.rootMotionSelected && (!property || state.rootMotionProperty === property);
+      const selected =
+        state.rootMotion.rootMotionSelected && (!property || state.rootMotion.rootMotionProperty === property);
       setAttribute(this.labels[index]!, 'data-selected', String(selected));
       setAttribute(this.labels[index]!.querySelector('button')!, 'aria-pressed', String(selected));
       if (property)
         for (const key of state.workingAnimation ? rootKeys(state.workingAnimation, property) : []) {
           const time = key.time / 1000;
           const marker = this.markers.get(`${property}:${time}`)!;
-          const active = state.selectedRootKey?.property === property && state.selectedRootKey.time === time;
+          const active =
+            state.rootMotion.selectedRootKey?.property === property && state.rootMotion.selectedRootKey.time === time;
           marker.setAttribute('aria-pressed', String(active));
           marker.dataset.primary = String(active);
           if (this.drag?.marker !== marker) marker.style.left = `${timeToTimelineX(time, state.duration, width)}px`;
         }
     }
     if (restoreFocus) {
-      const key = state.selectedRootKey;
+      const key = state.rootMotion.selectedRootKey;
       const marker = key ? this.markers.get(`${key.property}:${key.time}`) : undefined;
       (marker ?? requireElement(this.app, ANIMATION_IDS.timeline, HTMLElement)).focus({ preventScroll: true });
     }
     for (const [id, checked] of [
-      [ANIMATION_IDS.rootEditMode, state.rootMotionEditing],
-      [ANIMATION_IDS.rootShowTrajectory, state.rootTrajectoryVisible],
+      [ANIMATION_IDS.rootEditMode, state.rootMotion.rootMotionEditing],
+      [ANIMATION_IDS.rootShowTrajectory, state.rootMotion.rootTrajectoryVisible],
     ] as const)
       requireElement(this.app, id, HTMLInputElement).checked = checked;
     for (const [id, value] of [
-      [ANIMATION_IDS.rootDisplacementMode, state.worldDisplacementMode],
-      [ANIMATION_IDS.rootLoopMode, state.rootLoopMode],
+      [ANIMATION_IDS.rootDisplacementMode, state.rootMotion.worldDisplacementMode],
+      [ANIMATION_IDS.rootLoopMode, state.rootMotion.rootLoopMode],
     ] as const)
       requireElement(this.app, id, HTMLSelectElement).value = value;
     const values: Record<string, number | undefined> = {
-      [ANIMATION_IDS.rootX]: state.rootPosition.x,
-      [ANIMATION_IDS.rootY]: state.rootPosition.y,
-      [ANIMATION_IDS.rootKeyTime]: state.selectedRootKey?.time,
+      [ANIMATION_IDS.rootX]: state.rootMotion.rootPosition.x,
+      [ANIMATION_IDS.rootY]: state.rootMotion.rootPosition.y,
+      [ANIMATION_IDS.rootKeyTime]: state.rootMotion.selectedRootKey?.time,
       [ANIMATION_IDS.rootKeyValue]:
-        state.selectedRootKey && state.workingAnimation
-          ? rootKeys(state.workingAnimation, state.selectedRootKey.property).find(
-              (key) => key.time / 1000 === state.selectedRootKey!.time,
+        state.rootMotion.selectedRootKey && state.workingAnimation
+          ? rootKeys(state.workingAnimation, state.rootMotion.selectedRootKey.property).find(
+              (key) => key.time / 1000 === state.rootMotion.selectedRootKey!.time,
             )?.value
           : undefined,
     };
@@ -267,7 +272,7 @@ export class RootMotionController {
         input.disabled =
           !state.workingAnimation ||
           !state.animationAuthoringEnabled ||
-          (KEY_CONTROLS.has(input.id) && !state.selectedRootKey);
+          (KEY_CONTROLS.has(input.id) && !state.rootMotion.selectedRootKey);
       });
   }
   dispose(): void {

@@ -58,10 +58,10 @@ function fixture() {
     },
   ]);
   state.selectAnimation('sword');
-  state.setRootPosition({ x: 10, y: 20 }, 0);
-  state.setRootPosition({ x: 10, y: 20 }, 0.25);
-  state.setRootPosition({ x: 90, y: 20 }, 0.6);
-  state.setRootPosition({ x: 90, y: 20 }, 1);
+  state.rootMotion.setRootPosition({ x: 10, y: 20 }, 0);
+  state.rootMotion.setRootPosition({ x: 10, y: 20 }, 0.25);
+  state.rootMotion.setRootPosition({ x: 90, y: 20 }, 0.6);
+  state.rootMotion.setRootPosition({ x: 90, y: 20 }, 1);
   state.editGraphKey(
     { channel: { kind: 'root', id: 'Root Motion', property: 'x' }, time: 0.25 },
     {
@@ -134,14 +134,14 @@ test.each(['right', 'left'] as const)(
         const traveled = contacts.contacts[0]!.world;
         const localPose = { ...puppet.getBone('foot').pose };
         const offset = puppet.container.x - 300;
-        state.setWorldDisplacementView('none');
+        state.rootMotion.setWorldDisplacementView('none');
         contacts.sync(puppet);
         const stationary = contacts.contacts[0]!.world;
         assert.closeTo(traveled.x - stationary.x, offset, 1e-8);
         assert.closeTo(traveled.y, stationary.y, 1e-8);
         assert.deepEqual(puppet.getBone('foot').pose, localPose);
         if (seconds >= 0.6) assert.closeTo(offset, facing === 'left' ? -160 : 160, 1e-8);
-        state.setWorldDisplacementView('authored');
+        state.rootMotion.setWorldDisplacementView('authored');
       }
       contacts.sync(puppet);
       const html = renderToStaticMarkup(
