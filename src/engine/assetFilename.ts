@@ -1,11 +1,19 @@
-/** Keep filenames portable without changing the authored asset identity or manifest path. */
-export function safeFilename(name: string): string {
+/**
+ * Keep filenames portable without changing the authored asset identity or manifest path.
+ * Returns the sanitized `fallback` when nothing is left after sanitizing `name`, and
+ * `animation.json` when the fallback sanitizes to nothing too.
+ */
+export function safeFilename(name: string, fallback = 'animation.json'): string {
+  return sanitizeFilename(name) || sanitizeFilename(fallback) || 'animation.json';
+}
+
+function sanitizeFilename(name: string): string {
   const sanitized = Array.from(name, (character) =>
     character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 || /[<>:"/\\|?*]/.test(character) ? '_' : character,
   )
     .join('')
     .replace(/[. ]+$/, '');
-  if (!sanitized) return 'animation.json';
+  if (!sanitized) return '';
   return /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(sanitized) ? `_${sanitized}` : sanitized;
 }
 

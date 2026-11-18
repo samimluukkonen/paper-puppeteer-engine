@@ -110,7 +110,10 @@ export function StorySequencePanel({
               .then(async (files) => {
                 const { bytes } = await packageZipWorker.encode(files, signal);
                 signal.throwIfAborted();
-                downloadBlob(new Blob([bytes], { type: 'application/zip' }), `${safeFilename(story.id)}.story.zip`);
+                downloadBlob(
+                  new Blob([bytes], { type: 'application/zip' }),
+                  `${safeFilename(story.id, 'story')}.story.zip`,
+                );
                 setMessage('Story ZIP download started. Use Import Project for editable workspace backups.');
               })
               .catch((error: unknown) => {

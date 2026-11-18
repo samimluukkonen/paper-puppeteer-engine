@@ -98,6 +98,12 @@ test('collision-safe import uses content format and preserves IDs and binary own
   expect(project.audioSource(first)!.definition.name).toBe('Renamed');
 });
 
+test('an audio file whose name sanitizes to nothing is stored under the audio fallback name', async () => {
+  const project = new ProjectWorkspace('Audio');
+  await project.importAudio(new File([audio('mp3')], '..mp3'), 'sfx', loaderFor(project, backend().value));
+  expect(project.definition.audio!.map((entry) => entry.path)).toEqual(['audio/audio.mp3']);
+});
+
 test('missing, empty, oversized, unsupported and undecodable imports leave the project unchanged', async () => {
   const project = new ProjectWorkspace('Audio');
   const f = backend();

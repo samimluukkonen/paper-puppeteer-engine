@@ -1,5 +1,5 @@
 import { assert, test } from 'vitest';
-import { assetFilename } from '../src/devtools/shared/assetFilename.js';
+import { assetFilename, safeFilename } from '../src/devtools/shared/assetFilename.js';
 
 test.each([
   ['rigs/rig%20v2.json?revision=2#asset', 'rig v2.json'],
@@ -21,4 +21,17 @@ test.each([
 test('fallback filenames are sanitized too', () => {
   assert.equal(assetFilename(undefined, 'walk:run?.json'), 'walk_run_.json');
   assert.equal(assetFilename(undefined, '..'), 'animation.json');
+});
+
+test('safeFilename falls back to animation.json by default and to a caller fallback when given', () => {
+  assert.equal(safeFilename('...'), 'animation.json');
+  assert.equal(safeFilename(' . '), 'animation.json');
+  assert.equal(safeFilename('...', 'audio'), 'audio');
+});
+
+test('safeFilename sanitizes the caller fallback and never returns an empty or unsafe name', () => {
+  assert.equal(safeFilename('...', 'a:b?'), 'a_b_');
+  assert.equal(safeFilename('...', 'con'), '_con');
+  assert.equal(safeFilename('...', '...'), 'animation.json');
+  assert.equal(safeFilename('...', ''), 'animation.json');
 });

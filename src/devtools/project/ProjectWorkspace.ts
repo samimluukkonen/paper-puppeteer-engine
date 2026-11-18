@@ -605,7 +605,7 @@ export class ProjectWorkspace {
     const format = inspectAudioData(bytes);
     const decoded = await loader.prepare(bytes, active);
     active.throwIfAborted();
-    const stem = safeFilename(file.name.replace(/\.[^.]+$/, '').replace(/[%#]/g, '_')).slice(0, 100) || 'audio';
+    const stem = safeFilename(file.name.replace(/\.[^.]+$/, '').replace(/[%#]/g, '_'), 'audio').slice(0, 100);
     const used = new Set([
       ...(this.metadata.audio ?? []).map((entry) => entry.path.toLowerCase()),
       ...this.metadata.characters.map((entry) => entry.manifest.toLowerCase()),
