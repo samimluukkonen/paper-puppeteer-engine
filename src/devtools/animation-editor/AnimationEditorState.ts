@@ -676,15 +676,13 @@ export class AnimationEditorState {
   }
   /** Focusing an authoring field pauses at the held time, even before the first input. */
   beginTransformEdit(): void {
-    if (!this.animationAuthoringEnabled) return;
-    return this.batchNotifications(() => {
+    return this.session.run(undefined, () => {
       this.cancelTimelineDrag();
       if (this.selection.boneId && this.working) this.playback.pause();
     });
   }
   setTemporaryBoneProperty(property: TransformProperty, value: number): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.selection.boneId || !this.working || !transformProperties.includes(property) || !Number.isFinite(value))
         return false;
       this.cancelTimelineDrag();
@@ -695,8 +693,7 @@ export class AnimationEditorState {
     });
   }
   commitBoneProperty(property: TransformProperty): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
       const value = this.selectedBoneTransform?.[property];
@@ -704,8 +701,7 @@ export class AnimationEditorState {
     });
   }
   deleteBonePropertyKey(property: TransformProperty): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
       return this.keyframes.removeBonePropertyKeyframe(this.selection.boneId, property);
@@ -794,8 +790,7 @@ export class AnimationEditorState {
 
   /** Failed selections preserve the working copy; callers may explicitly discard authored changes. */
   selectAnimation(id: string | null, options: { discardChanges?: boolean; keepChanges?: boolean } = {}): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       if (options.keepChanges && this.selectedAnimationId) {
         this.clipContexts.set(this.selectedAnimationId, { time: this.currentTime, keys: this.selectedKeys });
       }
@@ -990,8 +985,7 @@ export class AnimationEditorState {
 
   /** Revert uses the current session's source, never a network reload or the last exported copy. */
   revertAnimation(options: { discardChanges?: boolean } = {}): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       const reverted = this.document.revertAnimation(options);
       if (reverted) this.resetAnimationSession(true);
       this.notify();
@@ -1032,8 +1026,7 @@ export class AnimationEditorState {
   }
 
   private createAnimationSession(create: () => boolean): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       const previousId = this.selectedAnimationId;
       const previousContext = { time: this.currentTime, keys: this.selectedKeys };
       const created = create();
@@ -1058,8 +1051,7 @@ export class AnimationEditorState {
 
   /** Validate before touching navigation; notify once with the complete fresh session and pose at zero. */
   importJson(json: string, options: AnimationImportOptions = {}): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
+    return this.session.run(false, () => {
       const imported = this.document.importJson(json, options);
       if (imported) {
         ++this.importedSessions;
@@ -1098,12 +1090,10 @@ export class AnimationEditorState {
   }
 
   undo(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.restoreHistory(() => this.document.undo()));
+    return this.session.run(false, () => this.restoreHistory(() => this.document.undo()));
   }
   redo(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.restoreHistory(() => this.document.redo()));
+    return this.session.run(false, () => this.restoreHistory(() => this.document.redo()));
   }
   private restoreHistory(restore: () => boolean): boolean {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.

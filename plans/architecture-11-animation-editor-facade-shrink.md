@@ -198,3 +198,25 @@ grep -cE 'if \(!this\.animationAuthoringEnabled\) return' $F
 - Every handle is typed so that it leaves out its module's facade-only reset methods.
 - Every cross-module rule from item 4 lives in its owning module or is recorded as facade-owned.
 - All existing tests pass with mechanical renames only.
+
+## As built (2026-11-18)
+
+Shipped as one commit per phase, `35f72f0` (phase 0) through `fed4a41` (phase 8), plus a final commit that moves the facade's remaining guarded batches onto `session.run`. Every phase was green: 4591 tests pass, including the 4 new session tests.
+
+| Measure | Before (`7dd916e`) | After |
+|---|---|---|
+| Lines | 1671 | 1118 |
+| Public members (first Acceptance grep, minus the constructor) | 255 | 110 |
+| Private members | 14 | 11 |
+| `batchNotifications(` wrappers | 80 | 15 |
+| Authoring-guard early returns | 61 | 2 (`deleteTimelineSelection`, `deleteSelectedKeyframe`) |
+
+- **Handles:** `ik`, `rootMotion`, `keyframes`, `events`, `previews`, `deformation`, `graph` and `playback`. Each is an `Omit<Module, …>` type exported from its module file. Where a handle hides members, the facade keeps the full module in a private `…Commands` field (`playbackController` for playback).
+- **Rename:** a type-aware script built on the TypeScript 5.9 compiler API, kept out of the repo. It rewrote `x.member` to `x.<handle>.member` only where `member` resolved to an `AnimationEditorState` declaration, and did the same for `AnimationEditorState['member']` types. That came to about 2,530 call sites. Hand edits beyond the script were receiver changes only: four `vi.spyOn(state, …)` calls and two `.bind(this.state)` calls in `TimelineInputController`.
+- **Deviations from the plan:**
+  - `AnimationEditorPlaybackCommands` is folded into `AnimationEditorPlaybackController`, so one object backs `state.playback`.
+  - `play`, `togglePlayback`, `restart` and `advancePlayback` check the guard without `run`, because batching them would publish the pose after animation events were dispatched.
+  - The deformation selection fields moved into the deformation module.
+  - Keyframe selection stays on the facade (see the phase 0 table).
+  - The private install step is named `installCore`, so `AnimationEditSession.install` does not exist even at runtime.
+- **Narrowed controllers:** `IKInspectorController`, `AnimationEditorIKHandles`, `AnimationEditorRootHandle`, `EventInspectorController` and `EventTrackController`.

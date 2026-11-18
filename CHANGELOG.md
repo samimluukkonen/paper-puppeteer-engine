@@ -4,7 +4,7 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
-- Route every authored animation editor edit through `AnimationEditSession.commit`. Pose library apply, clip interpolation, `replaceWorkingAnimation`, IK bake commits and library metadata edits no longer install snapshots themselves, and `AnimationEditSession.install` is now private. A new session operation, `run(denied, command)`, holds the authoring guard and the notification batch in one place. Editor behaviour is unchanged.
+- Route every authored animation editor edit through `AnimationEditSession.commit`. Pose library apply, clip interpolation, `replaceWorkingAnimation`, IK bake commits and library metadata edits no longer install snapshots themselves, and `AnimationEditSession.install` is now private. A new session operation, `run(denied, command)`, holds the authoring guard and the notification batch in one place. The command modules and the facade's own guarded commands (bone transform drafts, clip selection, revert, create, import, undo and redo) use it. Editor behaviour is unchanged.
 
 - Expose the animation editor's IK commands as one typed handle, `AnimationEditorState.ik`, instead of 29 forwarding members on the facade (for example, `state.selectIKConstraint(…)` becomes `state.ik.selectIKConstraint(…)`; member names are unchanged). The IK module now owns its authoring guards and notification batches through `session.run`. It also owns two cross-module rules: selecting an IK constraint or IK key clears the root and deformation selection, and the preview-aware `selectedIKTargetValues` read. `IKInspectorController` and `AnimationEditorIKHandles` depend only on the IK handle and a few facade members. Editor behaviour is unchanged.
 
