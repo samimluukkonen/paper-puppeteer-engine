@@ -1,5 +1,9 @@
-import { inspectImageHeader, sceneImageReferenceSchema } from '../../engine/core.js';
-import { createSceneTextureBudget } from '../../engine/runtime.js';
+import {
+  inspectImageHeader,
+  SCENE_TEXTURE_LIMITS,
+  sceneImageReferenceSchema,
+  TextureBudget,
+} from '../../engine/core.js';
 import { importSprite } from '../shared/artwork/spriteImport.js';
 import { Subscribers } from '../shared/subscriberNotifications.js';
 
@@ -33,7 +37,7 @@ export class SceneImageRegistry {
   /** Package bytes have already passed the package boundary; validate headers and collisions again. */
   register(reference: string, bytes: Uint8Array<ArrayBuffer>, name = reference.split('/').at(-1)!): void {
     sceneImageReferenceSchema.parse(reference);
-    const budget = createSceneTextureBudget();
+    const budget = new TextureBudget(SCENE_TEXTURE_LIMITS);
     for (const [key, asset] of this.assets) budget.checkImage(key, asset.bytes);
     budget.checkImage(reference, bytes);
     const header = inspectImageHeader(bytes)!;

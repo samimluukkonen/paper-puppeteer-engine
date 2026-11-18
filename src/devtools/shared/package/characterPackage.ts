@@ -2,6 +2,7 @@ import {
   canonicalJson,
   CharacterDefinition,
   CharacterLoader,
+  TextureBudget,
   DEFAULT_CHARACTER_TEXTURE_LIMITS,
   IMAGE_HEADER_BYTES,
   assertJsonInputSize,
@@ -21,7 +22,6 @@ import type {
   SpriteDefinition,
   AttachmentDefinition,
 } from '../../../engine/data.js';
-import { CharacterTextureBudget } from '../../../engine/runtime.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
 import { safeFilename } from '../assetFilename.js';
@@ -110,7 +110,7 @@ export async function validatePackage(files: PackageFiles, signal?: AbortSignal)
   if (new Set(folded).size !== folded.length) throw new Error('Metadata files must have distinct package paths.');
   for (const path of manifestPaths(manifest)) packagePath(path);
   const images = new Map<string, { bytes: Uint8Array<ArrayBuffer>; format: string }>();
-  const budget = new CharacterTextureBudget({ allowWebp: true });
+  const budget = new TextureBudget({ allowWebp: true });
   for (const [key, path] of Object.entries(manifest.textures)) {
     if (folded.includes(path.toLowerCase())) throw new Error(`Image "${key}" collides with metadata at "${path}".`);
     const bytes = files.get(path);
@@ -271,7 +271,7 @@ export class CharacterDraftSerializer {
 
   private async validateAsset(bytes: Uint8Array<ArrayBuffer>, signal: AbortSignal): Promise<void> {
     const header = inspectSpriteHeader(bytes.subarray(0, IMAGE_HEADER_BYTES));
-    new CharacterTextureBudget({ allowWebp: true }).checkImage('draft', bytes);
+    new TextureBudget({ allowWebp: true }).checkImage('draft', bytes);
     if (typeof Image !== 'undefined') {
       const sprite = await importSprite(
         new File([bytes], header.format === 'image/png' ? 'draft.png' : 'draft.webp', { type: header.format }),
@@ -457,7 +457,7 @@ async function serializeCharacterFiles(
     });
   // Sequential fetching bounds memory and gives every failure a precise resource name.
   let includedImageBytes = 0;
-  const budget = draft && new CharacterTextureBudget({ allowWebp: true });
+  const budget = draft && new TextureBudget({ allowWebp: true });
   for (const [key, path] of Object.entries(manifest.textures)) {
     signal.throwIfAborted();
     const bytes =

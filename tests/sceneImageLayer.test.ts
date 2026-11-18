@@ -8,6 +8,14 @@ import { SceneImageLayer } from '../src/engine/SceneImageLayer.js';
 import { DEFAULT_SCENE_LAYERS, sceneActorDepth } from '../src/engine/sceneLayers.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
 
+// EnvironmentPreviewLayer loads the runtime barrel; Phaser itself cannot load without a browser.
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
+
 class TestImage {
   src = '';
   naturalWidth = 1;

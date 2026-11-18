@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { sceneDraftSource } from '../src/devtools/project/editorDrafts.js';
 import { ProjectInspector } from '../src/devtools/project/projectInspection.js';
 import {
@@ -28,6 +28,14 @@ import {
 import { dialogueSpeaker, getDialogueLineAtTime, type SceneDialogueLine } from '../src/engine/sceneDialogue.js';
 import { buildScenePackage, validateScenePackage } from '../src/engine/ScenePackage.js';
 import { assetFixture, sceneFixture } from './helpers/scenePackageFixtures.js';
+
+// SceneEditorPlayback loads the runtime barrel; Phaser itself cannot load without a browser.
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
 
 const line: SceneDialogueLine = { id: 'opening', text: '森は静かだった。\n  "Hello" 👋\n', time: 0, duration: 500 };
 function scene() {

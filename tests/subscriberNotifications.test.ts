@@ -10,6 +10,14 @@ import { ArtworkController } from '../src/devtools/shared/artwork/ArtworkControl
 import { createEmptyScene } from '../src/engine/SceneDefinition.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
 
+// SceneEditorPlayback loads the runtime barrel; Phaser itself cannot load without a browser.
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();

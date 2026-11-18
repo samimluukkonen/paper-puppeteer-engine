@@ -448,6 +448,7 @@ export { abortable } from './abortable.js';
 export { safeFilename, assetFilename } from './assetFilename.js';
 export { DialogueKeyboardInput } from './DialogueKeyboardInput.js';
 export { DEFAULT_CHARACTER_TEXTURE_LIMITS } from './characterTextureDefaults.js';
+export { SCENE_TEXTURE_LIMITS, TextureBudget } from './textureBudget.js';
 export { assertMeshImageSize } from './meshGeometry.js';
 export { checkSkinReferences, throwValidationIssue } from './validation.js';
 export { decodeImage } from './decodeImage.js';

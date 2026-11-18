@@ -13,9 +13,9 @@ import {
   validateStoryDefinition,
   type CharacterManifest,
   type SceneCharacterAssets,
+  TextureBudget,
 } from '../../engine/core.js';
 import type { ValidationIssue } from '../../engine/data.js';
-import { CharacterTextureBudget } from '../../engine/runtime.js';
 import { inspectSpriteHeader } from '../shared/artwork/spriteImport.js';
 import type { PackageFiles, PackageSnapshot } from '../shared/package/characterPackage.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';
@@ -365,7 +365,7 @@ export class ProjectInspector {
               );
           }
           attempt(target, () => validatePackageFiles(character.files), 'rig');
-          const budget = new CharacterTextureBudget({ allowWebp: true });
+          const budget = new TextureBudget({ allowWebp: true });
           for (const [key, path] of Object.entries(definition.textures)) {
             edge(target, asset('texture', entry.id, key), `Character "${entry.name}" image library`);
             if (replacements.some((replacement) => replacement.assetKey === key && !replacement.reference)) continue;

@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { assert, test } from 'vitest';
+import { assert, test, vi } from 'vitest';
 import { SceneArtworkPanel } from '../src/devtools/scene-editor/SceneArtworkPanel.js';
 import { SceneAudioInspector } from '../src/devtools/scene-editor/SceneAudioInspector.js';
 import { SceneCameraPanel } from '../src/devtools/scene-editor/SceneCameraPanel.js';
@@ -16,6 +16,14 @@ import { GUIDE_TARGETS } from '../src/devtools/shared/guides/anchors.js';
 import { GuideLauncher } from '../src/devtools/shared/guides/GuideLauncher.js';
 import { guideRegistry } from '../src/devtools/shared/guides/registry.js';
 import { artworkFixture } from './helpers/scenePackageFixtures.js';
+
+// SceneEditorPlayback loads the runtime barrel; Phaser itself cannot load without a browser.
+vi.mock('phaser', () => ({
+  default: {
+    Scenes: { Events: { UPDATE: 'update', SHUTDOWN: 'shutdown' } },
+    GameObjects: { Events: { DESTROY: 'destroy' } },
+  },
+}));
 
 test('scene tours gate missing documents and selections, and explain tours preserve history and exported data', () => {
   const document = new SceneEditorDocument();
