@@ -33,7 +33,7 @@ puppet.addIK({
 });
 ```
 
-The three IDs must form a direct parent-child chain. Names must be unique. Definitions default to `bendDirection: 1`, `mix: 1`, `enabled: true`, and `priority: 0`. A constraint stays inactive until a target is supplied. Assigning `target = undefined` clears it. Targets are copied; assign a new point or use `setTarget` to move them. Changes take effect on the next update or an explicit `syncPose()`.
+The three IDs must form a direct parent-child chain. Names must be unique. Definitions default to `bendDirection: 1`, `mix: 1`, `enabled: true`, and `priority: 0`. A constraint stays inactive until a target is supplied. Assigning `target = undefined` clears it. Targets are copied; assign a new point or use `setTarget` to move them. Changes take effect on the next update.
 
 An optional `endOffset: { x, y }` moves the solved endpoint from the end bone's joint to a local point on that bone. The solver includes the end bone's rotation and scale when measuring the second effective link. With the default `{ x: 0, y: 0 }`, it still targets the joint itself. Use an offset such as `{ x: 0, y: 20 }` to place a hand's palm on a target while its wrist remains behind it.
 
@@ -53,16 +53,13 @@ The normal `puppet.update(delta)` pass is:
 4. Execute constraints by ascending priority, retaining insertion order for ties. Each constraint resolves its target immediately before solving; the skeleton and render mounts are refreshed after it.
 5. Record solved rotations, then update both debug overlays and render the final pose.
 
-IK modifies the evaluated pose, never animation keys or bind poses. Restoring before each pass prevents partial influence from accumulating on stopped animation or untracked bones. Disabling IK restores the authored pose on the next pass. `syncPose()` also restores the previous pass before resolving constraints; explicit changed pose rotations are retained. For externally scheduled animation, call `preparePose()` before sampling so the evaluation starts from the authored pose:
+IK modifies the evaluated pose, never animation keys or bind poses. Restoring before each pass prevents partial influence from accumulating on stopped animation or untracked bones. Disabling IK restores the authored pose on the next pass. Each pass also restores the previous pass before resolving constraints; explicit changed pose rotations are retained. `puppet.update(delta)` runs this pipeline after animation evaluation, and `setBoneRotation()` runs it immediately. To drive the pose from your own sampler, attach it as a pose source; the pipeline restores the authored pose, merges the source channels, then applies pose presets and IK:
 
 ```ts
-puppet.animationPlayer.update(delta, () => puppet.preparePose());
-puppet.preparePose(); // Also restore before manual edits while playback is paused or stopped.
-// Apply any custom procedural pose edits here.
-puppet.syncPose();
+const detach = puppet.attachPoseSource({ pose: sampledPose });
+// Later, restore runtime playback:
+detach();
 ```
-
-Hosts making several corrective IK passes in a frame can call `puppet.syncPose({ updateDebug: false })` once, change constraint targets/settings, and use `puppet.syncIK({ updateDebug: false })` for subsequent passes. `syncIK()` restores previous pre-IK rotations, retains active pose presets, and updates only restored/solved IK joints and their render copies. It does not advance animation or rebuild the authored pose. Call `syncPose()` again after changing authored poses, skeleton transforms, or skeleton visibility/alpha. Bone and attachment transforms remain synchronized for dependent target providers during every pass; call `puppet.refreshDebugViews()` after the final pass so overlays read the final pose without running another solve.
 
 Constraint `status` reports `inactive`, `solved`, `clamped`, `singular-transform`, or `unsupported-scale`. `resolvedTarget`, `lengthA`, and `lengthB` expose the last solve's diagnostics. `puppet.setIKDebug(true)` controls the separate IK overlay; `setDebug(true)` still controls the existing bone overlay. Displayed lengths are in the chain parent's solve coordinates.
 

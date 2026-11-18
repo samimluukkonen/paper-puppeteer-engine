@@ -56,7 +56,7 @@ interface PuppetSettings {
   skin?: string;
   /** Disable if the host calls update(deltaMilliseconds) itself. */
   autoUpdate?: boolean;
-  /** Opt into skipping unchanged idle poses. Direct edits require posePipeline.markPoseDirty() or posePipeline.syncPose().
+  /** Opt into skipping unchanged idle poses. Change poses through Puppet setters; direct bone/constraint edits are not tracked.
    * IK target providers and external animation/deformation sources still synchronize every update.
    */
   idleSync?: 'always' | 'dirty';

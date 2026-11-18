@@ -1,21 +1,24 @@
 import Phaser from 'phaser';
 import { useLayoutEffect, useState, useSyncExternalStore } from 'react';
 import {
-  Actor,
   cinematicFrame,
   SCENE_OUTPUT_VIEWPORT,
   throwNotificationErrors,
-  SceneDialogueOverlay,
-  SceneImageLayer,
   sceneLayer,
-  createSceneTextureBudget,
-  SceneTransitionOverlay,
   CLEAR_SCENE_TRANSITION,
   evaluateTransitionAtTime,
   assertSceneInstanceBudget,
 } from '../../engine/core.js';
 import type { CharacterDefinition } from '../../engine/data.js';
-import { loadSceneCharacter, Puppet } from '../../engine/runtime.js';
+import {
+  Actor,
+  createSceneTextureBudget,
+  loadSceneCharacter,
+  Puppet,
+  SceneDialogueOverlay,
+  SceneImageLayer,
+  SceneTransitionOverlay,
+} from '../../engine/runtime.js';
 import { blocksEditorShortcut } from '../../shared/keyboardShortcuts.js';
 import { observePreview } from '../../ui/observePreview.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';

@@ -2,7 +2,6 @@ import {
   canonicalJson,
   CharacterDefinition,
   CharacterLoader,
-  CharacterTextureBudget,
   DEFAULT_CHARACTER_TEXTURE_LIMITS,
   IMAGE_HEADER_BYTES,
   assertJsonInputSize,
@@ -22,6 +21,7 @@ import type {
   SpriteDefinition,
   AttachmentDefinition,
 } from '../../../engine/data.js';
+import { CharacterTextureBudget } from '../../../engine/runtime.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
 import { safeFilename } from '../assetFilename.js';

@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { useEffect, useId, useRef, useState } from 'react';
 import { DialogueKeyboardInput, StoryPlayer } from '../../engine/core.js';
-import type { DeepReadonly, StandaloneStorySource, StoryDefinition } from '../../engine/data.js';
-import { StoryPackageLoader, type LoadedScene } from '../../engine/runtime.js';
+import type { DeepReadonly, StoryDefinition } from '../../engine/data.js';
+import { StoryPackageLoader, type LoadedScene, type StandaloneStorySource } from '../../engine/runtime.js';
 import { createEditorGame, destroyEditorGame } from '../shared/editorGame.js';
 import { buildProjectStoryPackage } from './projectPackage.js';
 import type { ProjectWorkspace } from './ProjectWorkspace.js';

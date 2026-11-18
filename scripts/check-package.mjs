@@ -183,7 +183,7 @@ export function checkCompiledOwnership(clip: CompiledClip): void {
   await writeFile(
     browserEntry,
     `
-import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet, SyncPoseOptions } from 'paper-puppeteer-engine';
+import type { ActorOptions, ActorPosition, ActorPuppetOwnership, ChoreographyCoordinationResult, ChoreographyPlan, PlaybackWaitResult, Puppet } from 'paper-puppeteer-engine';
 import { Actor as RootActor, Puppet as RootPuppet } from 'paper-puppeteer-engine';
 import { Actor, Choreography, ChoreographyConflictError, Puppet as RuntimePuppet, loadSceneCharacter } from 'paper-puppeteer-engine/runtime';
 import { SceneLoader, SceneDialogueOverlay, StoryPlayer, StandaloneStoryPlayer, StoryPackageLoader, DialogueKeyboardInput, getDialogueAtTime } from 'paper-puppeteer-engine/runtime';
@@ -288,9 +288,7 @@ export async function useActor(puppet: Puppet): Promise<PlaybackWaitResult> {
   return result;
 }
 
-export function sync(puppet: Puppet, options: SyncPoseOptions): void {
-  puppet.syncPose(options);
-  puppet.syncIK(options);
+export function sync(puppet: Puppet): void {
   puppet.sampleAnimation(500, { mode: 'playback' }).sampleAnimation(250);
 }
 `,

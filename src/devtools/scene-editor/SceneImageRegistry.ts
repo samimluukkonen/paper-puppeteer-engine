@@ -1,4 +1,5 @@
-import { inspectImageHeader, sceneImageReferenceSchema, createSceneTextureBudget } from '../../engine/core.js';
+import { inspectImageHeader, sceneImageReferenceSchema } from '../../engine/core.js';
+import { createSceneTextureBudget } from '../../engine/runtime.js';
 import { importSprite } from '../shared/artwork/spriteImport.js';
 import { Subscribers } from '../shared/subscriberNotifications.js';
 

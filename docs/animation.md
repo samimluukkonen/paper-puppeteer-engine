@@ -184,13 +184,10 @@ puppet.play('wave');
 puppet.update(delta);
 
 puppet.stop();
-puppet.setBoneRotation('forearm', 0.1);
-const hand = puppet.getBone('hand');
-hand.pose.x = 3;
-puppet.syncPose();
-const worldPosition = hand.getWorldPosition();
+puppet.setBoneRotation('forearm', 0.1); // Projects immediately.
+const worldPosition = puppet.getBone('hand').getWorldPosition();
 ```
 
-An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, advanced hosts call `puppet.animationPlayer.update(delta, () => puppet.preparePose())`, modify joint poses, and call `puppet.syncPose()` to evaluate constraints. The optional preparation callback restores the previous pre-IK pose after validation succeeds, so rejected updates leave poses unchanged. `animationPlayer.update(delta)` returns `true` when it evaluated a pose and `false` when playback was paused or no layer advanced; the callback runs only when a pose will be evaluated. Hosts can use this result to avoid evaluating again before presentation. Before direct manual edits while paused or stopped, call `preparePose()` explicitly. `animationPlayer.duration` exposes the active base clip duration in milliseconds (zero when none is selected). `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
+An active track overwrites manual changes to its property on the next update. With `autoUpdate: false`, `puppet.update(delta)` advances animation, evaluates pose presets and constraints, and renders; with the default `idleSync: 'always'` it also projects direct joint edits made since the previous update. `puppet.previewClip(clip, timeMs)` samples a clip at an explicit time without advancing runtime clocks, events or root motion, and `puppet.attachPoseSource(source)` drives the pose from external channels until the returned function detaches them. A standalone `AnimationPlayer.update(delta)` returns `true` when it evaluated a pose and `false` when playback was paused or no layer advanced. `animationPlayer.duration` exposes the active base clip duration in milliseconds (zero when none is selected). `animationPlayer.applyCurrentPose()` reapplies the current stepped/blended/layered pose before external adjustments; `sample(time)` remains available to sample the base clip at an explicit smooth time without changing its clock. `puppet.resetPose()` stops playback and restores all bind transforms; enabled IK is then evaluated on that pose.
 
 See the [IK animation data model](ik-animation-data.md) for optional target/mix tracks, puppet-local coordinates, stable rig constraint names, validation, and pure authoring APIs. See [runtime IK evaluation](ik-animation-runtime.md) for playback, scrubbing, precedence, and layer blending. Visual IK authoring remains deferred.

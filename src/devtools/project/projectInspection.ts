@@ -2,7 +2,6 @@ import {
   validateAudioAssetData,
   canonicalJson,
   validateCharacterDefinition,
-  CharacterTextureBudget,
   shapeIssues,
   IMAGE_HEADER_BYTES,
   assertMeshImageSize,
@@ -16,6 +15,7 @@ import {
   type SceneCharacterAssets,
 } from '../../engine/core.js';
 import type { ValidationIssue } from '../../engine/data.js';
+import { CharacterTextureBudget } from '../../engine/runtime.js';
 import { inspectSpriteHeader } from '../shared/artwork/spriteImport.js';
 import type { PackageFiles, PackageSnapshot } from '../shared/package/characterPackage.js';
 import { PackageFingerprints } from '../shared/package/PackageFingerprints.js';

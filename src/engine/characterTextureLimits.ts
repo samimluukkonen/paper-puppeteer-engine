@@ -1,14 +1,9 @@
 import type Phaser from 'phaser';
+import { DEFAULT_CHARACTER_TEXTURE_LIMITS } from './characterTextureDefaults.js';
 import { IMAGE_HEADER_BYTES, inspectImageHeader } from './imageHeader.js';
 import { validateInputLimit } from './jsonInput.js';
 
-export const DEFAULT_CHARACTER_TEXTURE_LIMITS = Object.freeze({
-  maxImageBytes: 10 * 1024 * 1024,
-  maxTotalImageBytes: 50 * 1024 * 1024,
-  maxImageDimension: 8192,
-  maxImagePixels: 16 * 1024 * 1024,
-  maxTotalImagePixels: 64 * 1024 * 1024,
-});
+export { DEFAULT_CHARACTER_TEXTURE_LIMITS };
 
 type TextureLimits = { [Key in keyof typeof DEFAULT_CHARACTER_TEXTURE_LIMITS]: number };
 export interface CharacterTextureLimitOptions extends Partial<TextureLimits> {

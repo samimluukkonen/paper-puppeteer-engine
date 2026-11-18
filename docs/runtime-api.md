@@ -55,7 +55,7 @@ The Editor entry points remain the Vite application modules `src/devtools/rig-ed
 | Load scene artwork                    | `loadSceneCharacter(scene, url, options?)`; optionally pass `options.definition` to reuse loaded metadata                                        |
 | Queue artwork in a host preload phase | `queueCharacterTextures(scene, definition, options?)`                                                                                            |
 | Create and position a puppet          | `new Puppet(scene, { definition, x?, y?, scale?, facing?, skin?, autoUpdate?, idleSync? })`; rig-based construction remains supported            |
-| Skip unchanged idle synchronization   | Opt into `idleSync: 'dirty'`; call `markPoseDirty()` after direct edits or `syncPose()` for immediate projection; providers remain live          |
+| Skip unchanged idle synchronization   | Opt into `idleSync: 'dirty'`; Puppet setters such as `setBoneRotation` and `setIKTarget` keep it current; providers remain live                  |
 | Play, switch and crossfade            | `puppet.play(name, { fadeDuration?, restart?, speed?, layer? })`                                                                                 |
 | Control playback                      | `stop`, `pause`, `resume`, `restart`, `setSpeed`, `setPlaybackMode`, `setAnimationFPS`, `sampleAnimation`                                        |
 | Layers                                | `setLayerMask`, `setLayerWeight`, `clearLayer`; base layer behavior is unchanged                                                                 |
@@ -65,7 +65,7 @@ The Editor entry points remain the Vite application modules `src/devtools/rig-ed
 | Animation queues                      | `queue(name, options?)`, `getQueue()`, `clearQueue()`, `stopQueue()`, `replaceQueue(requests)` on Puppet and AnimationPlayer                     |
 | Async playback                        | `playAndWait(name, options?)`, `waitForPlayback(options?)` on Puppet and AnimationPlayer; typed terminal results and AbortSignal cancellation    |
 | Playback lifecycle                    | `getPlaybackStatus(layer?)`, `onPlaybackLifecycle(listener)` on Puppet and AnimationPlayer; snapshots include playback-instance identity         |
-| IK controls                           | `getIK`, `addIK`, `setIKTarget`; constraint target/provider, mix, enabled, end offset, bend and priority controls; `syncIK` / `syncPose`         |
+| IK controls                           | `getIK`, `addIK`, `setIKTarget`; constraint target/provider, mix, enabled, end offset, bend and priority controls                                |
 | Cleanup                               | `puppet.destroy()`, `puppet.isDestroyed`; standalone `AnimationPlayer.dispose()`, `TwoBoneIKConstraint.dispose()` and their `isDisposed` getters |
 
 Times, deltas and fades are milliseconds. Positions are pixels, rotations radians, and scales unitless. IDs remain strings for compatibility; existing validation checks names and cross-file references rather than requiring new branded IDs. Unknown clips, bones, slots, skins and constraints retain their existing errors.

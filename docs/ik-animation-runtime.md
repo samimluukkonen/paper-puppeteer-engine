@@ -28,7 +28,7 @@ The existing dependency order remains:
 4. Run constraints by ascending priority, retaining registration order for ties. Resolve each target immediately before its constraint. Project each solved branch so later constraints/providers see updated descendants and attachments.
 5. Finish rendering and refresh overlays.
 
-The demo keeps its presentation order: authored layers/layout, hand configuration, foot planting targets/body placement, initial weapon placement, priority-ordered primary arm then secondary weapon provider then legs, foot visual rotation, grip correction passes, and final overlays. Corrective `syncIK()` passes reuse the held target channels without advancing animation. No arbitrary reordering or additional solver is introduced.
+The demo keeps its presentation order: authored layers/layout, hand configuration, foot planting targets/body placement, initial weapon placement, priority-ordered primary arm then secondary weapon provider then legs, foot visual rotation, grip correction passes, and final overlays. Corrective `PosePipeline.syncIK()` passes reuse the held target channels without advancing animation. No arbitrary reordering or additional solver is introduced.
 
 ## Coordinates and sparse defaults
 
@@ -68,7 +68,7 @@ Smooth interpolation samples continuous time. Stepped playback quantizes each cl
 | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `src/engine/AnimationClip.ts`, `core.ts`                                                                 | Compiled IK ownership/validation/cache and public `CompiledIKTrack`/`evaluateIKClip` exports.                            |
 | `src/engine/ik/AnimationIKPose.ts`, `AnimationLayerEvaluator.ts`, `AnimationPlayer.ts`                   | Sparse channel interpolation/blending on existing clocks, transition snapshots, and `ikAnimation` state.                 |
-| `src/engine/ik/TwoBoneIKConstraint.ts`, `ik/types.ts`, `Puppet.ts`, `PuppetPoseController.ts`            | Target/influence precedence, affine adapters, `clearMixOverride`, `setIKAnimationSource`, and per-constraint resolution. |
+| `src/engine/ik/TwoBoneIKConstraint.ts`, `ik/types.ts`, `Puppet.ts`, `PosePipeline.ts`            | Target/influence precedence, affine adapters, `clearMixOverride`, `setIKAnimationSource`, and per-constraint resolution. |
 | `src/devtools/animation-editor/AnimationEditorPreview.ts`, `AnimationEditorScene.ts`                     | Working-copy channels, authored rig constraint registration, and fixed-preview override release.                         |
 | `tests/ikAnimationRuntime.test.ts`, `animationEditorScene.test.ts`, `browser/ikAnimationRuntime.spec.ts` | Runtime, scene, and local browser regressions.                                                                           |
 | `package.json`, `package-lock.json`, `CHANGELOG.md`, `README.md`, IK/animation guides                    | Package milestone and runtime documentation.                                                                             |

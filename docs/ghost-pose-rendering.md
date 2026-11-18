@@ -24,7 +24,7 @@ Sampling spacing follows the v0.5.3.1 policy: one authored stepped frame, otherw
 
 ## IK and lifecycle
 
-Ghosts show authored poses before procedural IK and temporary inspector drafts. Read-only procedural IK sampling is not supported. Rendering never captures the active puppet's corrected pose or invokes `preparePose()` / `syncPose()` on it, and never bakes IK.
+Ghosts show authored poses before procedural IK and temporary inspector drafts. Read-only procedural IK sampling is not supported. Rendering never captures the active puppet's corrected pose or invokes its pose pipeline's `preparePose()` / `syncPose()`, and never bakes IK.
 
 No ghost objects are allocated until a valid enabled sample exists. Disabling hides the retained objects and clears sampled snapshots; reenabling reuses them. Animation switches reuse the same rig and render branches. Scene shutdown, loading failure or editor disposal unsubscribe the layer, destroy all ghost containers/images and clear cached snapshots. Ghosts are disposed before the active puppet; textures remain owned by Phaser's texture manager.
 

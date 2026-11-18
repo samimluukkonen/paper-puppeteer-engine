@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import { PuppetRenderer, transformProperties, type JointTransform } from '../../engine/core.js';
+import { transformProperties, type JointTransform } from '../../engine/core.js';
 import type { MeshDeformationPose, Rig } from '../../engine/data.js';
-import { Bone, type Puppet } from '../../engine/runtime.js';
+import { Bone, PuppetRenderer, type Puppet } from '../../engine/runtime.js';
 import type { AnimationEditorState, ReadonlyAnimation } from './AnimationEditorState.js';
 import type { GhostPoseSample } from './ghostPoseSampling.js';
 import { DEFAULT_ONION_SKIN_SETTINGS, type OnionSkinSettings, updateOnionSkinSettings } from './onionSkinSettings.js';

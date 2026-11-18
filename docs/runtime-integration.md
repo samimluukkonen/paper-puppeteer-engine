@@ -90,16 +90,15 @@ Puppets update automatically from Phaser scene `UPDATE` by default and apply ani
 
 For static puppets, opt into `idleSync: 'dirty'` at construction. When animation evaluation reports no work (including paused, stopped and completed playback), unchanged puppets skip bone transforms, render projection, IK, meshes and debug refreshes. Animation evaluation and `onUpdate` callbacks continue normally. The default `idleSync: 'always'` preserves automatic synchronization of directly mutable poses on every update.
 
-In dirty mode, call `puppet.markPoseDirty()` after directly editing bone poses, constraint properties or the puppet/ancestor transforms; multiple invalidations coalesce into one synchronization on the next update. Call `syncPose()` instead for immediate projection. `preparePose()` also invalidates before manual editing, and Puppet setters such as `setIKTarget()` invalidate deferred work. Setters that already synchronize immediately retain that behavior. `syncIK()` retains any pending full pose synchronization.
+In dirty mode, change poses through Puppet methods. `setBoneRotation()` projects immediately; setters such as `setIKTarget()` invalidate deferred work, and multiple invalidations coalesce into one synchronization on the next update. Direct edits to bone poses, constraint properties or the puppet/ancestor transforms are not tracked in dirty mode; keep the default `idleSync: 'always'` for puppets edited that way.
 
 ```ts
 const puppet = new Puppet(this, { definition, idleSync: 'dirty' });
-puppet.preparePose();
-puppet.getBone('root').pose.rotation = 0.2;
-puppet.markPoseDirty(); // Project on the next scene update; syncPose() projects immediately.
+puppet.setBoneRotation('root', 0.2); // Projects immediately.
+puppet.setIKTarget('arm', 40, 12); // Projects on the next scene update.
 ```
 
-IK target providers continue to run on idle updates, including providers currently returning `undefined`. External IK animation and mesh deformation sources also keep synchronization active because their values may change independently. After changing a constraint directly (for example `puppet.getIK('arm').enabled = false`), invalidate or synchronize explicitly. Debug overlays follow the same contract; use `refreshDebugViews()` when only their host presentation changes.
+IK target providers continue to run on idle updates, including providers currently returning `undefined`. External IK animation and mesh deformation sources also keep synchronization active because their values may change independently.
 
 ## Resource ownership and cleanup
 

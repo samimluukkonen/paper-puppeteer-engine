@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { SceneImageLayer } from '../../engine/core.js';
+import { SceneImageLayer } from '../../engine/runtime.js';
 import { environmentPreviewImages } from '../shared/environmentPreview.js';
 import type { EnvironmentPreviewController } from './EnvironmentPreviewController.js';
 

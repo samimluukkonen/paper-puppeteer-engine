@@ -27,7 +27,7 @@ Bone keys describe local transforms relative to a bone's parent. IK X/Y keys des
 
 Camera zoom/pan, puppet translation/rotation/scale, facing and enclosing containers are removed by the existing affine conversion when dragging. Facing reflects the preview through placement without rewriting keys. Direct target mirroring is deferred. Bone mirroring preserves IK tracks and samples authored bone transforms before IK.
 
-At each runtime presentation pass, the previous IK rotations are restored, bone clips/layers and pose presets are evaluated, then priority-ordered constraints solve. Both upper-arm and forearm rotation keys supply the base for influence blending. The source clip, rig, bind pose and authored pose exports remain unchanged. Repeated `syncIK()` calls restore this base before solving again.
+At each runtime presentation pass, the previous IK rotations are restored, bone clips/layers and pose presets are evaluated, then priority-ordered constraints solve. Both upper-arm and forearm rotation keys supply the base for influence blending. The source clip, rig, bind pose and authored pose exports remain unchanged. Repeated `PosePipeline.syncIK()` calls restore this base before solving again.
 
 Missing X/Y use the current end contact point, including endpoint offsets and preceding constraints. A track containing only influence keys can affect an existing runtime target, but cannot invent a target position. No tracks, empty placeholders and no constraints preserve ordinary bone playback.
 

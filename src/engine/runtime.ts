@@ -87,3 +87,7 @@ export { StoryPackageLoader } from './StoryPackageLoader.js';
 export { StoryAudioPool } from './StoryAudioPool.js';
 
 export { SceneImageTextureCache } from './SceneImageTextureCache.js';
+export { SceneImageLayer } from './SceneImageLayer.js';
+export { PuppetRenderer } from './PuppetRenderer.js';
+export { CharacterTextureBudget } from './characterTextureLimits.js';
+export { createSceneTextureBudget } from './sceneTextureBudget.js';

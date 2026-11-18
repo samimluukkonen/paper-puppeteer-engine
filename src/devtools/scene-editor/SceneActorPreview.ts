@@ -1,13 +1,7 @@
 import type Phaser from 'phaser';
-import {
-  Actor,
-  throwNotificationErrors,
-  sceneActorDepth,
-  sceneLayer,
-  assertSceneInstanceBudget,
-} from '../../engine/core.js';
+import { throwNotificationErrors, sceneActorDepth, sceneLayer, assertSceneInstanceBudget } from '../../engine/core.js';
 import type { CharacterDefinition, DeepReadonly, SceneActorDefinition } from '../../engine/data.js';
-import { Puppet } from '../../engine/runtime.js';
+import { Actor, Puppet } from '../../engine/runtime.js';
 import { evaluatedFootContacts } from '../shared/footContactGround.js';
 import { actorGroundOffset } from './actorGrounding.js';
 import type { ActorGroundContact, ReadonlyScene } from './SceneEditorDocument.js';
