@@ -9,16 +9,8 @@ import process from 'node:process';
  * Remove an entry as soon as a fix ships: upgrade the dependency, then delete the entry.
  * The audit fails on an entry that npm no longer reports, so stale entries cannot linger.
  */
-const allowed = [
-  {
-    id: 'GHSA-fc5q-39xc-vjpf',
-    packageName: 'picomatch',
-    // TODO: remove when picomatch ships a fix (all versions <= 4.0.7 are affected, none patched as of 2026-11-17).
-    reason:
-      'ReDoS on crafted extglob patterns. Reached only through vite/vitest dev tooling, which matches globs from ' +
-      'our own config, never from user input; picomatch is not part of the runtime package or the built output.',
-  },
-];
+/** @type {{ id: string, packageName: string, reason: string }[]} */
+const allowed = [];
 
 const result = spawnSync('npm', ['audit', '--json'], { encoding: 'utf8', shell: process.platform === 'win32' });
 /**
