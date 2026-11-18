@@ -60,7 +60,7 @@ test('real constraint rows use separate identities, sparse markers, cached layou
     },
   });
   state.setTimelineBoneExpanded('arm', true);
-  state.setTimelineIKExpanded('arm', true);
+  state.ik.setTimelineIKExpanded('arm', true);
   const rows = state.timelineTracks;
   const parent = rows.find((row) => row.kind === 'ik' && row.constraintId === 'arm');
   assert.exists(parent);
@@ -75,12 +75,12 @@ test('real constraint rows use separate identities, sparse markers, cached layou
     [[['ik', 0, 10]], [['ik', 0.5, 20]], [['ik', 0.5, 0.5]]],
   );
   assert.isTrue(state.isTimelineBoneExpanded('arm'));
-  assert.isTrue(state.isTimelineIKExpanded('arm'));
+  assert.isTrue(state.ik.isTimelineIKExpanded('arm'));
   assert.notEqual(ikTrackKey('arm'), JSON.stringify(['arm', null]));
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.25);
   assert.strictEqual(state.timelineTracks, rows);
-  state.setIKPropertyKeyframe('arm', 'x', 15);
+  state.ik.setIKPropertyKeyframe('arm', 'x', 15);
   const other = rows.find((row) => row.kind === 'ik' && row.constraintId === 'other');
   assert.strictEqual(
     state.timelineTracks.find((row) => row.kind === 'ik' && row.constraintId === 'other'),
@@ -93,18 +93,18 @@ test('typed IK selection clears bone keys and draft without dirtying the working
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
   state.setTemporaryBoneProperty('y', 12);
   const working = state.workingAnimation;
-  assert.isTrue(state.selectIKConstraint('arm', 'x'));
+  assert.isTrue(state.ik.selectIKConstraint('arm', 'x'));
   assert.deepEqual(state.selectedTarget, { kind: 'ik', constraintId: 'arm', property: 'x' });
   assert.isNull(state.selectedBoneId);
   assert.lengthOf(state.selectedKeys, 0);
   assert.deepEqual(state.boneTransformDraft, {});
   assert.isFalse(state.commitBoneProperty('x'));
-  assert.isFalse(state.selectIKConstraint('missing'));
+  assert.isFalse(state.ik.selectIKConstraint('missing'));
   assert.strictEqual(state.workingAnimation, working);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   state.selectBone('arm');
-  assert.isNull(state.selectedIKConstraintId);
+  assert.isNull(state.ik.selectedIKConstraintId);
   assert.deepEqual(state.selectedTarget, { kind: 'bone', boneId: 'arm' });
 });
 
@@ -118,19 +118,19 @@ test('inspector evaluation shares sparse IK interpolation, stepped timing, endpo
       ],
     },
   });
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.55);
-  assert.deepEqual(state.selectedIKTargetValues, { x: 55, y: 115, mix: 0.2 });
+  assert.deepEqual(state.ik.selectedIKTargetValues, { x: 55, y: 115, mix: 0.2 });
   state.setCurrentTime(1);
-  assert.deepEqual(state.selectedIKTargetValues, { x: 80, y: 115, mix: 0.2 });
-  state.deleteIKPropertyKey('x');
+  assert.deepEqual(state.ik.selectedIKTargetValues, { x: 80, y: 115, mix: 0.2 });
+  state.ik.deleteIKPropertyKey('x');
   state.setCurrentTime(0.55);
   // One surviving x key holds its value; deleting it restores the current bone endpoint.
-  assert.equal(state.selectedIKTargetValues!.x, 30);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 30);
   state.setCurrentTime(0);
-  state.deleteIKPropertyKey('x');
+  state.ik.deleteIKPropertyKey('x');
   state.setCurrentTime(0.55);
-  assert.deepEqual(state.selectedIKTargetValues, { x: 15, y: 115, mix: 0.2 });
+  assert.deepEqual(state.ik.selectedIKTargetValues, { x: 15, y: 115, mix: 0.2 });
 });
 
 test.each([1001, 1003, 1001.123456789])('inspectors and canvas retain the exact %s ms stepped endpoint', (duration) => {
@@ -152,18 +152,18 @@ test.each([1001, 1003, 1001.123456789])('inspectors and canvas retain the exact 
   });
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const preview = new AnimationEditorPreview(state, puppet);
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   state.setCurrentTime(state.duration);
   assert.equal(state.currentTimeMilliseconds, duration);
-  assert.equal(state.selectedIKTargetValues!.x, 80);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 80);
   assert.equal(puppet.getIK('arm').resolvedTarget!.x, 80);
   assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 20);
   assert.equal(state.getEvaluatedBoneTransform('root')!.x, 20);
   assert.equal(puppet.getBone('root').pose.x, 20);
   const working = state.workingAnimation;
-  assert.isTrue(state.commitIKProperty('x'));
+  assert.isTrue(state.ik.commitIKProperty('x'));
   assert.strictEqual(state.workingAnimation, working);
-  assert.isTrue(state.setIKPropertyKeyframe('arm', 'y', 75));
+  assert.isTrue(state.ik.setIKPropertyKeyframe('arm', 'y', 75));
   assert.equal(state.workingAnimation!.ikTracks!.arm!.at(-1)!.time, duration);
   assert.isTrue(state.setBonePropertyKeyframe('root', 'y', 12));
   assert.equal(state.workingAnimation!.tracks.root!.at(-1)!.time, duration);
@@ -175,24 +175,24 @@ test('numeric edits hold playback; commits create/update independent channels wi
   const { state, clip, before } = fixture();
   const source = state.sourceAnimation;
   const working = state.workingAnimation!;
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.5);
   state.play();
-  state.beginIKEdit();
+  state.ik.beginIKEdit();
   assert.isFalse(state.isPlaying);
-  for (const value of [1, 12, 120]) state.setTemporaryIKProperty('x', value);
-  state.setTemporaryIKProperty('y', 35);
+  for (const value of [1, 12, 120]) state.ik.setTemporaryIKProperty('x', value);
+  state.ik.setTemporaryIKProperty('y', 35);
   state.advancePlayback(1);
   assert.equal(state.currentTime, 0.5);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
-  assert.isTrue(state.commitIKProperty('x'));
+  assert.isTrue(state.ik.commitIKProperty('x'));
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm, [{ time: 500, x: 120 }]);
-  assert.deepEqual(state.ikTargetDraft, { y: 35 });
+  assert.deepEqual(state.ik.ikTargetDraft, { y: 35 });
   assert.equal(state.historyLength, 1);
-  state.setTemporaryIKProperty('x', 60);
-  state.commitIKProperty('x');
-  state.commitIKProperty('mix');
+  state.ik.setTemporaryIKProperty('x', 60);
+  state.ik.commitIKProperty('x');
+  state.ik.commitIKProperty('mix');
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm, [{ time: 500, x: 60, mix: 0.7 }]);
   assert.equal(state.historyLength, 3);
   assert.isTrue(state.dirty);
@@ -203,25 +203,25 @@ test('numeric edits hold playback; commits create/update independent channels wi
   assert.strictEqual(state.sourceAnimation, source);
   assert.equal(JSON.stringify(clip), before);
   assert.isTrue(state.undo());
-  assert.isUndefined(state.findIKPropertyKeyframe('arm', 'mix'));
+  assert.isUndefined(state.ik.findIKPropertyKeyframe('arm', 'mix'));
   assert.isTrue(state.redo());
-  assert.equal(state.findIKPropertyKeyframe('arm', 'mix')!.value, 0.7);
+  assert.equal(state.ik.findIKPropertyKeyframe('arm', 'mix')!.value, 0.7);
 });
 
 test('property deletion retains siblings, events, other constraints and history fallback', () => {
   const { state } = fixture({ ikTracks: { arm: [{ time: 0, x: 50, y: 60, mix: 0.8 }], other: [{ time: 0, y: 90 }] } });
-  state.selectIKConstraint('arm');
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0 });
+  state.ik.selectIKConstraint('arm');
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0 });
   const other = state.workingAnimation!.ikTracks!.other;
-  assert.isTrue(state.deleteSelectedIKKeyframe());
-  assert.isNull(state.selectedIKKeyframe);
+  assert.isTrue(state.ik.deleteSelectedIKKeyframe());
+  assert.isNull(state.ik.selectedIKKeyframe);
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm, [{ time: 0, y: 60, mix: 0.8 }]);
-  assert.deepEqual(state.selectedIKTargetValues, { x: 10, y: 60, mix: 0.8 });
+  assert.deepEqual(state.ik.selectedIKTargetValues, { x: 10, y: 60, mix: 0.8 });
   assert.strictEqual(state.workingAnimation!.ikTracks!.other, other);
   state.undo();
-  assert.isNull(state.selectedIKKeyframe, 'history does not restore transient selection');
+  assert.isNull(state.ik.selectedIKKeyframe, 'history does not restore transient selection');
   assert.isFalse(state.dirty);
-  assert.equal(state.selectedIKTargetValues!.x, 50);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 50);
   state.redo();
   assert.isTrue(state.dirty);
 });
@@ -236,22 +236,22 @@ test('single key movement uses snapping/collision semantics and never moves spar
       ],
     },
   });
-  assert.isTrue(state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.0000000001 }));
-  assert.equal(state.selectedIKKeyframe!.time, 0);
+  assert.isTrue(state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.0000000001 }));
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0);
   state.setKeyframeSnapMode('frame');
-  assert.isTrue(state.moveSelectedIKKeyframe(0.49));
+  assert.isTrue(state.ik.moveSelectedIKKeyframe(0.49));
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm, [
     { time: 0, y: 60 },
     { time: 500, x: 50 },
   ]);
-  assert.equal(state.selectedIKKeyframe!.time, 0.5);
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0.5);
   assert.equal(state.currentTime, 0.5);
   assert.equal(state.historyLength, 1);
   state.undo();
-  assert.equal(state.selectedIKKeyframe!.time, 0.5, 'selection reconciles to surviving authored destination');
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0.5, 'selection reconciles to surviving authored destination');
   state.redo();
-  state.nudgeSelectedIKKeyframe(1);
-  assert.equal(state.selectedIKKeyframe!.time, 0.6);
+  state.ik.nudgeSelectedIKKeyframe(1);
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0.6);
   assert.equal(state.historyLength, 2);
 });
 
@@ -259,13 +259,13 @@ test('invalid IK edits and deferred clipboard commands preserve data and bone ke
   const { state } = fixture();
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
   state.copyTimelineSelection();
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   const working = state.workingAnimation;
-  assert.isFalse(state.setTemporaryIKProperty('mix', 2));
-  assert.isFalse(state.setIKPropertyKeyframe('arm', 'mix', -1));
-  assert.isFalse(state.setIKPropertyKeyframe('missing', 'x', 1));
-  assert.isFalse(state.selectIKKeyframe({ kind: 'ik', constraintId: 'missing', property: 'x', time: 0 }));
-  assert.isFalse(state.removeIKPropertyKeyframe('missing', 'x'));
+  assert.isFalse(state.ik.setTemporaryIKProperty('mix', 2));
+  assert.isFalse(state.ik.setIKPropertyKeyframe('arm', 'mix', -1));
+  assert.isFalse(state.ik.setIKPropertyKeyframe('missing', 'x', 1));
+  assert.isFalse(state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'missing', property: 'x', time: 0 }));
+  assert.isFalse(state.ik.removeIKPropertyKeyframe('missing', 'x'));
   assert.isFalse(state.pasteTimelineClipboard());
   assert.isFalse(state.duplicateTimelineSelection());
   assert.isFalse(state.copyTimelineSelection());
@@ -283,13 +283,13 @@ test('navigation, playback, animation changes and history cancel IK numeric draf
     () => state.selectAnimation('second'),
   ]) {
     state.pause();
-    state.selectIKConstraint('arm');
-    state.setTemporaryIKProperty('x', 77);
+    state.ik.selectIKConstraint('arm');
+    state.ik.setTemporaryIKProperty('x', 77);
     cancel();
-    assert.deepEqual(state.ikTargetDraft, {});
+    assert.deepEqual(state.ik.ikTargetDraft, {});
     assert.isFalse(state.dirty);
   }
-  assert.isNull(state.selectedIKConstraintId);
+  assert.isNull(state.ik.selectedIKConstraintId);
 });
 
 test('IK commands notify once after coordinating playback, selection and history', () => {
@@ -299,36 +299,36 @@ test('IK commands notify once after coordinating playback, selection and history
   state.subscribe(() =>
     observations.push({
       playing: state.isPlaying,
-      selected: state.selectedIKConstraintId,
+      selected: state.ik.selectedIKConstraintId,
       x: state.workingAnimation?.ikTracks?.arm?.[0]?.x,
       history: state.historyLength,
     }),
   );
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   assert.lengthOf(observations, 1);
   observations.length = 0;
-  assert.isTrue(state.setTemporaryIKProperty('x', 70));
+  assert.isTrue(state.ik.setTemporaryIKProperty('x', 70));
   assert.deepEqual(observations, [{ playing: false, selected: 'arm', x: undefined, history: 0 }]);
   observations.length = 0;
-  assert.isTrue(state.commitIKProperty('x'));
+  assert.isTrue(state.ik.commitIKProperty('x'));
   assert.deepEqual(observations, [{ playing: false, selected: 'arm', x: 70, history: 1 }]);
 });
 
 test('history reconciliation removes missing IK markers and retains unrelated constraint selection', () => {
   const { state } = fixture();
-  state.selectIKConstraint('arm');
-  state.setIKPropertyKeyframe('arm', 'x', 60, 0.5);
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.5 });
+  state.ik.selectIKConstraint('arm');
+  state.ik.setIKPropertyKeyframe('arm', 'x', 60, 0.5);
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.5 });
   state.undo();
-  assert.isNull(state.selectedIKKeyframe);
-  assert.equal(state.selectedIKConstraintId, 'arm');
+  assert.isNull(state.ik.selectedIKKeyframe);
+  assert.equal(state.ik.selectedIKConstraintId, 'arm');
   state.redo();
-  assert.isNull(state.selectedIKKeyframe);
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.5 });
+  assert.isNull(state.ik.selectedIKKeyframe);
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.5 });
   const next = { ...state.workingAnimation!, ikTracks: { other: [{ time: 0, y: 90 }] } };
   state.replaceWorkingAnimation(next);
-  assert.isNull(state.selectedIKKeyframe);
-  assert.equal(state.selectedIKConstraintId, 'arm');
+  assert.isNull(state.ik.selectedIKKeyframe);
+  assert.equal(state.ik.selectedIKConstraintId, 'arm');
 });
 
 test('inspector fallback honors earlier constraints, affine ancestors and end offsets with the existing solver', () => {
@@ -367,9 +367,9 @@ test('inspector fallback honors earlier constraints, affine ancestors and end of
   state.selectAnimation('nested');
   const puppet = new Puppet(puppetScene(), { rig, autoUpdate: false });
   const preview = new AnimationEditorPreview(state, puppet);
-  state.selectIKConstraint('grip');
-  assert.approximately(state.selectedIKTargetValues!.y, puppet.getIK('grip').resolvedTarget!.y, 1e-8);
-  assert.equal(state.selectedIKTargetValues!.x, 20);
+  state.ik.selectIKConstraint('grip');
+  assert.approximately(state.ik.selectedIKTargetValues!.y, puppet.getIK('grip').resolvedTarget!.y, 1e-8);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 20);
   assert.equal(JSON.stringify(clip), before);
   assert.equal(rig.getBone('upper').rotation, undefined);
   preview.dispose();
@@ -391,7 +391,7 @@ test('React adapter caches snapshots, validates text, synchronizes edits and rel
   const changed = vi.fn();
   const release = controller.subscribe(changed);
   assert.strictEqual(controller.getSnapshot(), controller.getSnapshot());
-  state.selectIKConstraint('arm');
+  state.ik.selectIKConstraint('arm');
   state.setCurrentTime(0.5);
   assert.equal(controller.getSnapshot().fields[0]!.text, '15');
   state.play();
@@ -423,7 +423,7 @@ test('React adapter caches snapshots, validates text, synchronizes edits and rel
   assert.strictEqual(controller.getSnapshot(), snapshot);
   release();
   changed.mockClear();
-  next.selectIKConstraint('arm');
+  next.ik.selectIKConstraint('arm');
   assert.equal(changed.mock.calls.length, 0);
   controller.dispose();
   assert.isFalse(controller.getSnapshot().ready);
@@ -434,7 +434,7 @@ test.each(['x', 'y', 'mix'] as const)(
   (property) => {
     for (const value of [0.123456789, 1e-7]) {
       const { state } = fixture({ ikTracks: { arm: [{ time: 0, [property]: value }] } });
-      state.selectIKConstraint('arm');
+      state.ik.selectIKConstraint('arm');
       const controller = new IKInspectorController();
       controller.bind(state);
       const working = state.workingAnimation;
@@ -459,19 +459,19 @@ test('committed IK authoring immediately refreshes the existing puppet/solver an
     assert.approximately(endpoint.x, x, 1e-7);
     assert.approximately(endpoint.y, y, 1e-7);
   };
-  state.selectIKConstraint('arm');
-  state.setTemporaryIKProperty('mix', 1);
-  state.commitIKProperty('mix');
+  state.ik.selectIKConstraint('arm');
+  state.ik.setTemporaryIKProperty('mix', 1);
+  state.ik.commitIKProperty('mix');
   for (const [time, x, y] of [
     [0, 60, 65],
     [0.5, 30, 85],
     [1, -40, 75],
   ]) {
     state.setCurrentTime(time!);
-    state.setTemporaryIKProperty('x', x!);
-    state.setTemporaryIKProperty('y', y!);
-    state.commitIKProperty('x');
-    state.commitIKProperty('y');
+    state.ik.setTemporaryIKProperty('x', x!);
+    state.ik.setTemporaryIKProperty('y', y!);
+    state.ik.commitIKProperty('x');
+    state.ik.commitIKProperty('y');
     check(x!, y!);
     assert.strictEqual(puppet.getIK('arm'), constraint);
   }
@@ -481,7 +481,7 @@ test('committed IK authoring immediately refreshes the existing puppet/solver an
   check(30, 85);
   state.pause();
   state.setCurrentTime(1);
-  state.deleteIKPropertyKey('x');
+  state.ik.deleteIKPropertyKey('x');
   check(30, 75);
   state.undo();
   check(-40, 75);

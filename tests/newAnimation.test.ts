@@ -204,9 +204,9 @@ test.each(['bone draft', 'key drag', 'event drag', 'IK drag', 'scrub'])(
         state.beginEventDrag(state.eventTimelineTrack.markers[0]!.ref);
         break;
       case 'IK drag':
-        state.selectIKConstraint('reach');
-        state.beginIKTargetDrag('reach');
-        state.previewIKTargetDrag({ x: 15, y: 25 });
+        state.ik.selectIKConstraint('reach');
+        state.ik.beginIKTargetDrag('reach');
+        state.ik.previewIKTargetDrag({ x: 15, y: 25 });
         break;
       case 'scrub':
         state.play();
@@ -220,7 +220,7 @@ test.each(['bone draft', 'key drag', 'event drag', 'IK drag', 'scrub'])(
     assert.isFalse(state.isPlaying);
     assert.equal(state.currentTime, 0);
     assert.isNull(state.selectedEvent);
-    assert.isNull(state.selectedIKConstraintId);
+    assert.isNull(state.ik.selectedIKConstraintId);
     assert.deepEqual(state.workingAnimation!.tracks, {});
     assert.deepEqual(state.workingAnimation!.events, []);
     assert.isUndefined(state.workingAnimation!.ikTracks);
@@ -253,8 +253,8 @@ test('empty documents accept events and IK keys through ordinary history and ser
   const state = new AnimationEditorState(rig());
   state.createAnimation({ name: 'reach' });
   assert.isTrue(state.createAnimationEvent());
-  state.selectIKConstraint('reach');
-  assert.isTrue(state.setIKPropertyKeyframe('reach', 'x', 20));
+  state.ik.selectIKConstraint('reach');
+  assert.isTrue(state.ik.setIKPropertyKeyframe('reach', 'x', 20));
   const exported = state.exportJson();
   state.undo();
   assert.isUndefined(state.workingAnimation!.ikTracks?.reach);

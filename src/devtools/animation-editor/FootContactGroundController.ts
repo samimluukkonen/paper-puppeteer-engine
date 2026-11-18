@@ -107,8 +107,8 @@ export class FootContactGroundController {
       state?.sessionRevision,
       state?.editorMode,
       state?.isPlaying,
-      state?.selectedIKConstraintId,
-      state?.ikTargetDraft,
+      state?.ik.selectedIKConstraintId,
+      state?.ik.ikTargetDraft,
       state?.boneTransformDraft,
       guide?.guide,
       guide?.dragging,
@@ -120,7 +120,7 @@ export class FootContactGroundController {
       matrix?.tx,
       matrix?.ty,
       state?.hasPendingAnimationEdits,
-      active ? state?.getIKManipulationDisabledReason(this.constraintId) : undefined,
+      active ? state?.ik.getIKManipulationDisabledReason(this.constraintId) : undefined,
     ];
     if (active) for (const runtime of this.runtime) context.push(runtime, runtime.configurationRevision);
     if (context.length === this.context.length && context.every((value, index) => value === this.context[index]))
@@ -195,9 +195,9 @@ export class FootContactGroundController {
     if (!this.constraints.length) return 'This marker requires manual posing or an existing foot IK setup.';
     if (!this.constraintId) return 'Confirm the applicable foot IK constraint.';
     if (!this.guide?.getSnapshot().guide.enabled) return 'Show the ground guide first.';
-    if (this.guide.getSnapshot().dragging || state.ikTargetDrag) return 'Finish the current drag first.';
+    if (this.guide.getSnapshot().dragging || state.ik.ikTargetDrag) return 'Finish the current drag first.';
     if (state.hasPendingAnimationEdits) return 'Apply or cancel temporary edits before aligning.';
-    const unavailable = state.getIKManipulationDisabledReason(this.constraintId);
+    const unavailable = state.ik.getIKManipulationDisabledReason(this.constraintId);
     if (unavailable) return unavailable;
     if (getIKBakeRuntimeIssues(state.rig!, this.runtime).length)
       return 'Release runtime IK targets/providers and restore authored IK settings before aligning.';
@@ -252,8 +252,8 @@ export class FootContactGroundController {
     const id = this.constraintId;
     // Selection is view state; the normal authoring command installs X/Y together in existing history.
     this.cancel();
-    if (!state.selectIKConstraint(id)) return false;
-    return state.commitIKTarget(plan.target);
+    if (!state.ik.selectIKConstraint(id)) return false;
+    return state.ik.commitIKTarget(plan.target);
   }
   private authoredPoseMatches(): boolean {
     const state = this.state!;

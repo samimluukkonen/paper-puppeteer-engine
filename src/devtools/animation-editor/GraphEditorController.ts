@@ -90,7 +90,7 @@ export class GraphEditorController {
         const channel = graphChannels(state).find((entry) => entry.property === this.property.value);
         if (channel?.kind === 'root') state.selectRootMotion(channel.property);
         else if (channel?.kind === 'bone') state.selectTimelineProperty(channel.id, channel.property);
-        else if (channel) state.selectIKConstraint(channel.id, channel.property);
+        else if (channel) state.ik.selectIKConstraint(channel.id, channel.property);
       },
       options,
     );
@@ -212,7 +212,7 @@ export class GraphEditorController {
     if (channel.kind === 'root')
       return state.selectedRootKey?.property === channel.property ? state.selectedRootKey.time : undefined;
     if (channel.kind === 'ik') {
-      const key = state.selectedIKKeyframe;
+      const key = state.ik.selectedIKKeyframe;
       return key?.constraintId === channel.id && key.property === channel.property ? key.time : undefined;
     }
     const key = state.selectedKeyframe;
@@ -295,7 +295,7 @@ export class GraphEditorController {
     else if (ref.channel.kind === 'bone')
       state.selectKeyframe({ boneId: ref.channel.id, property: ref.channel.property, time: ref.time });
     else
-      state.selectIKKeyframe({
+      state.ik.selectIKKeyframe({
         kind: 'ik',
         constraintId: ref.channel.id,
         property: ref.channel.property,
@@ -462,7 +462,7 @@ export class GraphEditorController {
       context,
       view,
       state.selectedKeys,
-      state.selectedIKKeyframe,
+      state.ik.selectedIKKeyframe,
       state.selectedRootKey,
       state.editorMode,
       this.width,

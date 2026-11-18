@@ -789,15 +789,15 @@ test('shared scene rebinds newly authored IK for animation keying, safe deletion
     assert.isTrue(original.isDestroyed);
     assert.isTrue(current.getIK('tendrilIK').enabled);
     assert.equal(state.rig!.ik![0]!.name, 'tendrilIK');
-    assert.isTrue(state.setIKPropertyKeyframe('tendrilIK', 'x', 20, 0));
-    assert.isTrue(state.setIKPropertyKeyframe('tendrilIK', 'y', 55, 0));
+    assert.isTrue(state.ik.setIKPropertyKeyframe('tendrilIK', 'x', 20, 0));
+    assert.isTrue(state.ik.setIKPropertyKeyframe('tendrilIK', 'y', 55, 0));
     const actual = localToWorld({ x: 0, y: 0 }, current.getBone('tip').container.getWorldTransformMatrix());
     const expected = localToWorld({ x: 20, y: 55 }, current.container.getWorldTransformMatrix());
     assert.approximately(actual.x, expected.x, 1e-8);
     assert.approximately(actual.y, expected.y, 1e-8);
     assert.throws(() => editor.removeIKConstraint('tendrilIK'), /animation "motion" IK track/);
-    state.removeIKPropertyKeyframe('tendrilIK', 'x', 0);
-    state.removeIKPropertyKeyframe('tendrilIK', 'y', 0);
+    state.ik.removeIKPropertyKeyframe('tendrilIK', 'x', 0);
+    state.ik.removeIKPropertyKeyframe('tendrilIK', 'y', 0);
     editor.removeIKConstraint('tendrilIK');
     current = Reflect.get(scene, 'puppet') as Puppet;
     assert.throws(() => current.getIK('tendrilIK'), /Unknown IK/);
@@ -869,15 +869,15 @@ test('explicit guide alignment uses fresh puppet transforms, authors one XY hist
     assert.isFalse(scene.alignSelectedIKTargetToGround());
     scene.groundGuide.update({ enabled: true, y: 570 });
     assert.isFalse(scene.alignSelectedIKTargetToGround());
-    state.selectIKConstraint('leg');
+    state.ik.selectIKConstraint('leg');
     state.setCurrentTime(0.5);
     for (const facing of ['left', 'right'] as const) {
       scene.setFacing(facing);
       puppet.container.setPosition(310, 420).setScale(1.5).setRotation(0.2);
       const matrix = puppet.container.getWorldTransformMatrix();
-      const before = localToWorld(state.selectedIKTargetValues!, matrix);
+      const before = localToWorld(state.ik.selectedIKTargetValues!, matrix);
       assert.isTrue(scene.alignSelectedIKTargetToGround());
-      const after = localToWorld(state.selectedIKTargetValues!, matrix);
+      const after = localToWorld(state.ik.selectedIKTargetValues!, matrix);
       assert.closeTo(after.x, before.x, 1e-8);
       assert.closeTo(after.y, 570, 1e-8);
       assert.strictEqual(state.workingAnimation!.tracks, original.tracks);

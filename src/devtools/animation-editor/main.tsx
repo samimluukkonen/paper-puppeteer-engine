@@ -365,7 +365,7 @@ const unmount = mountView(
         inspector.bind(state);
         ikInspector.bind(state);
         releaseWorkspaceSelection?.();
-        let selectedIK = state.selectedIKConstraintId;
+        let selectedIK = state.ik.selectedIKConstraintId;
         let selectedBone = state.selectedBoneId;
         let selectedEvent = state.selectedEvent;
         let selectedRoot = state.rootMotionSelected;
@@ -381,7 +381,7 @@ const unmount = mountView(
             for (const panel of app.querySelectorAll<HTMLDetailsElement>('[data-tool-panel]')) panel.open = false;
           }
           if (
-            (state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK) ||
+            (state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK) ||
             (state.selectedBoneId && state.selectedBoneId !== selectedBone) ||
             (state.selectedEvent && state.selectedEvent !== selectedEvent) ||
             (state.selectedKeys.length && state.selectedKeys !== selectedKeys) ||
@@ -394,7 +394,7 @@ const unmount = mountView(
                 ? 'animation-inspector-root'
                 : state.selectedEvent && state.selectedEvent !== selectedEvent
                   ? 'animation-inspector-selection'
-                  : state.selectedIKConstraintId && state.selectedIKConstraintId !== selectedIK
+                  : state.ik.selectedIKConstraintId && state.ik.selectedIKConstraintId !== selectedIK
                     ? 'animation-inspector-ik'
                     : state.selectedBoneId &&
                         state.selectedBoneId !== selectedBone &&
@@ -406,7 +406,7 @@ const unmount = mountView(
                 .querySelector(`[data-editor-tab-panel="${id}"]`)
                 ?.dispatchEvent(new CustomEvent('workspace:reveal-tab', { bubbles: true, detail: id }));
           }
-          selectedIK = state.selectedIKConstraintId;
+          selectedIK = state.ik.selectedIKConstraintId;
           selectedBone = state.selectedBoneId;
           selectedEvent = state.selectedEvent;
           selectedRoot = state.rootMotionSelected;

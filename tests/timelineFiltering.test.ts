@@ -133,7 +133,7 @@ test('selected target mode follows preview-style bone picks, properties, IK targ
   state.expandTimeline('selected');
   state.selectTimelineProperty('rightForearm', 'rotation');
   assert.isFalse(state.timelineVisibility.selectionHidden);
-  state.selectIKConstraint('ReachTarget', 'mix');
+  state.ik.selectIKConstraint('ReachTarget', 'mix');
   state.expandTimeline('selected');
   assert.deepEqual(visible(state), [
     'IK: ReachTarget',
@@ -219,13 +219,13 @@ test('hidden bone/property and multi-key selections persist and reveal opens eve
 
 test('hidden IK keys and events keep their typed selections and can be revealed', () => {
   const { state } = fixture();
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'ReachTarget', property: 'mix', time: 0 });
-  const key = state.selectedIKKeyframe;
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'ReachTarget', property: 'mix', time: 0 });
+  const key = state.ik.selectedIKKeyframe;
   state.setTimelineFilters({ showIK: false });
   assert.equal(state.timelineVisibility.hiddenKeyCount, 1);
-  assert.strictEqual(state.selectedIKKeyframe, key);
+  assert.strictEqual(state.ik.selectedIKKeyframe, key);
   state.revealTimelineSelection();
-  assert.strictEqual(state.selectedIKKeyframe, key);
+  assert.strictEqual(state.ik.selectedIKKeyframe, key);
   assert.isFalse(state.timelineVisibility.selectionHidden);
   const ref = state.eventTimelineTrack.markers[0]!.ref;
   state.selectAnimationEvent(ref);

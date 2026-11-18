@@ -72,18 +72,18 @@ test('root-only character → rig IK → animation → bake → package → Char
     assert.isTrue(animation.createAnimation({ name: 'reach', loop: false }));
     animation.setAuthoredPlaybackMode('smooth');
     assert.isTrue(animation.timelineTracks.some((row) => row.kind === 'ik' && row.constraintId === 'tipIK'));
-    assert.isTrue(animation.selectIKConstraint('tipIK'));
+    assert.isTrue(animation.ik.selectIKConstraint('tipIK'));
     const rigHistory = editor.state.historyLength;
     for (const [time, x] of [
       [0, 20],
       [1, -20],
     ] as const) {
       animation.setCurrentTime(time);
-      animation.setTemporaryIKProperty('x', x);
-      animation.setTemporaryIKProperty('y', 60);
-      assert.isTrue(animation.commitIKTarget());
+      animation.ik.setTemporaryIKProperty('x', x);
+      animation.ik.setTemporaryIKProperty('y', 60);
+      assert.isTrue(animation.ik.commitIKTarget());
     }
-    animation.setIKPropertyKeyframe('tipIK', 'mix', 1, 0);
+    animation.ik.setIKPropertyKeyframe('tipIK', 'mix', 1, 0);
     assert.equal(editor.state.historyLength, rigHistory);
     const authored = animation.workingAnimation;
     assert.isTrue(animation.undo());

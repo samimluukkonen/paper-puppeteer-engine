@@ -222,7 +222,7 @@ export class TimelineNavigationController {
 
   private selectedTimes(): number[] {
     const state = this.getState();
-    if (state.selectedIKKeyframe) return [state.selectedIKKeyframe.time];
+    if (state.ik.selectedIKKeyframe) return [state.ik.selectedIKKeyframe.time];
     if (state.selectedEventData) return [toSeconds(state.selectedEventData.time)];
     return state.selectedKeys.map((key) => key.time);
   }
@@ -253,7 +253,7 @@ export class TimelineNavigationController {
     if (state.isPlaying && this.follow.checked)
       this.inset.scrollLeft = followTimelineTime(this.view, state.currentTime);
     this.renderTime();
-    const hasSelection = !!state.selectedIKKeyframe || !!state.selectedEvent || state.selectedKeys.length > 0;
+    const hasSelection = !!state.ik.selectedIKKeyframe || !!state.selectedEvent || state.selectedKeys.length > 0;
     setCommandAvailability(
       requireElement(this.app, ANIMATION_IDS.timelineFitSelection, HTMLButtonElement),
       !state.workingAnimation

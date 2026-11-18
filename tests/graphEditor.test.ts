@@ -72,7 +72,7 @@ test('property selection exposes exactly supported channels and follows the shar
   );
   state.selectTimelineProperty('root', 'rotation');
   assert.equal(selectedGraphChannel(state)?.property, 'rotation');
-  state.selectIKConstraint('arm', 'mix');
+  state.ik.selectIKConstraint('arm', 'mix');
   assert.deepEqual(
     graphChannels(state).map((channel) => channel.property),
     ['x', 'y', 'mix'],
@@ -224,11 +224,11 @@ test('Bézier preview updates actual puppet pose immediately and cancel restores
 });
 test('IK outgoing controls share history, selection, evaluator and serialization', () => {
   const state = fixture();
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'mix', time: 0 });
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'mix', time: 0 });
   state.setCurrentTime(0.25);
   state.beginGraphEdit({ channel: mix, time: 0 });
   state.previewGraphEdit({ curve: { mode: 'stepped' } });
-  assert.equal(state.selectedIKTargetValues?.mix, 0);
+  assert.equal(state.ik.selectedIKTargetValues?.mix, 0);
   state.commitGraphEdit();
   const animation = state.workingAnimation!;
   assert.equal(evaluateIKClip(compileClip(animation, rig), 250).get('arm')!.mix!.value, 0);

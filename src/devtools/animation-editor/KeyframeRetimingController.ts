@@ -94,7 +94,7 @@ export class KeyframeRetimingController {
     return success;
   }
   private buildSnapshot(): KeyframeRetimingSnapshot {
-    const count = this.state?.selectedIKKeyframe ? 1 : (this.state?.selectedKeys.length ?? 0);
+    const count = this.state?.ik.selectedIKKeyframe ? 1 : (this.state?.selectedKeys.length ?? 0);
     const scale = Number(this.scale);
     const selectionReason = this.state ? retimeSelectionReason(this.state) : 'Load a valid animation first.';
     const reason = selectionReason
@@ -109,7 +109,7 @@ export class KeyframeRetimingController {
       this.state?.workingAnimation,
       this.state?.sessionRevision,
       this.state?.selectedKeys,
-      this.state?.selectedIKKeyframe,
+      this.state?.ik.selectedIKKeyframe,
       this.anchor === 'playhead' ? this.state?.currentTime : undefined,
       this.anchor,
       this.scale,

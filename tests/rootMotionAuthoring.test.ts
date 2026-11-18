@@ -178,11 +178,11 @@ test('selection switches between root, bones and IK without rewriting either ani
   const before = state.workingAnimation;
   state.selectRootMotion('y', 0);
   assert.isNull(state.selectedBoneId);
-  assert.isNull(state.selectedIKConstraintId);
+  assert.isNull(state.ik.selectedIKConstraintId);
   state.selectBone('pelvis');
   assert.isFalse(state.rootMotionSelected);
   state.selectRootMotion('x', 0);
-  state.selectIKConstraint('legIK');
+  state.ik.selectIKConstraint('legIK');
   assert.isFalse(state.rootMotionSelected);
   assert.deepEqual(
     graphChannels(state).map((key) => key.kind),

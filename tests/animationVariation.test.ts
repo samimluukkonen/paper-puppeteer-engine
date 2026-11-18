@@ -332,7 +332,7 @@ test('variations retain independent Graph Editor, Pose Library, mirroring, IK an
   const pose = state.saveCurrentPose('Heavy attack');
   state.setCurrentTime(0.5);
   assert.isTrue(state.applyLibraryPose(pose));
-  assert.isTrue(state.setIKPropertyKeyframe('reach', 'x', 25));
+  assert.isTrue(state.ik.setIKPropertyKeyframe('reach', 'x', 25));
   assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right', { boneIds: ['arm_L'], properties: ['rotation'] }));
   const first = state.workingAnimation!;
   assert.isTrue(state.createVariation({ name: 'heavy-final', timeScale: 0.5 }));

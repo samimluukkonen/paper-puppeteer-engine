@@ -18,7 +18,7 @@ export class AnimationEditorPreview {
   private animation: ReadonlyAnimation | null | undefined;
   private sampledTime: number | undefined;
   private draft: Readonly<Partial<JointTransform>> | undefined;
-  private ikDraft: AnimationEditorState['ikTargetDraft'] | undefined;
+  private ikDraft: AnimationEditorState['ik']['ikTargetDraft'] | undefined;
   private ikId: string | null | undefined;
   private libraryPose: AnimationEditorState['previewedPose'] | undefined;
   private detachPoseSource: (() => void) | undefined;
@@ -71,8 +71,8 @@ export class AnimationEditorPreview {
     const rig = this.state.rig ?? this.puppet.rig;
     // Keep the editor clock continuous while held playback frames reuse their projected pose.
     const draft = this.state.boneTransformDraft;
-    const ikDraft = this.state.ikTargetDraft;
-    const ikId = this.state.selectedIKConstraintId;
+    const ikDraft = this.state.ik.ikTargetDraft;
+    const ikId = this.state.ik.selectedIKConstraintId;
     const libraryPose = this.state.previewedPose;
     if (
       !force &&

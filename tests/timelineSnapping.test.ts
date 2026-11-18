@@ -257,11 +257,11 @@ test('event identity exclusions allow same-time events and event movement stays 
 test('IK movement shares authored bone/event/playhead targets and keeps typed sparse collision/history rules', () => {
   const { state } = session();
   state.setTimelineSnapSettings({ frames: false, playhead: false });
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.1 });
-  state.moveSelectedIKKeyframe(0.755);
-  assert.equal(state.selectedIKKeyframe!.time, 0.75);
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.1 });
+  state.ik.moveSelectedIKKeyframe(0.755);
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0.75);
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm![0], { time: 100, y: 20 });
-  state.moveSelectedIKKeyframe(0.957);
+  state.ik.moveSelectedIKKeyframe(0.957);
   assert.deepEqual(state.workingAnimation!.ikTracks!.arm!.at(-1), { time: 950, x: 10 });
   assert.equal(state.historyLength, 2);
   state.undo();
@@ -333,9 +333,9 @@ test.each(['key', 'event'] as const)(
 test('nudges advance past coincident sparse sibling keys, events and playhead', () => {
   const { state } = session();
   state.setTimelineSnapSettings({ frames: false });
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.1 });
-  state.nudgeSelectedIKKeyframe(1);
-  assert.equal(state.selectedIKKeyframe!.time, 0.11);
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'arm', property: 'x', time: 0.1 });
+  state.ik.nudgeSelectedIKKeyframe(1);
+  assert.equal(state.ik.selectedIKKeyframe!.time, 0.11);
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.8 });
   state.nudgeSelectedKeyframe(1);
   assert.equal(state.selectedKeyframe!.time, 0.81);

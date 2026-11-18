@@ -50,6 +50,7 @@ export interface AnimationEditActions {
   commit(edit: AnimationEdit, opts?: AnimationEditCommitOptions): boolean;
   selectKeyframe(key: KeyframeSelection, modifiers?: KeyframeSelectionModifiers): boolean;
   selectEvent(ref: AnimationEventRef): boolean;
+  clearRootSelection(): void;
   clearBoneSelection(): void;
   clearOtherSelection(): void;
   selectCommittedKey(channel: GraphChannel, time: Seconds): void;
@@ -183,6 +184,9 @@ export class AnimationEditSession implements AnimationEditActions {
       this.deps.clearRootSelection();
       return this.deps.selectEvent(ref);
     });
+  }
+  clearRootSelection(): void {
+    this.deps.clearRootSelection();
   }
   clearBoneSelection(): void {
     this.deps.clearBoneSelection();

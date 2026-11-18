@@ -201,7 +201,7 @@ export class TimelineInputController {
     // Commit the previous inspector field before selection changes or a drag acquires state.
     marker.focus({ preventScroll: true });
     if ('kind' in key) {
-      this.state.selectIKKeyframe(key);
+      this.state.ik.selectIKKeyframe(key);
       return;
     }
     if (event.ctrlKey || event.metaKey || event.shiftKey) {

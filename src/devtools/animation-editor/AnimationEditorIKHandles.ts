@@ -4,6 +4,19 @@ import type { Puppet } from '../../engine/runtime.js';
 import { panCamera, zoomCameraAt } from '../shared/editorCamera.js';
 import type { GroundGuide } from '../shared/groundGuide.js';
 import type { AnimationEditorState } from './AnimationEditorState.js';
+
+/** Target handles drive the IK handle; the rest is the clock, session and character placement. */
+type IKHandleState = Pick<
+  AnimationEditorState,
+  | 'ik'
+  | 'subscribe'
+  | 'sessionRevision'
+  | 'animationAuthoringEnabled'
+  | 'workingAnimation'
+  | 'currentTimeMilliseconds'
+  | 'previewPlacementOffset'
+  | 'setPreviewPlacementOffset'
+>;
 import { evaluateIKTarget } from './ikInspectorSampling.js';
 import { ikTargetToWorld, pointerToIKTarget, snapIKTargetToGuide } from './ikTargetCoordinates.js';
 
@@ -28,7 +41,7 @@ export class AnimationEditorIKHandles {
 
   constructor(
     private readonly scene: Phaser.Scene,
-    private readonly state: AnimationEditorState,
+    private readonly state: IKHandleState,
     private readonly puppet: Puppet,
     private readonly ground?: { guide: () => GroundGuide; dragging: () => boolean },
   ) {
@@ -42,7 +55,7 @@ export class AnimationEditorIKHandles {
     window.addEventListener?.('pagehide', this.cancel);
     window.addEventListener?.('visibilitychange', this.visibilityChanged, true);
     this.unsubscribe = state.subscribe(() => {
-      if (this.offset && !state.ikTargetDrag) this.release();
+      if (this.offset && !state.ik.ikTargetDrag) this.release();
       if (
         this.characterDrag &&
         (!state.animationAuthoringEnabled || state.sessionRevision !== this.characterDrag.session)
@@ -91,7 +104,7 @@ export class AnimationEditorIKHandles {
                   : Math.abs(sx - sy) > IK_EPSILON * Math.max(sx, sy)
                     ? 'This solver does not support nonuniform scale inside the IK chain. Use uniform root scale.'
                     : null;
-      this.state.setIKManipulationDisabledReason(definition.name, reason);
+      this.state.ik.setIKManipulationDisabledReason(definition.name, reason);
     }
   }
 
@@ -105,8 +118,8 @@ export class AnimationEditorIKHandles {
       const constraint = this.puppet.getIK(definition.name);
       const sampled = evaluateIKTarget(animation, this.puppet.rig, definition.name, this.state.currentTimeMilliseconds);
       if (!sampled) return [];
-      const selected = this.state.selectedIKConstraintId === definition.name;
-      const target = selected ? { ...sampled, ...this.state.ikTargetDraft } : sampled;
+      const selected = this.state.ik.selectedIKConstraintId === definition.name;
+      const target = selected ? { ...sampled, ...this.state.ik.ikTargetDraft } : sampled;
       const endpoint = localToWorld(
         constraint.endOffset,
         this.puppet.getBone(constraint.endBone).container.getWorldTransformMatrix(),
@@ -121,7 +134,7 @@ export class AnimationEditorIKHandles {
           id: definition.name,
           world,
           endpoint,
-          disabledReason: this.state.getIKManipulationDisabledReason(definition.name),
+          disabledReason: this.state.ik.getIKManipulationDisabledReason(definition.name),
         },
       ];
     });
@@ -136,10 +149,11 @@ export class AnimationEditorIKHandles {
     const zoom = this.scene.cameras.main.zoom;
     // Draw the selection last so nearby targets cannot cover its highlight.
     const handles = [...this.getHandles()].sort(
-      (a, b) => Number(a.id === this.state.selectedIKConstraintId) - Number(b.id === this.state.selectedIKConstraintId),
+      (a, b) =>
+        Number(a.id === this.state.ik.selectedIKConstraintId) - Number(b.id === this.state.ik.selectedIKConstraintId),
     );
     for (const handle of handles) {
-      const selected = this.state.selectedIKConstraintId === handle.id;
+      const selected = this.state.ik.selectedIKConstraintId === handle.id;
       const color = handle.disabledReason || !this.interactive ? 0x8b929a : selected ? 0xe7a52b : 0x249fa8;
       const radius = (selected ? 14 : 11) / zoom;
       const extent = radius + 5 / zoom;
@@ -176,21 +190,22 @@ export class AnimationEditorIKHandles {
     const camera = this.scene.cameras.main;
     const world = camera.getWorldPoint(pointer.x, pointer.y);
     const handles = [...this.getHandles()].sort(
-      (a, b) => Number(b.id === this.state.selectedIKConstraintId) - Number(a.id === this.state.selectedIKConstraintId),
+      (a, b) =>
+        Number(b.id === this.state.ik.selectedIKConstraintId) - Number(a.id === this.state.ik.selectedIKConstraintId),
     );
     const handle = handles.find((entry) => {
-      const hitRadius = entry.id === this.state.selectedIKConstraintId ? 25 : 22;
+      const hitRadius = entry.id === this.state.ik.selectedIKConstraintId ? 25 : 22;
       return Math.hypot(entry.world.x - world.x, entry.world.y - world.y) * camera.zoom <= hitRadius;
     });
     if (!handle) return false;
     if (!this.interactive || handle.disabledReason) {
-      if (this.state.selectedIKConstraintId !== handle.id) this.state.selectIKConstraint(handle.id);
+      if (this.state.ik.selectedIKConstraintId !== handle.id) this.state.ik.selectIKConstraint(handle.id);
       return true;
     }
     const matrix = this.puppet.container.getWorldTransformMatrix();
     const start = pointerToIKTarget(pointer, camera, matrix);
     const target = worldToLocal(handle.world, matrix);
-    if (!start || !target || !this.state.beginIKTargetDrag(handle.id)) return true;
+    if (!start || !target || !this.state.ik.beginIKTargetDrag(handle.id)) return true;
     this.pointerId = pointer.id;
     this.offset = { x: target.x - start.x, y: target.y - start.y };
     return true;
@@ -239,14 +254,14 @@ export class AnimationEditorIKHandles {
       return;
     }
     this.refreshAvailability();
-    if (!this.offset || !this.state.ikTargetDrag) return;
+    if (!this.offset || !this.state.ik.ikTargetDrag) return;
     const target = pointerToIKTarget(pointer, this.scene.cameras.main, this.puppet.container.getWorldTransformMatrix());
     if (!target) {
       this.cancel();
       return;
     }
     const draft = { x: target.x + this.offset.x, y: target.y + this.offset.y };
-    this.state.previewIKTargetDrag(
+    this.state.ik.previewIKTargetDrag(
       this.ground
         ? snapIKTargetToGuide(
             draft,
@@ -261,7 +276,7 @@ export class AnimationEditorIKHandles {
     if (pointer.id !== this.pointerId) return;
     if (this.offset) {
       this.pointerMove(pointer);
-      this.state.endIKTargetDrag();
+      this.state.ik.endIKTargetDrag();
     }
     this.release();
   };
@@ -276,7 +291,7 @@ export class AnimationEditorIKHandles {
     this.characterDrag = undefined;
   }
   private cancel = (): void => {
-    this.state.cancelIKTargetDrag();
+    this.state.ik.cancelIKTargetDrag();
     this.release();
   };
   private visibilityChanged = (): void => {

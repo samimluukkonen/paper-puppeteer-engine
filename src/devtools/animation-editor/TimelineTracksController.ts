@@ -142,7 +142,7 @@ export class TimelineTracksController {
         const state = this.state;
         if (state) {
           if (track.kind === 'ik')
-            state.setTimelineIKExpanded(track.constraintId, !state.isTimelineIKExpanded(track.constraintId));
+            state.ik.setTimelineIKExpanded(track.constraintId, !state.ik.isTimelineIKExpanded(track.constraintId));
           else state.setTimelineBoneExpanded(track.boneId, !state.isTimelineBoneExpanded(track.boneId));
         }
       });
@@ -169,7 +169,7 @@ export class TimelineTracksController {
     );
     select.addEventListener('click', () => {
       if ('constraintId' in track)
-        this.state?.selectIKConstraint(track.constraintId, track.kind === 'ik-property' ? track.property : null);
+        this.state?.ik.selectIKConstraint(track.constraintId, track.kind === 'ik-property' ? track.property : null);
       else if (track.kind === 'bone') this.state?.selectBone(track.boneId);
       else this.state?.selectTimelineProperty(track.boneId, track.property);
     });
@@ -180,7 +180,7 @@ export class TimelineTracksController {
   }
 
   private selectMarker(key: TimelineKey, modifiers: { additive: boolean; range: boolean }): void {
-    if (isIKKey(key)) this.state?.selectIKKeyframe(key);
+    if (isIKKey(key)) this.state?.ik.selectIKKeyframe(key);
     else this.state?.selectKeyframe(key, modifiers);
   }
 
@@ -345,7 +345,7 @@ export class TimelineTracksController {
           const marker = row.markers.get(key.time)!;
           const segment = isIKKey(key) ? undefined : state.getSegmentInterpolation(key);
           const ikCurve = isIKKey(key)
-            ? state.findIKPropertyKeyframe(key.constraintId, key.property, key.time)?.curve
+            ? state.ik.findIKPropertyKeyframe(key.constraintId, key.property, key.time)?.curve
             : undefined;
           setAttribute(marker, 'data-interpolation', ikCurve?.mode ?? segment?.mode ?? 'unavailable');
           const interpolation = isIKKey(key)
@@ -452,7 +452,7 @@ export class TimelineTracksController {
     if (
       !changed &&
       this.selectedIK === state.selectedTarget &&
-      this.selectedIKKey === state.selectedIKKeyframe &&
+      this.selectedIKKey === state.ik.selectedIKKeyframe &&
       this.selectedBone === state.selectedBoneId &&
       this.selectedProperty === state.selectedTimelineProperty &&
       this.selectedKey === state.primaryKey &&
@@ -462,7 +462,7 @@ export class TimelineTracksController {
     const previousKeys = this.selectedKeys ?? [];
     const previousPrimary = this.selectedKey;
     this.selectedIK = state.selectedTarget;
-    this.selectedIKKey = state.selectedIKKeyframe;
+    this.selectedIKKey = state.ik.selectedIKKeyframe;
     this.selectedBone = state.selectedBoneId;
     this.selectedProperty = state.selectedTimelineProperty;
     this.selectedKey = state.primaryKey;
@@ -472,8 +472,8 @@ export class TimelineTracksController {
       const row = this.rows.get(trackKey(track))!;
       const selected =
         'constraintId' in track
-          ? track.constraintId === state.selectedIKConstraintId &&
-            (track.kind === 'ik' || track.property === state.selectedIKProperty)
+          ? track.constraintId === state.ik.selectedIKConstraintId &&
+            (track.kind === 'ik' || track.property === state.ik.selectedIKProperty)
           : track.boneId === this.selectedBone && (track.kind === 'bone' || track.property === this.selectedProperty);
       if (track.kind === 'ik-property')
         for (const key of row.visibleKeys ?? []) {

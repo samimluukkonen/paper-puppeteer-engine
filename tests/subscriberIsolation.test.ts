@@ -73,7 +73,7 @@ test('IK inspector refreshes succeed and reach later listeners when a UI subscri
   controller.bind(state);
   const { failure, later } = brokenThenHealthy(controller);
 
-  assert.doesNotThrow(() => state.selectIKConstraint('arm'));
+  assert.doesNotThrow(() => state.ik.selectIKConstraint('arm'));
   assert.equal(controller.getSnapshot().constraintId, 'arm');
   assert.isAtLeast(later.mock.calls.length, 1);
   assert.strictEqual(reporter.mock.calls[0]![0], failure);

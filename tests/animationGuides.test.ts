@@ -94,8 +94,8 @@ test('missing character, no clip, empty clip, bone keys and optional IK have liv
   assert.isTrue(launcher.getAvailability('animation-keyframe-editing').available);
   assert.include(JSON.stringify(launcher.getAvailability('animation-ik-targets')), 'select an IK constraint');
   assert.include(JSON.stringify(launcher.getAvailability('animation-ik-baking')), 'Create authored IK');
-  animation.selectIKConstraint('reach-any-name');
-  animation.setIKPropertyKeyframe('reach-any-name', 'x', 30);
+  animation.ik.selectIKConstraint('reach-any-name');
+  animation.ik.setIKPropertyKeyframe('reach-any-name', 'x', 30);
   launcher.refresh();
   assert.isTrue(launcher.getAvailability('animation-ik-targets').available);
   assert.isTrue(launcher.getAvailability('animation-ik-baking').available);
@@ -121,8 +121,8 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     }
     if (kind === 'ik') {
       const id = rig.workingCopy.ik![0]!.name;
-      animation.selectIKConstraint(id);
-      animation.setIKPropertyKeyframe(id, 'x', 20);
+      animation.ik.selectIKConstraint(id);
+      animation.ik.setIKPropertyKeyframe(id, 'x', 20);
     }
     if (kind === 'draft') {
       animation.selectBone('root');
@@ -144,7 +144,7 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
       time: animation.currentTime,
       playing: animation.isPlaying,
       selection: animation.selectedBoneId,
-      ik: animation.selectedIKConstraintId,
+      ik: animation.ik.selectedIKConstraintId,
       draft: animation.boneTransformDraft,
       poses: animation.poseLibrary.packagePoses(),
       libraryUndo: animation.poseLibrary.canUndo,
@@ -184,7 +184,7 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     assert.equal(animation.currentTime, before.time);
     assert.equal(animation.isPlaying, before.playing);
     assert.equal(animation.selectedBoneId, before.selection);
-    assert.equal(animation.selectedIKConstraintId, before.ik);
+    assert.equal(animation.ik.selectedIKConstraintId, before.ik);
     assert.deepEqual(animation.boneTransformDraft, before.draft);
     assert.strictEqual(animation.poseLibrary.packagePoses(), before.poses);
     assert.equal(animation.poseLibrary.canUndo, before.libraryUndo);

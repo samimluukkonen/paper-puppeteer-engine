@@ -199,11 +199,11 @@ test('editor export/import stabilizes and CharacterLoader/Puppet play the same a
   const state = new AnimationEditorState(rig, [source]);
   state.selectAnimation('reach');
   state.setCurrentTime(0.5);
-  state.selectIKConstraint('leftIK');
-  state.setTemporaryIKProperty('x', 30);
-  state.setTemporaryIKProperty('y', 70);
-  assert.isTrue(state.commitIKTarget());
-  state.setIKPropertyKeyframe('leftIK', 'mix', 0.5);
+  state.ik.selectIKConstraint('leftIK');
+  state.ik.setTemporaryIKProperty('x', 30);
+  state.ik.setTemporaryIKProperty('y', 70);
+  assert.isTrue(state.ik.commitIKTarget());
+  state.ik.setIKPropertyKeyframe('leftIK', 'mix', 0.5);
   const json = state.exportJson();
   const authored = state.workingAnimation!;
   for (let round = 0; round < 3; ++round) {
@@ -262,7 +262,7 @@ test('invalid IK imports and unsupported versions preserve the working session a
   const rig = skeleton();
   const state = new AnimationEditorState(rig, [animation()]);
   state.selectAnimation('reach');
-  state.setIKPropertyKeyframe('leftIK', 'x', 12);
+  state.ik.setIKPropertyKeyframe('leftIK', 'x', 12);
   const working = state.workingAnimation;
   const history = state.historyLength;
   for (const input of [

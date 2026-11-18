@@ -191,12 +191,12 @@ export class TimelineController {
   private revealSelection(): void {
     const state = this.state;
     const layout = timelineRowLayout(state.timelineTracks, state.timelineVisibility.rows);
-    const key = state.selectedIKKeyframe ?? state.primaryKey;
+    const key = state.ik.selectedIKKeyframe ?? state.primaryKey;
     const index = layout.findIndex(({ track }) =>
       'constraintId' in track
-        ? track.constraintId === state.selectedIKConstraintId &&
-          (state.selectedIKProperty
-            ? track.kind === 'ik-property' && track.property === state.selectedIKProperty
+        ? track.constraintId === state.ik.selectedIKConstraintId &&
+          (state.ik.selectedIKProperty
+            ? track.kind === 'ik-property' && track.property === state.ik.selectedIKProperty
             : track.kind === 'ik')
         : track.boneId === state.selectedBoneId &&
           (state.selectedTimelineProperty
@@ -256,7 +256,7 @@ export class TimelineController {
       state.timelineTracks,
       this.deformation.revision,
       state.selectedTarget,
-      state.selectedIKKeyframe,
+      state.ik.selectedIKKeyframe,
       state.selectedBoneId,
       state.selectedTimelineProperty,
       state.selectedKeys,
@@ -298,7 +298,7 @@ export class TimelineController {
       requireElement(this.app, ANIMATION_IDS.timelineRevealSelection, HTMLElement).hidden = !visibility.selectionHidden;
       const selectionStatus = requireElement(this.app, ANIMATION_IDS.timelineSelectionStatus, HTMLElement);
       selectionStatus.hidden = !visibility.selectionHidden;
-      const count = state.selectedKeys.length + (state.selectedIKKeyframe ? 1 : 0);
+      const count = state.selectedKeys.length + (state.ik.selectedIKKeyframe ? 1 : 0);
       setText(
         selectionStatus,
         visibility.hiddenKeyCount

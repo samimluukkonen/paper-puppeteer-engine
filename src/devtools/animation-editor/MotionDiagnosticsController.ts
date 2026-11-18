@@ -125,8 +125,8 @@ export class MotionDiagnosticsController {
         time: finding.timeMs / 1000,
       });
     } else {
-      state.setTimelineIKExpanded(finding.id, true);
-      state.selectIKKeyframe({
+      state.ik.setTimelineIKExpanded(finding.id, true);
+      state.ik.selectIKKeyframe({
         kind: 'ik',
         constraintId: finding.id,
         property: finding.property as IKAnimationProperty,

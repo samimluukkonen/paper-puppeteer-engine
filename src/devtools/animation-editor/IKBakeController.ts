@@ -104,7 +104,7 @@ export class IKBakeController {
     }
     if (!this.clip) return;
     this.state?.cancelTransformEdit();
-    this.state?.cancelIKEdit();
+    this.state?.ik.cancelIKEdit();
     this.preview = true;
     this.state?.pause();
     this.previewTime = undefined;
@@ -154,7 +154,7 @@ export class IKBakeController {
 
   private refresh(): void {
     const state = this.state;
-    if (this.preview && (state?.hasTemporaryTransform || Object.keys(state?.ikTargetDraft ?? {}).length))
+    if (this.preview && (state?.hasTemporaryTransform || Object.keys(state?.ik.ikTargetDraft ?? {}).length))
       this.clearPreview();
     if (state && this.session !== state.sessionRevision) {
       this.session = state.sessionRevision;

@@ -365,17 +365,17 @@ export class AnimationEditorScene extends Phaser.Scene {
       this.rigMode ||
       dragging ||
       !guide.enabled ||
-      !state.selectedIKTargetValues ||
-      state.ikManipulationDisabledReason ||
-      state.ikTargetDrag
+      !state.ik.selectedIKTargetValues ||
+      state.ik.ikManipulationDisabledReason ||
+      state.ik.ikTargetDrag
     )
       return false;
     const target = alignIKTargetToGuide(
-      state.selectedIKTargetValues,
+      state.ik.selectedIKTargetValues,
       puppet.container.getWorldTransformMatrix(),
       guide.y,
     );
-    return !!target && state.commitIKTarget(target);
+    return !!target && state.ik.commitIKTarget(target);
   }
 
   private createIKHandles(state: AnimationEditorState, puppet: Puppet): AnimationEditorIKHandles {
@@ -529,7 +529,7 @@ export class AnimationEditorScene extends Phaser.Scene {
 
   /** Pin current solver endpoints in canonical puppet space; mirroring only changes their world projection. */
   setIKPreview(enabled: boolean): void {
-    this.state?.cancelIKTargetDrag();
+    this.state?.ik.cancelIKTargetDrag();
     this.ikPreviewEnabled = enabled;
     const puppet = this.puppet;
     if (!puppet) return;

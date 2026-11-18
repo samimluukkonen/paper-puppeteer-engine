@@ -47,7 +47,7 @@ export function workspaceGuideHost(options: {
           if (animation.hasKeyframeAtTime(animation.selectedBoneId, 'x')) capabilities.push('selected-x-key');
         }
         if (options.getOnionEnabled?.()) capabilities.push('onion-enabled');
-        if (animation.selectedIKConstraintId) capabilities.push('tool:selected-ik');
+        if (animation.ik.selectedIKConstraintId) capabilities.push('tool:selected-ik');
         if (rig.workingCopy.bones.some((bone) => bone.sprite) || rig.workingCopy.attachments?.length)
           capabilities.push('rig-artwork');
         if (

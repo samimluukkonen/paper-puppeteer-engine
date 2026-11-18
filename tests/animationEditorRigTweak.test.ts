@@ -299,11 +299,11 @@ test('entering Rig Tweak cancels active keyframe and IK target drags without cre
     assert.strictEqual(state.workingAnimation, animation);
     assert.equal(state.currentTime, time);
     state.setEditorMode('animation');
-    assert.isTrue(state.beginIKTargetDrag('arm'));
-    assert.isTrue(state.previewIKTargetDrag({ x: 70, y: 90 }));
+    assert.isTrue(state.ik.beginIKTargetDrag('arm'));
+    assert.isTrue(state.ik.previewIKTargetDrag({ x: 70, y: 90 }));
     state.setEditorMode('rig-tweak');
-    assert.isNull(state.ikTargetDrag);
-    assert.deepEqual(state.ikTargetDraft, {});
+    assert.isNull(state.ik.ikTargetDrag);
+    assert.deepEqual(state.ik.ikTargetDraft, {});
     assert.strictEqual(state.workingAnimation, animation);
     assert.equal(state.historyLength, 0);
     assert.isFalse(state.dirty);
@@ -465,7 +465,7 @@ test('Rig Editor default-target drags preview and commit independently of animat
     assert.equal(editor.state.historyLength, 1);
     assert.strictEqual(state.workingAnimation, animation);
     assert.equal(state.historyLength, history);
-    assert.deepEqual(state.ikTargetDraft, {});
+    assert.deepEqual(state.ik.ikTargetDraft, {});
     puppet = Reflect.get(scene, 'puppet') as Puppet;
     assert.equal(puppet.getIK('arm').targetOwnership, 'animation');
     editor.undo();

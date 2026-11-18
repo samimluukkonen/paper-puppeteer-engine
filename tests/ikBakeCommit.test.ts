@@ -205,8 +205,8 @@ test('one editor history entry restores original IK and exact baked data, includ
   assert.isTrue(state.dirty);
   state.redo();
   assert.isFalse(state.dirty);
-  assert.isTrue(state.getIKManipulationDisabledReason('arm')?.includes('baked'));
-  assert.isFalse(state.beginIKTargetDrag('arm'));
+  assert.isTrue(state.ik.getIKManipulationDisabledReason('arm')?.includes('baked'));
+  assert.isFalse(state.ik.beginIKTargetDrag('arm'));
   assert.isTrue(state.selectAnimation('other'));
   assert.deepEqual(state.workingAnimation!.ikTracks, other.ikTracks);
   assert.isUndefined(state.workingAnimation!.disabledIKConstraints);

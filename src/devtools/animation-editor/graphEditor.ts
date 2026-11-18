@@ -55,8 +55,8 @@ export const graphPropertyLabels: Record<TransformProperty | IKAnimationProperty
 export function graphChannels(state: AnimationEditorState): readonly GraphChannel[] {
   if (state.rootMotionSelected)
     return (['x', 'y'] as const).map((property) => ({ kind: 'root', id: 'Root Motion', property }));
-  if (state.selectedIKConstraintId)
-    return ikAnimationProperties.map((property) => ({ kind: 'ik', id: state.selectedIKConstraintId!, property }));
+  if (state.ik.selectedIKConstraintId)
+    return ikAnimationProperties.map((property) => ({ kind: 'ik', id: state.ik.selectedIKConstraintId!, property }));
   if (state.selectedBoneId)
     return transformProperties.map((property) => ({ kind: 'bone', id: state.selectedBoneId!, property }));
   return [];
@@ -70,7 +70,7 @@ export function selectedGraphChannel(state: AnimationEditorState): GraphChannel 
         (channel.kind === 'root'
           ? state.rootMotionProperty
           : channel.kind === 'ik'
-            ? state.selectedIKProperty
+            ? state.ik.selectedIKProperty
             : state.selectedTimelineProperty),
     ) ?? channels[0]
   );

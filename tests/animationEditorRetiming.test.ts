@@ -325,12 +325,12 @@ test('commit keeps primary and new keys selected, synchronizes preview once and 
 
 test('selected IK key retimes with coherent typed selection and one Undo', () => {
   const { state } = session();
-  state.selectIKKeyframe({ kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.8 });
+  state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.8 });
   state.setCurrentTime(0.2);
   const before = state.workingAnimation;
   assert.isTrue(state.retimeSelectedKeyframes({ scale: 0.5, anchor: 'playhead' }));
-  assert.deepEqual(state.selectedIKKeyframe, { kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.5 });
-  assert.equal(state.findIKPropertyKeyframe('reach', 'mix', 0.5)?.value, 0.8);
+  assert.deepEqual(state.ik.selectedIKKeyframe, { kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.5 });
+  assert.equal(state.ik.findIKPropertyKeyframe('reach', 'mix', 0.5)?.value, 0.8);
   assert.equal(state.historyLength, 1);
   assert.strictEqual(state.workingAnimation!.tracks, before!.tracks);
   state.undo();

@@ -233,7 +233,7 @@ export class TimelineSessionController {
       state.canRedo,
       state.selectedKeys,
       state.selectedTarget,
-      state.selectedIKKeyframe,
+      state.ik.selectedIKKeyframe,
       state.selectedRootKey,
       state.selectedDeformationKey,
       state.deformationSelected,
@@ -266,7 +266,7 @@ export class TimelineSessionController {
     if (this.discard.disabled !== !state.dirty) this.discard.disabled = !state.dirty;
     const deleteDisabled =
       state.selectedKeys.length === 0 &&
-      !state.selectedIKKeyframe &&
+      !state.ik.selectedIKKeyframe &&
       !state.selectedEvent &&
       !state.selectedRootKey &&
       !state.selectedDeformationKey;
@@ -302,7 +302,7 @@ export class TimelineSessionController {
     );
     const count =
       state.selectedKeys.length +
-      (state.selectedIKKeyframe ? 1 : 0) +
+      (state.ik.selectedIKKeyframe ? 1 : 0) +
       (state.selectedRootKey ? 1 : 0) +
       (state.selectedDeformationKey ? 1 : 0);
     const hidden = state.timelineVisibility.hiddenKeyCount;
@@ -316,7 +316,7 @@ export class TimelineSessionController {
     );
     const copyDisabled = state.deformationSelected
       ? !state.selectedDeformationKey
-      : state.rootMotionSelected || !!state.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
+      : state.rootMotionSelected || !!state.ik.selectedIKConstraintId || (deleteDisabled && !state.selectedEvent);
     if (this.copyKeys.disabled !== copyDisabled) this.copyKeys.disabled = copyDisabled;
     if (this.duplicateKeys.disabled !== (state.rootMotionSelected ? !state.selectedRootKey : copyDisabled))
       this.duplicateKeys.disabled = state.rootMotionSelected ? !state.selectedRootKey : copyDisabled;
@@ -328,7 +328,7 @@ export class TimelineSessionController {
         ? !animation
         : state.deformationSelected ||
           state.rootMotionSelected ||
-          !!state.selectedIKConstraintId ||
+          !!state.ik.selectedIKConstraintId ||
           !animation ||
           !state.timelineClipboard;
     if (this.pasteKeys.disabled !== pasteDisabled) this.pasteKeys.disabled = pasteDisabled;
@@ -338,7 +338,7 @@ export class TimelineSessionController {
         : 'Select a deformation key first.'
       : state.rootMotionSelected
         ? 'Root clipboard is unavailable; use Duplicate key.'
-        : state.selectedIKConstraintId
+        : state.ik.selectedIKConstraintId
           ? 'IK clipboard and duplication are unavailable. Select bone keys or an event.'
           : copyDisabled
             ? 'Select bone keys or an event first.'
@@ -359,7 +359,7 @@ export class TimelineSessionController {
           ? 'Copy a deformation key first.'
           : state.rootMotionSelected
             ? 'Select a bone or event track to paste.'
-            : state.selectedIKConstraintId
+            : state.ik.selectedIKConstraintId
               ? 'Select a bone track or event track to paste.'
               : !animation
                 ? 'Load a valid animation first.'

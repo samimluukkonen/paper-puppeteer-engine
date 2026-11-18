@@ -121,17 +121,17 @@ test('cleanup comparison synchronizes the selected IK inspector with the same pr
     },
   ]);
   state.selectAnimation('motion');
-  state.selectIKConstraint('reach');
+  state.ik.selectIKConstraint('reach');
   const controller = new MotionDiagnosticsController();
   controller.bind(state);
   controller.run();
   controller.previewCleanup();
   controller.compare(750, true);
-  assert.equal(state.selectedIKTargetValues!.x, 15);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 15);
   controller.compare(500, false);
-  assert.equal(state.selectedIKTargetValues!.x, 10);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 10);
   controller.cancel();
-  assert.equal(state.selectedIKTargetValues!.x, 0);
+  assert.equal(state.ik.selectedIKTargetValues!.x, 0);
   controller.dispose();
 });
 

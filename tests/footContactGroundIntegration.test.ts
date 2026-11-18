@@ -322,8 +322,8 @@ test('proposals invalidate on ground, clip, time, facing and drafts; runtime own
     assert.include(f.contacts.disabledReason, 'manual posing');
     f.contacts.selectMarker('sole');
     f.contacts.selectConstraint('leg');
-    f.state.selectIKConstraint('leg');
-    f.state.setTemporaryIKProperty('y', 30);
+    f.state.ik.selectIKConstraint('leg');
+    f.state.ik.setTemporaryIKProperty('y', 30);
     assert.include(f.contacts.disabledReason, 'temporary');
     assert.equal(f.state.historyLength, 0);
   } finally {

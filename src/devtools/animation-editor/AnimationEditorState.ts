@@ -18,7 +18,6 @@ import type {
   FiredAnimationEvent,
   AnimationPose,
   ValidationIssue,
-  IKAnimationProperty,
   IKBakePlan,
   PoseDefinition,
   DeepReadonly,
@@ -43,7 +42,7 @@ import {
 } from './AnimationEditorDocument.js';
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
 import { AnimationEditorGraphGestures } from './AnimationEditorGraphGestures.js';
-import { AnimationEditorIKCommands } from './AnimationEditorIKCommands.js';
+import { AnimationEditorIKCommands, type AnimationEditorIKHandle } from './AnimationEditorIKCommands.js';
 import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
@@ -69,8 +68,6 @@ import {
   sampleGhostPoses,
 } from './ghostPoseSampling.js';
 import type { GraphKeyEdit, GraphKeyRef } from './graphEditor.js';
-import { evaluateIKTarget } from './ikInspectorSampling.js';
-import type { IKKeyframeSelection } from './ikTimeline.js';
 import {
   getAnimationInterpolation,
   getInterpolationForKeys,
@@ -419,7 +416,8 @@ export class AnimationEditorState {
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly snapping: AnimationEditorTimelineSnapping;
   private readonly keyframes: AnimationEditorKeyframeCommands;
-  private readonly ik: AnimationEditorIKCommands;
+  /** IK selection, drafts, target drags and IK key edits. */
+  readonly ik: AnimationEditorIKHandle;
   private readonly events: AnimationEditorEventCommands;
   private readonly playbackController: AnimationEditorPlaybackController;
   private readonly playbackCommands: AnimationEditorPlaybackCommands;
@@ -521,14 +519,24 @@ export class AnimationEditorState {
         !!(
           this.keyframeDrag ||
           this.eventDrag ||
-          this.ikTargetDrag ||
+          this.ik.ikTargetDrag ||
           this.graphEditActive ||
           this.rootMotionDragActive ||
           this.deformationEditActive
         ),
     });
     this.playbackCommands = new AnimationEditorPlaybackCommands(this.document, this.session);
-    this.ik = new AnimationEditorIKCommands(this.document, this.selection, this.playback, this.snapping, this.session);
+    this.ik = new AnimationEditorIKCommands(
+      this.document,
+      this.selection,
+      this.playback,
+      this.snapping,
+      this.session,
+      () =>
+        this.graphEditActive || this.previews.hasIKPreview
+          ? { animation: this.previewAnimation!, timeMs: this.previewTimeMilliseconds }
+          : null,
+    );
   }
 
   private get working(): ReadonlyAnimation | null {
@@ -551,7 +559,7 @@ export class AnimationEditorState {
       const heldTime = this.currentTimeMilliseconds;
       this.cancelTimelineDrag();
       this.cancelTransformEdit();
-      this.cancelIKEdit();
+      this.ik.cancelIKEdit();
       this.pause();
       this.endScrub();
       this.mode = mode;
@@ -611,119 +619,6 @@ export class AnimationEditorState {
   /** Typed authoring target; IK constraints never share a bone identity. */
   get selectedTarget() {
     return this.selection.target;
-  }
-  get selectedIKConstraintId(): string | null {
-    return this.ik.selectedIKConstraintId;
-  }
-  get selectedIKProperty(): IKAnimationProperty | null {
-    return this.ik.selectedIKProperty;
-  }
-  get selectedIKKeyframe(): IKKeyframeSelection | null {
-    return this.ik.selectedIKKeyframe;
-  }
-  get ikTargetDraft() {
-    return this.ik.ikTargetDraft;
-  }
-  get selectedIKTargetValues() {
-    const id = this.selectedIKConstraintId;
-    if ((this.graphEditActive || this.previews.hasIKPreview) && id && this.rig)
-      return evaluateIKTarget(this.previewAnimation!, this.rig, id, this.previewTimeMilliseconds);
-    return this.ik.selectedIKTargetValues;
-  }
-  selectIKConstraint(id: string, property: IKAnimationProperty | null = null): boolean {
-    return this.batchNotifications(() => {
-      this.clearRootSelection();
-      return this.ik.selectIKConstraint(id, property);
-    });
-  }
-  setTimelineIKExpanded(id: string, expanded: boolean): boolean {
-    return this.batchNotifications(() => this.ik.setTimelineIKExpanded(id, expanded));
-  }
-  isTimelineIKExpanded(id: string): boolean {
-    return this.ik.isTimelineIKExpanded(id);
-  }
-  findIKPropertyKeyframe(
-    id: string,
-    property: IKAnimationProperty,
-    time = this.currentTime,
-  ): PropertyKeyframe | undefined {
-    return this.ik.findIKPropertyKeyframe(id, property, time);
-  }
-  selectIKKeyframe(ref: IKKeyframeSelection): boolean {
-    return this.batchNotifications(() => {
-      this.clearRootSelection();
-      return this.ik.selectIKKeyframe(ref);
-    });
-  }
-  cancelIKEdit(): void {
-    return this.batchNotifications(() => this.ik.cancelIKEdit());
-  }
-  beginIKEdit(): void {
-    if (!this.animationAuthoringEnabled) return;
-    return this.batchNotifications(() => this.ik.beginIKEdit());
-  }
-  setTemporaryIKProperty(property: IKAnimationProperty, value: number): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.setTemporaryIKProperty(property, value));
-  }
-  commitIKProperty(property: IKAnimationProperty): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.commitIKProperty(property));
-  }
-  setIKPropertyKeyframe(id: string, property: IKAnimationProperty, value: number, time = this.currentTime): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.setIKPropertyKeyframe(id, property, value, time));
-  }
-  deleteIKPropertyKey(property: IKAnimationProperty): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.deleteIKPropertyKey(property));
-  }
-  removeIKPropertyKeyframe(id: string, property: IKAnimationProperty, time = this.currentTime): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.removeIKPropertyKeyframe(id, property, time));
-  }
-  deleteSelectedIKKeyframe(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.deleteSelectedIKKeyframe());
-  }
-  moveSelectedIKKeyframe(time: Seconds): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.moveSelectedIKKeyframe(time));
-  }
-  nudgeSelectedIKKeyframe(direction: -1 | 1, large = false): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.nudgeSelectedIKKeyframe(direction, large));
-  }
-  get ikTargetDrag() {
-    return this.ik.ikTargetDrag;
-  }
-  get ikManipulationDisabledReason() {
-    return this.ik.ikManipulationDisabledReason;
-  }
-  getIKManipulationDisabledReason(id: string): string | null {
-    return this.ik.getIKManipulationDisabledReason(id);
-  }
-  setIKManipulationDisabledReason(id: string, reason: string | null): void {
-    this.batchNotifications(() => this.ik.setIKManipulationDisabledReason(id, reason));
-  }
-  beginIKTargetDrag(id: string): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.beginIKTargetDrag(id));
-  }
-  previewIKTargetDrag(point: Point): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.previewIKTargetDrag(point));
-  }
-  endIKTargetDrag(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.endIKTargetDrag());
-  }
-  cancelIKTargetDrag(): boolean {
-    return this.batchNotifications(() => this.ik.cancelIKTargetDrag());
-  }
-  commitIKTarget(target?: Point): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.ik.commitIKTarget(target));
   }
   get selectedBoneId(): string | null {
     return this.selection.boneId;
@@ -797,19 +692,19 @@ export class AnimationEditorState {
   copyTimelineSelection(): boolean {
     if (this.deformationSelected) return this.copyDeformationKey();
     if (this.rootMotionSelected) return false;
-    if (this.selectedIKConstraintId) return false;
+    if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
     if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
     if (this.rootMotionSelected) return false;
-    if (this.selectedIKConstraintId) return false;
+    if (this.ik.selectedIKConstraintId) return false;
     return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
     if (this.deformationSelected) return this.duplicateDeformationKey();
     if (this.rootMotionSelected) return this.duplicateRootKey();
-    if (this.selectedIKConstraintId) return false;
+    if (this.ik.selectedIKConstraintId) return false;
     return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
   }
   setSelectedEventDataJson(text: string): boolean {
@@ -866,12 +761,12 @@ export class AnimationEditorState {
   }
   pasteKeyframes(): boolean {
     if (!this.animationAuthoringEnabled) return false;
-    if (this.selectedIKConstraintId) return false;
+    if (this.ik.selectedIKConstraintId) return false;
     return this.batchNotifications(() => this.keyframes.pasteKeyframes());
   }
   duplicateSelectedKeyframes(): boolean {
     if (!this.animationAuthoringEnabled) return false;
-    if (this.selectedIKConstraintId) return false;
+    if (this.ik.selectedIKConstraintId) return false;
     return this.batchNotifications(() => this.keyframes.duplicateSelectedKeyframes());
   }
   get keyframeDrag(): KeyframeDrag | null {
@@ -997,13 +892,13 @@ export class AnimationEditorState {
     if (this.rootMotionSelected) return this.animationAuthoringEnabled && this.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
     if (this.selectedEvent) return this.deleteSelectedEvent();
-    if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
+    if (this.ik.selectedIKKeyframe) return this.ik.deleteSelectedIKKeyframe();
     return this.deleteSelectedKeyframes();
   }
 
   deleteSelectedKeyframes(): boolean {
     if (!this.animationAuthoringEnabled) return false;
-    if (this.selectedIKKeyframe) return this.deleteSelectedIKKeyframe();
+    if (this.ik.selectedIKKeyframe) return this.ik.deleteSelectedIKKeyframe();
     return this.batchNotifications(() => this.keyframes.deleteSelectedKeyframes());
   }
   /** Compatibility alias: deletion operates on the whole selection. */
@@ -1176,10 +1071,10 @@ export class AnimationEditorState {
   get hasPendingAnimationEdits(): boolean {
     return (
       this.hasTemporaryTransform ||
-      Object.keys(this.ikTargetDraft).length > 0 ||
+      Object.keys(this.ik.ikTargetDraft).length > 0 ||
       !!this.keyframeDrag ||
       !!this.eventDrag ||
-      !!this.ikTargetDrag ||
+      !!this.ik.ikTargetDrag ||
       this.graphEditActive ||
       this.rootMotionDragActive ||
       this.deformationEditActive
@@ -1514,7 +1409,7 @@ export class AnimationEditorState {
     this.rootMotionEditing = false;
     this.previews.reset();
     this.cancelGraphEdit();
-    this.cancelIKTargetDrag();
+    this.ik.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframes.resetSession();
     this.events.resetSession();

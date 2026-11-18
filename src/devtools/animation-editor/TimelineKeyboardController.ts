@@ -236,7 +236,7 @@ export class TimelineKeyboardController {
       (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') ||
       (!state.selectedKeyframe &&
         !state.selectedEvent &&
-        !state.selectedIKKeyframe &&
+        !state.ik.selectedIKKeyframe &&
         !state.selectedRootKey &&
         !state.selectedDeformationKey) ||
       event.altKey ||
@@ -247,7 +247,7 @@ export class TimelineKeyboardController {
     event.preventDefault();
     const direction = event.key === 'ArrowLeft' ? -1 : 1;
     if (state.selectedEvent) state.nudgeSelectedEvent(direction, event.shiftKey);
-    else if (state.selectedIKKeyframe) state.nudgeSelectedIKKeyframe(direction, event.shiftKey);
+    else if (state.ik.selectedIKKeyframe) state.ik.nudgeSelectedIKKeyframe(direction, event.shiftKey);
     else state.nudgeSelectedKeyframe(direction, event.shiftKey);
     return true;
   }

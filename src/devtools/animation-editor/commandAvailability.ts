@@ -4,7 +4,7 @@ import type { AnimationEditorState } from './AnimationEditorState.js';
 /** An empty reason means the command is available. Hidden keys retain their authored scope. */
 export function retimeSelectionReason(state: AnimationEditorState): string {
   if (!state.workingAnimation) return 'Load a valid animation first.';
-  return state.selectedKeys.length || state.selectedIKKeyframe
+  return state.selectedKeys.length || state.ik.selectedIKKeyframe
     ? ''
     : 'Select bone keyframes or an IK channel key to retime. Events cannot be retimed.';
 }

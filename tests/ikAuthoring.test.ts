@@ -308,9 +308,9 @@ test('loaded workspace checks unselected clips and newly authored animation trac
   workspace.rig.createIKConstraint(leg);
   workspace.animation.updatePreviewRig(new Rig(workspace.rig.workingCopy));
   workspace.animation.selectAnimation('reach');
-  assert.isTrue(workspace.animation.setIKPropertyKeyframe(leg.name, 'x', 10, 0));
+  assert.isTrue(workspace.animation.ik.setIKPropertyKeyframe(leg.name, 'x', 10, 0));
   assert.throws(() => workspace.rig.undo(), /animation "reach" IK track/);
-  workspace.animation.removeIKPropertyKeyframe(leg.name, 'x', 0);
+  workspace.animation.ik.removeIKPropertyKeyframe(leg.name, 'x', 0);
   workspace.rig.removeIKConstraint(leg.name);
 });
 
@@ -391,8 +391,8 @@ test('external host IDs are reserved and deleting an unused selected IK clears a
   workspace.rig.createIKConstraint(leg);
   workspace.animation.updatePreviewRig(new Rig(workspace.rig.workingCopy));
   workspace.animation.selectAnimation('reach');
-  assert.isTrue(workspace.animation.selectIKConstraint(leg.name));
+  assert.isTrue(workspace.animation.ik.selectIKConstraint(leg.name));
   workspace.rig.removeIKConstraint(leg.name);
   workspace.animation.updatePreviewRig(new Rig(workspace.rig.workingCopy));
-  assert.isNull(workspace.animation.selectedIKConstraintId);
+  assert.isNull(workspace.animation.ik.selectedIKConstraintId);
 });

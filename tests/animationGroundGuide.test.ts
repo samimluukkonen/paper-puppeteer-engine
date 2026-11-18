@@ -284,18 +284,18 @@ test('alignment commits through existing XY key authoring with one undo and pres
   const f = fixture();
   try {
     const state = f.state;
-    state.selectIKConstraint('leg');
+    state.ik.selectIKConstraint('leg');
     state.setCurrentTime(0.3);
     const original = state.workingAnimation!;
-    const values = state.selectedIKTargetValues!;
-    assert.isTrue(state.commitIKTarget({ x: values.x, y: 75 }));
+    const values = state.ik.selectedIKTargetValues!;
+    assert.isTrue(state.ik.commitIKTarget({ x: values.x, y: 75 }));
     const committed = state.workingAnimation!;
     assert.equal(state.historyLength, 1);
     assert.strictEqual(committed.tracks, original.tracks);
     assert.strictEqual(committed.events, original.events);
     assert.equal(committed.duration, original.duration);
-    assert.equal(state.selectedIKTargetValues!.mix, values.mix);
-    assert.equal(state.findIKPropertyKeyframe('leg', 'y')!.value, 75);
+    assert.equal(state.ik.selectedIKTargetValues!.mix, values.mix);
+    assert.equal(state.ik.findIKPropertyKeyframe('leg', 'y')!.value, 75);
     state.undo();
     assert.strictEqual(state.workingAnimation, original);
     assert.isTrue(state.canRedo);
@@ -304,8 +304,8 @@ test('alignment commits through existing XY key authoring with one undo and pres
     assert.isTrue(state.canRedo);
     state.redo();
     assert.strictEqual(state.workingAnimation, committed);
-    state.setIKManipulationDisabledReason('leg', 'External owner');
-    assert.isFalse(state.commitIKTarget({ x: 0, y: 100 }));
+    state.ik.setIKManipulationDisabledReason('leg', 'External owner');
+    assert.isFalse(state.ik.commitIKTarget({ x: 0, y: 100 }));
     assert.strictEqual(state.workingAnimation, committed);
   } finally {
     f.handle.dispose();

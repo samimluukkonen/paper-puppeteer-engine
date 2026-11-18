@@ -146,9 +146,9 @@ test.each(['handIK', 'footIK'])(
       const source = state.sourceAnimation;
       const handle = handles.getHandles().find((entry) => entry.id === id)!;
       assert.isTrue(handles.pointerDown(f.pointer(handle.world)));
-      assert.equal(state.selectedIKConstraintId, id);
+      assert.equal(state.ik.selectedIKConstraintId, id);
       assert.isNull(state.selectedBoneId);
-      assert.isTrue(state.isTimelineIKExpanded(id));
+      assert.isTrue(state.ik.isTimelineIKExpanded(id));
       assert.isFalse(state.isPlaying);
       assert.equal(inspector.getSnapshot().constraintId, id);
       const target = id === 'handIK' ? { x: 30, y: 80 } : { x: 175, y: 75 };
@@ -161,8 +161,8 @@ test.each(['handIK', 'footIK'])(
         localToWorld(target, puppet.container.getWorldTransformMatrix()),
       );
       input.emit('pointerupoutside', f.localPointer(target));
-      assert.isNull(state.ikTargetDrag);
-      close(state.selectedIKTargetValues!, target);
+      assert.isNull(state.ik.ikTargetDrag);
+      close(state.ik.selectedIKTargetValues!, target);
       assert.isFalse(state.dirty);
       assert.equal(state.historyLength, 0);
       assert.strictEqual(state.workingAnimation, working);
@@ -173,10 +173,10 @@ test.each(['handIK', 'footIK'])(
       assert.isTrue(inspector.commitTarget());
       release();
       assert.deepEqual(observations, [1]);
-      assert.equal(state.findIKPropertyKeyframe(id, 'x')!.value, target.x);
-      assert.equal(state.findIKPropertyKeyframe(id, 'y')!.value, target.y);
-      assert.isUndefined(state.findIKPropertyKeyframe(id, 'mix'));
-      assert.deepEqual(state.ikTargetDraft, {});
+      assert.equal(state.ik.findIKPropertyKeyframe(id, 'x')!.value, target.x);
+      assert.equal(state.ik.findIKPropertyKeyframe(id, 'y')!.value, target.y);
+      assert.isUndefined(state.ik.findIKPropertyKeyframe(id, 'mix'));
+      assert.deepEqual(state.ik.ikTargetDraft, {});
       assert.strictEqual(state.workingAnimation!.tracks, working.tracks);
       assert.strictEqual(state.workingAnimation!.events, working.events);
       assert.strictEqual(state.sourceAnimation, source);
@@ -186,7 +186,7 @@ test.each(['handIK', 'footIK'])(
       assert.isFalse(state.dirty);
       state.redo();
       assert.isTrue(state.dirty);
-      close(state.selectedIKTargetValues!, target);
+      close(state.ik.selectedIKTargetValues!, target);
       assert.equal(state.currentTime, 0.5);
       handles.render();
     } finally {
@@ -198,26 +198,26 @@ test.each(['handIK', 'footIK'])(
 test('Escape restores a prior numeric/released preview, ignores other pointers and never authors cancelled movement', () => {
   const f = fixture();
   try {
-    f.state.selectIKConstraint('handIK');
+    f.state.ik.selectIKConstraint('handIK');
     f.inspector.edit('x', '45.0');
-    const before = f.state.ikTargetDraft;
+    const before = f.state.ik.ikTargetDraft;
     const handle = f.handles.getHandles()[0]!;
     f.handles.pointerDown(f.pointer(handle.world));
     f.input.emit('pointermove', f.localPointer({ x: -30, y: 70 }, 2));
-    assert.strictEqual(f.state.ikTargetDraft, before);
+    assert.strictEqual(f.state.ik.ikTargetDraft, before);
     f.input.emit('pointermove', f.localPointer({ x: -30, y: 70 }));
     const escape = new Event('keydown', { cancelable: true });
     Object.assign(escape, { key: 'Escape', isComposing: false });
     f.browser.dispatchEvent(escape);
     assert.isTrue(escape.defaultPrevented);
-    assert.isNull(f.state.ikTargetDrag);
-    assert.deepEqual(f.state.ikTargetDraft, before);
+    assert.isNull(f.state.ik.ikTargetDrag);
+    assert.deepEqual(f.state.ik.ikTargetDraft, before);
     assert.equal(f.inspector.getSnapshot().fields[0]!.text, '45');
     f.input.emit('pointerup', f.localPointer({ x: -30, y: 70 }));
     assert.isFalse(f.state.dirty);
     assert.equal(f.state.historyLength, 0);
-    assert.isFalse(f.state.endIKTargetDrag());
-    assert.isFalse(f.state.previewIKTargetDrag({ x: 5, y: 5 }));
+    assert.isFalse(f.state.ik.endIKTargetDrag());
+    assert.isFalse(f.state.ik.previewIKTargetDrag({ x: 5, y: 5 }));
     assert.equal(JSON.stringify(f.clip), f.original);
   } finally {
     f.dispose();
@@ -238,7 +238,7 @@ test.each(['blur', 'selection', 'scrub', 'undo', 'session', 'hidden', 'locked'])
       if (action === 'session') f.state.selectAnimation('other');
       if (action === 'hidden') f.handles.setVisible(false);
       if (action === 'locked') f.handles.setInteractive(false);
-      assert.isNull(f.state.ikTargetDrag);
+      assert.isNull(f.state.ik.ikTargetDrag);
       f.input.emit('pointermove', f.localPointer({ x: 1000, y: 1000 }));
       assert.isFalse(f.state.dirty);
       assert.equal(f.state.historyLength, 0);
@@ -263,10 +263,10 @@ test.each([0, 0.4, 1])('influence %s remains unchanged and unreachable handles r
     close(handle.world, localToWorld(requested, f.puppet.container.getWorldTransformMatrix()));
     assert.isAbove(Math.hypot(handle.world.x - handle.endpoint.x, handle.world.y - handle.endpoint.y), 500);
     assert.equal(constraint.status, mix === 0 ? 'inactive' : 'clamped');
-    assert.equal(f.state.selectedIKTargetValues!.mix, mix);
-    f.state.commitIKTarget();
+    assert.equal(f.state.ik.selectedIKTargetValues!.mix, mix);
+    f.state.ik.commitIKTarget();
     assert.equal(f.state.workingAnimation!.ikTracks!.handIK!.at(-1)!.x, requested.x);
-    assert.equal(f.state.findIKPropertyKeyframe('handIK', 'mix')!.value, mix);
+    assert.equal(f.state.ik.findIKPropertyKeyframe('handIK', 'mix')!.value, mix);
   } finally {
     f.dispose();
   }
@@ -287,7 +287,7 @@ test.each(['left', 'right'] as const)(
       const start = { x: 61, y: 61 };
       f.handles.pointerDown(f.localPointer(start));
       f.input.emit('pointermove', f.localPointer({ x: 31, y: 81 }));
-      close(f.state.selectedIKTargetValues!, { x: 30, y: 80 });
+      close(f.state.ik.selectedIKTargetValues!, { x: 30, y: 80 });
       f.input.emit('pointerup', f.localPointer({ x: 31, y: 81 }));
       close(f.handles.getHandles()[0]!.world, localToWorld({ x: 30, y: 80 }, matrix));
       assert.isAbove(
@@ -318,11 +318,11 @@ test.each(['provider', 'empty-provider', 'runtime', 'disabled', 'singular'])(
       f.puppet.posePipeline.syncPose();
       const handle = f.handles.getHandles()[0]!;
       assert.isTrue(f.handles.pointerDown(f.pointer(handle.world)));
-      assert.equal(f.state.selectedIKConstraintId, 'handIK');
+      assert.equal(f.state.ik.selectedIKConstraintId, 'handIK');
       assert.isNull(f.state.selectedBoneId);
-      assert.isNull(f.state.ikTargetDrag);
+      assert.isNull(f.state.ik.ikTargetDrag);
       assert.isNotNull(f.inspector.getSnapshot().disabledReason);
-      assert.isFalse(f.state.beginIKTargetDrag('handIK'));
+      assert.isFalse(f.state.ik.beginIKTargetDrag('handIK'));
       assert.isFalse(f.inspector.commitTarget());
       if (owner === 'provider' || owner === 'runtime') close(constraint.resolvedTarget!, target);
       if (owner === 'empty-provider') assert.equal(constraint.status, 'inactive');
@@ -332,7 +332,7 @@ test.each(['provider', 'empty-provider', 'runtime', 'disabled', 'singular'])(
       constraint.enabled = true;
       f.puppet.container.setScale(1);
       f.handles.refreshAvailability();
-      assert.isTrue(f.state.beginIKTargetDrag('handIK'));
+      assert.isTrue(f.state.ik.beginIKTargetDrag('handIK'));
     } finally {
       f.dispose();
     }
@@ -353,16 +353,16 @@ test('ghost samples and exported JSON exclude drafts; hide/lock do not author, a
     f.handles.setVisible(true);
     f.handles.setInteractive(false);
     assert.isTrue(f.handles.pointerDown(f.pointer(f.handles.getHandles()[0]!.world)));
-    assert.isNull(f.state.ikTargetDrag);
+    assert.isNull(f.state.ik.ikTargetDrag);
     f.handles.setInteractive(true);
     f.handles.pointerDown(f.pointer(f.handles.getHandles()[0]!.world));
     f.handles.dispose();
-    assert.isNull(f.state.ikTargetDrag);
+    assert.isNull(f.state.ik.ikTargetDrag);
     for (const event of ['pointermove', 'pointerup', 'pointerupoutside', 'wheel'])
       assert.equal(f.input.listenerCount(event), 0);
     const snapshot = f.inspector.getSnapshot();
     f.inspector.unbind();
-    f.state.selectIKConstraint('footIK');
+    f.state.ik.selectIKConstraint('footIK');
     assert.isNull(f.inspector.getSnapshot().constraintId);
     assert.notStrictEqual(snapshot, f.inspector.getSnapshot());
   } finally {
@@ -394,7 +394,7 @@ test.each(['visible', 'hidden'] as const)(
       f.input.emit('wheel', start, [], 0, -200);
       assert.isAbove(f.camera.zoom, zoom);
       assert.isFalse(f.state.dirty);
-      assert.isNull(f.state.ikTargetDrag);
+      assert.isNull(f.state.ik.ikTargetDrag);
     } finally {
       f.dispose();
     }
@@ -404,17 +404,17 @@ test.each(['visible', 'hidden'] as const)(
 test('provider ownership acquired during dragging cancels the gesture, preserves mix drafts and keeps its target', () => {
   const f = fixture();
   try {
-    f.state.selectIKConstraint('handIK');
-    f.state.setTemporaryIKProperty('mix', 0.4);
+    f.state.ik.selectIKConstraint('handIK');
+    f.state.ik.setTemporaryIKProperty('mix', 0.4);
     f.handles.pointerDown(f.pointer(f.handles.getHandles()[0]!.world));
-    assert.isFalse(f.state.previewIKTargetDrag({ x: Infinity, y: 0 }));
+    assert.isFalse(f.state.ik.previewIKTargetDrag({ x: Infinity, y: 0 }));
     f.input.emit('pointermove', f.localPointer({ x: 20, y: 80 }));
     const owned = { x: 120, y: 150 };
     f.puppet.getIK('handIK').setTargetProvider(() => owned);
     f.puppet.posePipeline.syncPose();
     f.handles.refreshAvailability();
-    assert.isNull(f.state.ikTargetDrag);
-    assert.deepEqual(f.state.ikTargetDraft, { mix: 0.4 });
+    assert.isNull(f.state.ik.ikTargetDrag);
+    assert.deepEqual(f.state.ik.ikTargetDraft, { mix: 0.4 });
     f.input.emit('pointerup', f.localPointer({ x: 50, y: 70 }));
     close(f.puppet.getIK('handIK').resolvedTarget!, owned);
     assert.equal(f.puppet.getIK('handIK').targetOwnership, 'provider');
@@ -425,10 +425,10 @@ test('provider ownership acquired during dragging cancels the gesture, preserves
     f.handles.pointerDown(f.pointer(f.handles.getHandles()[0]!.world));
     f.input.emit('pointermove', f.localPointer({ x: 30, y: 70 }));
     f.input.emit('pointerup', f.localPointer({ x: 30, y: 70 }));
-    f.state.commitIKTarget();
-    assert.deepEqual(f.state.ikTargetDraft, { mix: 0.4 });
+    f.state.ik.commitIKTarget();
+    assert.deepEqual(f.state.ik.ikTargetDraft, { mix: 0.4 });
     assert.equal(f.state.workingAnimation!.ikTracks!.handIK![0]!.mix, 1);
-    assert.equal(f.state.selectedIKTargetValues!.mix, 0.4);
+    assert.equal(f.state.ik.selectedIKTargetValues!.mix, 0.4);
   } finally {
     f.dispose();
   }
@@ -439,7 +439,7 @@ test.each(['unsupported-scale', 'singular-transform'] as const)(
   (status) => {
     const f = fixture();
     try {
-      f.state.selectIKConstraint('handIK');
+      f.state.ik.selectIKConstraint('handIK');
       const root = f.puppet.getBone('upper');
       root.pose.scaleX = status === 'unsupported-scale' ? 2 : 0;
       f.puppet.posePipeline.syncPose();
@@ -449,14 +449,14 @@ test.each(['unsupported-scale', 'singular-transform'] as const)(
         f.inspector.getSnapshot().disabledReason!,
         status === 'unsupported-scale' ? 'uniform' : 'singular',
       );
-      assert.isFalse(f.state.beginIKTargetDrag('handIK'));
+      assert.isFalse(f.state.ik.beginIKTargetDrag('handIK'));
       assert.equal(f.state.historyLength, 0);
       root.pose.scaleX = 1;
       f.puppet.posePipeline.syncPose();
       f.handles.refreshAvailability();
       assert.isNull(f.inspector.getSnapshot().disabledReason);
-      assert.isTrue(f.state.beginIKTargetDrag('handIK'));
-      f.state.cancelIKTargetDrag();
+      assert.isTrue(f.state.ik.beginIKTargetDrag('handIK'));
+      f.state.ik.cancelIKTargetDrag();
     } finally {
       f.dispose();
     }
@@ -478,7 +478,7 @@ test('handle teardown is idempotent and late input/render calls never touch dest
     assert.deepEqual(f.handles.getHandles(), []);
     assert.isFalse(f.handles.pointerDown(f.localPointer({ x: 20, y: 60 })));
     f.input.emit('pointermove', f.localPointer({ x: 20, y: 60 }));
-    assert.isNull(f.state.ikTargetDrag);
+    assert.isNull(f.state.ik.ikTargetDrag);
     assert.equal(destroy.mock.calls.length, 1);
     assert.equal(clear.mock.calls.length, 0);
     assert.equal(f.state.historyLength, 0);
@@ -496,17 +496,17 @@ test('opt-in ground snapping changes only an explicit IK drag draft until Set Ta
     dragging: () => false,
   });
   try {
-    f.state.selectIKConstraint('handIK');
+    f.state.ik.selectIKConstraint('handIK');
     const original = f.state.workingAnimation;
     const start = handles.getHandles().find((entry) => entry.id === 'handIK')!.world;
     assert.isTrue(handles.pointerDown(f.pointer(start)));
     f.input.emit('pointermove', f.pointer({ x: start.x + 10, y: guide.y + 2 }));
-    const world = localToWorld(f.state.selectedIKTargetValues!, f.puppet.container.getWorldTransformMatrix());
+    const world = localToWorld(f.state.ik.selectedIKTargetValues!, f.puppet.container.getWorldTransformMatrix());
     assert.closeTo(world.y, guide.y, 1e-8);
     assert.strictEqual(f.state.workingAnimation, original);
     f.input.emit('pointerup', f.pointer({ x: start.x + 10, y: guide.y + 2 }));
     assert.strictEqual(f.state.workingAnimation, original);
-    assert.isTrue(f.state.commitIKTarget());
+    assert.isTrue(f.state.ik.commitIKTarget());
     assert.equal(f.state.historyLength, 1);
     f.state.undo();
     assert.strictEqual(f.state.workingAnimation, original);
