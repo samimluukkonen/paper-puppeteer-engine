@@ -36,7 +36,14 @@
       "import": "./dist/library/serialization.js"
     }
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "*.css",
+    "./src/main.ts",
+    "./src/devtools/**",
+    "./src/examples/**",
+    "./src/shared/**",
+    "./src/ui/**"
+  ],
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
