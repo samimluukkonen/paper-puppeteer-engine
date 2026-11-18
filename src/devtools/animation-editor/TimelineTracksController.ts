@@ -87,7 +87,7 @@ export class TimelineTracksController {
   private selectedKeys: readonly KeyframeSelection[] | undefined;
   private width = -1;
   private duration = -1;
-  private drag: AnimationEditorState['keyframeDrag'] | undefined;
+  private drag: AnimationEditorState['keyframes']['keyframeDrag'] | undefined;
   private summaryAnimation: AnimationEditorState['workingAnimation'] | undefined;
   private viewportKey = '';
   private rangeKey = '';
@@ -207,13 +207,13 @@ export class TimelineTracksController {
       viewportChanged ||
       visibility !== this.visibilityRendered ||
       this.deformationRevision !== (this.deformation?.revision ?? -1) ||
-      this.drag !== state.keyframeDrag;
+      this.drag !== state.keyframes.keyframeDrag;
     this.viewportKey = viewportKey;
     this.visibilityRendered = visibility;
     const startTime = ((viewport.left - TIMELINE_MARKER_OVERSCAN) / Math.max(1, width)) * state.duration;
     const endTime = ((viewport.left + viewport.width + TIMELINE_MARKER_OVERSCAN) / Math.max(1, width)) * state.duration;
-    const movingKeys = keyframeSelectionIndex(state.keyframeDrag?.originalKeys ?? []);
-    const delta = state.keyframeDrag?.previewDelta ?? 0;
+    const movingKeys = keyframeSelectionIndex(state.keyframes.keyframeDrag?.originalKeys ?? []);
+    const delta = state.keyframes.keyframeDrag?.previewDelta ?? 0;
     this.deformationRevision = this.deformation?.revision ?? -1;
     const summariesChanged = changed || this.summaryAnimation !== state.workingAnimation;
     this.summaryAnimation = state.workingAnimation;
@@ -242,7 +242,7 @@ export class TimelineTracksController {
         labels.push(row.label);
         lanes.push(row.lane);
         const trackChanged = row.track !== track;
-        if (!trackChanged && !viewportChanged && this.drag === state.keyframeDrag) continue;
+        if (!trackChanged && !viewportChanged && this.drag === state.keyframes.keyframeDrag) continue;
         changedRows.add(row);
         row.track = track;
         if (trackChanged) {
@@ -423,7 +423,7 @@ export class TimelineTracksController {
     const previousDrag = this.drag;
     this.width = width;
     this.duration = state.duration;
-    this.drag = state.keyframeDrag;
+    this.drag = state.keyframes.keyframeDrag;
     if (changed || resized || previousDrag !== this.drag) {
       const moving = keyframeSelectionIndex(this.drag?.originalKeys ?? []);
       const position = (ref: TimelineKey, marker: HTMLButtonElement): void => {

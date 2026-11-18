@@ -66,7 +66,7 @@ export class KeyframeRetimingController {
   previewRetiming(): boolean {
     if (!this.state || this.snapshot.reason) return false;
     try {
-      this.preview = this.state.previewKeyframeRetiming(this.options);
+      this.preview = this.state.keyframes.previewKeyframeRetiming(this.options);
       this.feedback = '';
     } catch (error) {
       this.preview = null;
@@ -85,7 +85,7 @@ export class KeyframeRetimingController {
       return false;
     }
     const count = this.snapshot.count;
-    const success = this.state.retimeSelectedKeyframes(this.options);
+    const success = this.state.keyframes.retimeSelectedKeyframes(this.options);
     this.preview = null;
     this.feedback = success
       ? `Retimed ${count} selected ${count === 1 ? 'key' : 'keys'}. One Undo restores the original timing.`

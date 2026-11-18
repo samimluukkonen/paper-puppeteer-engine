@@ -282,10 +282,10 @@ test('all pooled ghosts follow working key movement, history, interpolation, FPS
         }
       }
     };
-    f.state.setBonePropertyKeyframe('root', 'x', 150, 0.5);
+    f.state.keyframes.setBonePropertyKeyframe('root', 'x', 150, 0.5);
     verify();
     f.state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
-    f.state.moveSelectedKeyframe(0.6);
+    f.state.keyframes.moveSelectedKeyframe(0.6);
     verify();
     f.state.undo();
     verify();
@@ -475,7 +475,7 @@ test('scrubs/playback/working edits refresh authored ghosts while idle selection
     f.state.advancePlayback(0.05);
     f.state.pause();
     assert.approximately(ghost.bones.get('root')!.pose.x, 68.5, 1e-10);
-    f.state.setBonePropertyKeyframe('root', 'x', 200, 0.65);
+    f.state.keyframes.setBonePropertyKeyframe('root', 'x', 200, 0.65);
     assert.approximately(ghost.bones.get('root')!.pose.x, 200, 1e-10);
     f.state.undo();
     assert.approximately(ghost.bones.get('root')!.pose.x, 68.5, 1e-10);
@@ -613,29 +613,29 @@ test('every authoring transaction, import and revert immediately renders the cur
       assert.equal(events.mock.calls.length, 0);
     };
     for (const value of [120, 180]) {
-      assert.isTrue(f.state.setBonePropertyKeyframe('root', 'x', value, 0.4));
+      assert.isTrue(f.state.keyframes.setBonePropertyKeyframe('root', 'x', value, 0.4));
       verify();
     }
-    assert.isTrue(f.state.setBonePropertyKeyframe('arm', 'rotation', 0.7, 0.4));
+    assert.isTrue(f.state.keyframes.setBonePropertyKeyframe('arm', 'rotation', 0.7, 0.4));
     verify();
     f.state.selectKeyframes([
       { boneId: 'root', property: 'x', time: 0.4 },
       { boneId: 'arm', property: 'rotation', time: 0.4 },
     ]);
-    assert.isTrue(f.state.beginKeyframeDrag(f.state.primaryKey!));
-    f.state.previewKeyframeDrag(0.5);
+    assert.isTrue(f.state.keyframes.beginKeyframeDrag(f.state.primaryKey!));
+    f.state.keyframes.previewKeyframeDrag(0.5);
     verify(); // During a drag the authored working copy remains authoritative.
-    assert.isTrue(f.state.commitKeyframeDrag());
+    assert.isTrue(f.state.keyframes.commitKeyframeDrag());
     verify();
-    assert.isTrue(f.state.copySelectedKeyframes());
+    assert.isTrue(f.state.keyframes.copySelectedKeyframes());
     f.state.setCurrentTime(0.7);
-    assert.isTrue(f.state.pasteKeyframes());
+    assert.isTrue(f.state.keyframes.pasteKeyframes());
     verify();
-    assert.isTrue(f.state.duplicateSelectedKeyframes());
+    assert.isTrue(f.state.keyframes.duplicateSelectedKeyframes());
     verify();
     assert.isTrue(f.state.deleteSelectedKeyframes());
     verify();
-    assert.isTrue(f.state.removeBonePropertyKeyframe('root', 'x', 0.5));
+    assert.isTrue(f.state.keyframes.removeBonePropertyKeyframe('root', 'x', 0.5));
     verify();
     assert.isTrue(f.state.setAuthoredInterpolation('linear'));
     verify();
@@ -661,7 +661,7 @@ test('every authoring transaction, import and revert immediately renders the cur
     verify(); // Import resets the clock and keeps only next neighbors.
     f.state.setCurrentTime(0.5);
     verify();
-    assert.isTrue(f.state.setBonePropertyKeyframe('root', 'x', -333, 0.4));
+    assert.isTrue(f.state.keyframes.setBonePropertyKeyframe('root', 'x', -333, 0.4));
     verify();
     assert.isTrue(f.state.revertAnimation({ discardChanges: true }));
     verify();

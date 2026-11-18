@@ -270,12 +270,12 @@ test('mode changes pause and cancel animation gestures/drafts without authoring 
   state.endScrub();
   assert.equal(state.currentTime, 0.4);
   assert.isFalse(state.isPlaying);
-  assert.isFalse(state.setBonePropertyKeyframe('root', 'rotation', 1));
+  assert.isFalse(state.keyframes.setBonePropertyKeyframe('root', 'rotation', 1));
   assert.isFalse(state.deleteSelectedKeyframes());
   assert.isFalse(state.createAnimationEvent());
   assert.isFalse(state.setAuthoredFPS(20));
   assert.isFalse(state.undo());
-  assert.isFalse(state.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0 }));
+  assert.isFalse(state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0 }));
   assert.isFalse(state.replaceWorkingAnimation({ ...animation, tracks: {} }));
   assert.strictEqual(state.workingAnimation, animation);
   assert.equal(state.historyLength, 0);
@@ -291,11 +291,11 @@ test('entering Rig Tweak cancels active keyframe and IK target drags without cre
   const { scene, state } = await session();
   try {
     const animation = state.workingAnimation;
-    assert.isTrue(state.beginKeyframeDrag({ boneId: 'root', property: 'rotation', time: 0 }));
-    state.previewKeyframeDrag(0.2);
+    assert.isTrue(state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'rotation', time: 0 }));
+    state.keyframes.previewKeyframeDrag(0.2);
     const time = state.currentTime;
     state.setEditorMode('rig-tweak');
-    assert.isNull(state.keyframeDrag);
+    assert.isNull(state.keyframes.keyframeDrag);
     assert.strictEqual(state.workingAnimation, animation);
     assert.equal(state.currentTime, time);
     state.setEditorMode('animation');
@@ -318,7 +318,7 @@ test('one rig working copy updates paused pose, geometry, IK and ghosts while an
     const source = JSON.stringify(definition.rigFile);
     state.setCurrentTime(0.5);
     state.selectBone('lower');
-    state.setBonePropertyKeyframe('lower', 'rotation', 0.2);
+    state.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0.2);
     const animation = state.workingAnimation;
     const json = state.exportJson();
     const animationHistory = state.historyLength;

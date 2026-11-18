@@ -77,8 +77,8 @@ test('playback, preview and key readiness construct edited tracks only when a mi
 
 test('clock changes still update unsupported-transform readiness while mirror preview is off', () => {
   const { state, controller } = fixture();
-  state.setBonePropertyKeyframe('leftArm', 'scaleX', 1, 0);
-  state.setBonePropertyKeyframe('leftArm', 'scaleX', -1, 1);
+  state.keyframes.setBonePropertyKeyframe('leftArm', 'scaleX', 1, 0);
+  state.keyframes.setBonePropertyKeyframe('leftArm', 'scaleX', -1, 1);
   assert.equal(controller.getSnapshot().poseReason, '');
   state.setCurrentTime(0.75);
   assert.isFalse(controller.getSnapshot().preview);
@@ -235,7 +235,7 @@ test('current-pose commit invokes existing command, pauses and updates history, 
   state.setCurrentTime(0.25);
   const source = state.sourceAnimation;
   const originalLeft = state.workingAnimation!.tracks.leftArm;
-  const command = vi.spyOn(state, 'mirrorCurrentPoseToKeys');
+  const command = vi.spyOn(state.keyframes, 'mirrorCurrentPoseToKeys');
   controller.togglePreview();
   state.play();
   assert.isTrue(controller.commitPose());
@@ -264,7 +264,7 @@ test('selected keys commit preserves exact time, interpolation, primary key and 
   const { state, controller } = fixture();
   state.selectKeyframe({ boneId: 'leftArm', property: 'rotation', time: 0 });
   state.selectKeyframe({ boneId: 'leftArm', property: 'rotation', time: 1 }, { additive: true });
-  const command = vi.spyOn(state, 'mirrorSelectedKeyframes');
+  const command = vi.spyOn(state.keyframes, 'mirrorSelectedKeyframes');
   const source = state.sourceAnimation;
   assert.isTrue(controller.commitKeys());
   assert.deepEqual(command.mock.calls[0], ['left-to-right']);
@@ -310,7 +310,7 @@ test('pairs persist per rig, restore against a fresh rig, and reject stale or ma
 
 test('unsupported transforms and storage failure give actionable feedback and disposal releases subscriptions', () => {
   const { state, controller } = fixture();
-  state.setBonePropertyKeyframe('leftArm', 'scaleX', -1, 0);
+  state.keyframes.setBonePropertyKeyframe('leftArm', 'scaleX', -1, 0);
   assert.include(controller.getSnapshot().poseReason, 'axis sign');
   assert.include(render(controller), 'axis sign');
   state.undo();

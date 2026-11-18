@@ -121,9 +121,9 @@ test('input disposal cancels a key drag without committing it', () => {
     timeline as unknown as HTMLButtonElement,
   );
   timeline.dispatchEvent(pointer('pointermove', 75));
-  assert.equal(current.keyframeDrag?.previewTime, 0.75);
+  assert.equal(current.keyframes.keyframeDrag?.previewTime, 0.75);
   input.dispose();
-  assert.isNull(current.keyframeDrag);
+  assert.isNull(current.keyframes.keyframeDrag);
   assert.equal(current.currentTime, 0);
   assert.equal(current.historyLength, 0);
   assert.isFalse(current.dirty);
@@ -134,7 +134,7 @@ test('a key drag ignores other pointers and commits once when releasing capture 
   const current = state();
   const { timeline, create } = inputFixture(() => current);
   const input = create();
-  const commit = vi.spyOn(current, 'commitKeyframeDrag');
+  const commit = vi.spyOn(current.keyframes, 'commitKeyframeDrag');
   input.beginKeyDrag(
     pointer('pointerdown', 0) as unknown as PointerEvent,
     { boneId: 'root', property: 'x', time: 0 },
@@ -144,14 +144,14 @@ test('a key drag ignores other pointers and commits once when releasing capture 
   timeline.dispatchEvent(pointer('pointermove', 90, 2));
   timeline.dispatchEvent(pointer('pointercancel', 90, 2));
   timeline.dispatchEvent(pointer('pointerup', 90, 2));
-  assert.equal(current.keyframeDrag?.previewTime, 0);
+  assert.equal(current.keyframes.keyframeDrag?.previewTime, 0);
   assert.isFalse(current.isScrubbing);
   assert.deepEqual([...timeline.captures], [1]);
   timeline.dispatchEvent(pointer('pointermove', 75));
   timeline.dispatchEvent(pointer('pointerup', 75));
   timeline.dispatchEvent(pointer('pointerup', 75));
   assert.equal(commit.mock.calls.length, 1);
-  assert.isNull(current.keyframeDrag);
+  assert.isNull(current.keyframes.keyframeDrag);
   assert.equal(current.selectedKeyframe?.time, 0.75);
   assert.equal(current.historyLength, 1);
   assert.isTrue(current.dirty);

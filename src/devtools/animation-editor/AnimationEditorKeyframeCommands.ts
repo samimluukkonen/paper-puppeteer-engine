@@ -40,7 +40,20 @@ export interface KeyframeDrag {
   readonly disableSnapping: boolean;
 }
 
-/** Owns keyframe mutation transactions and transient drag/nudge state; the session owns the commit ordering. */
+/** Facade-owned inputs: the rig-session symmetry mapping and the event drag a key drag replaces. */
+export interface KeyframeCommandDeps {
+  readonly symmetry: () => BoneSymmetryMapping | null;
+  readonly cancelEventDrag: () => boolean;
+}
+
+/** The public `state.keyframes` domain handle; only the facade resets the session. */
+export type AnimationEditorKeyframeHandle = Omit<AnimationEditorKeyframeCommands, 'resetSession'>;
+
+/**
+ * Owns keyframe mutation transactions and transient drag/nudge state; the session owns the commit ordering.
+ * Guarded commands run through `session.run`; the drag cancel only batches. Edits whose only effect is
+ * one `commit` (move, set, remove) rely on its guard.
+ */
 export class AnimationEditorKeyframeCommands {
   private drag: KeyframeDrag | null = null;
 
@@ -51,6 +64,7 @@ export class AnimationEditorKeyframeCommands {
     private readonly session: AnimationEditActions,
     private readonly clipboard: TimelineClipboard,
     private readonly snapping: AnimationEditorTimelineSnapping,
+    private readonly deps: KeyframeCommandDeps,
   ) {}
 
   private get working(): ReadonlyAnimation | null {
@@ -82,58 +96,65 @@ export class AnimationEditorKeyframeCommands {
 
   /** Validate the complete candidate before changing transient editor state; install once for Undo/Redo. */
   retimeSelectedKeyframes(options: RetimeOptions): boolean {
-    let result: RetimeResult<ReadonlyAnimation>;
-    try {
-      result = this.previewKeyframeRetiming(options);
-    } catch (error) {
-      this.document.reportError(error);
-      this.session.notify();
-      return false;
-    }
-    if (result.animation === this.working) return false;
-    const primaryIndex = this.selection.key ? this.selectedKeys.indexOf(this.selection.key) : 0;
-    const time = this.currentTime;
-    // Set destination identities before the existing installation reconciliation resolves them.
-    const first = result.keys[0]!;
-    return this.session.commit(() => result.animation, {
-      time,
-      after: () => {
-        if ('kind' in first) this.selection.setIKKey(first);
-        else {
-          const keys = result.keys.filter((key): key is KeyframeSelection => !('kind' in key));
-          this.selection.setKeys(keys, keys[primaryIndex] ?? null);
-        }
-      },
+    return this.session.run(false, () => {
+      let result: RetimeResult<ReadonlyAnimation>;
+      try {
+        result = this.previewKeyframeRetiming(options);
+      } catch (error) {
+        this.document.reportError(error);
+        this.session.notify();
+        return false;
+      }
+      if (result.animation === this.working) return false;
+      const primaryIndex = this.selection.key ? this.selectedKeys.indexOf(this.selection.key) : 0;
+      const time = this.currentTime;
+      // Set destination identities before the existing installation reconciliation resolves them.
+      const first = result.keys[0]!;
+      return this.session.commit(() => result.animation, {
+        time,
+        after: () => {
+          if ('kind' in first) this.selection.setIKKey(first);
+          else {
+            const keys = result.keys.filter((key): key is KeyframeSelection => !('kind' in key));
+            this.selection.setKeys(keys, keys[primaryIndex] ?? null);
+          }
+        },
+      });
     });
   }
 
-  mirrorCurrentPoseToKeys(
-    mapping: BoneSymmetryMapping,
-    direction: MirrorDirection,
-    options: MirrorCurrentPoseOptions = {},
-  ): boolean {
-    const boneIds = options.boneIds ?? (this.selection.boneId ? [this.selection.boneId] : undefined);
-    return this.commitMirror((animation, rig) =>
-      mirrorCurrentPoseToKeys(animation, rig, mapping, this.playback.currentTimeMilliseconds, direction, {
-        ...options,
-        ...(boneIds ? { boneIds } : {}),
-      }),
-    );
+  /** Explicit authored mirror command; defaults to the selected bone or all mapped sources. */
+  mirrorCurrentPoseToKeys(direction: MirrorDirection, options: MirrorCurrentPoseOptions = {}): boolean {
+    return this.session.run(false, () => {
+      const mapping = this.deps.symmetry();
+      if (!mapping) return false;
+      const boneIds = options.boneIds ?? (this.selection.boneId ? [this.selection.boneId] : undefined);
+      return this.commitMirror((animation, rig) =>
+        mirrorCurrentPoseToKeys(animation, rig, mapping, this.playback.currentTimeMilliseconds, direction, {
+          ...options,
+          ...(boneIds ? { boneIds } : {}),
+        }),
+      );
+    });
   }
 
-  mirrorSelectedKeyframes(mapping: BoneSymmetryMapping, direction: MirrorDirection): boolean {
-    const primary = this.selection.key;
-    // Preserve the primary source's counterpart as the destination primary.
-    const sources = primary ? [primary, ...this.selectedKeys.filter((key) => key !== primary)] : this.selectedKeys;
-    return this.commitMirror((animation, rig) =>
-      mirrorSelectedKeyframes(
-        animation,
-        rig,
-        mapping,
-        sources.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: toMilliseconds(key.time) })),
-        direction,
-      ),
-    );
+  mirrorSelectedKeyframes(direction: MirrorDirection): boolean {
+    return this.session.run(false, () => {
+      const mapping = this.deps.symmetry();
+      if (!mapping) return false;
+      const primary = this.selection.key;
+      // Preserve the primary source's counterpart as the destination primary.
+      const sources = primary ? [primary, ...this.selectedKeys.filter((key) => key !== primary)] : this.selectedKeys;
+      return this.commitMirror((animation, rig) =>
+        mirrorSelectedKeyframes(
+          animation,
+          rig,
+          mapping,
+          sources.map((key) => ({ boneId: key.boneId, property: key.property, timeMs: toMilliseconds(key.time) })),
+          direction,
+        ),
+      );
+    });
   }
 
   /** Build and validate before touching gestures, playback, drafts or selection. One install owns history/dirty. */
@@ -167,19 +188,25 @@ export class AnimationEditorKeyframeCommands {
     this.session.notify();
     return true;
   }
+  /** Bone keys never paste over an IK selection; IK channels have no keyframe clipboard. */
   pasteKeyframes(): boolean {
-    const clipboard = this.keyframeClipboard;
-    return clipboard ? this.pasteGroup(clipboard, this.currentTime) : false;
+    return this.session.run(false, () => {
+      if (this.selection.ikTarget?.constraintId) return false;
+      const clipboard = this.keyframeClipboard;
+      return clipboard ? this.pasteGroup(clipboard, this.currentTime) : false;
+    });
   }
   /** Duplicate shares paste logic without overwriting the user's clipboard or seeking away from the playhead. */
   duplicateSelectedKeyframes(): boolean {
-    if (!this.working) return false;
-    const group = copyKeyframeSelection(this.working, this.selectedKeys);
-    if (!group) return false;
-    const playback = this.working.playback;
-    const step =
-      playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0 ? 1 / playback.fps : 0.01;
-    return this.pasteGroup(group, toSeconds(group.anchorTimeMs) + step);
+    return this.session.run(false, () => {
+      if (this.selection.ikTarget?.constraintId || !this.working) return false;
+      const group = copyKeyframeSelection(this.working, this.selectedKeys);
+      if (!group) return false;
+      const playback = this.working.playback;
+      const step =
+        playback?.mode === 'stepped' && Number.isFinite(playback.fps) && playback.fps > 0 ? 1 / playback.fps : 0.01;
+      return this.pasteGroup(group, toSeconds(group.anchorTimeMs) + step);
+    });
   }
   private pasteGroup(group: KeyframeClipboard, anchorTime: Seconds): boolean {
     if (!this.working || !this.rig || !group.entries.length) return false;
@@ -204,7 +231,14 @@ export class AnimationEditorKeyframeCommands {
   get keyframeFPS(): number {
     return this.snapping.fps;
   }
+  /** A key drag replaces any event drag, even when the key is already selected and no gesture begins. */
   beginKeyframeDrag(key: KeyframeSelection): boolean {
+    return this.session.run(false, () => {
+      this.deps.cancelEventDrag();
+      return this.startKeyframeDrag(key);
+    });
+  }
+  private startKeyframeDrag(key: KeyframeSelection): boolean {
     this.cancelKeyframeDrag();
     const playheadTime = this.currentTime;
     const originalPrimary = this.selection.key;
@@ -230,6 +264,9 @@ export class AnimationEditorKeyframeCommands {
     return true;
   }
   previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
+    return this.session.run(false, () => this.updateKeyframeDrag(time, disableSnapping));
+  }
+  private updateKeyframeDrag(time: Seconds, disableSnapping: boolean): boolean {
     if (!this.drag || !Number.isFinite(time)) return false;
     const { originalKeys, key, playheadTime } = this.drag;
     const earliest = originalKeys.reduce((min, entry) => Math.min(min, entry.time), key.time);
@@ -257,20 +294,24 @@ export class AnimationEditorKeyframeCommands {
     return true;
   }
   commitKeyframeDrag(): boolean {
-    const drag = this.drag;
-    if (!drag) return false;
-    this.drag = null;
-    return this.moveSelectedKeyframe(drag.previewTime);
+    return this.session.run(false, () => {
+      const drag = this.drag;
+      if (!drag) return false;
+      this.drag = null;
+      return this.moveSelectedKeyframe(drag.previewTime);
+    });
   }
   cancelKeyframeDrag(): boolean {
-    if (!this.drag) return false;
-    const { key, originalKeys, originalPrimary } = this.drag;
-    const time = key.time;
-    this.drag = null;
-    this.selection.setKeys(originalKeys, originalPrimary, false);
-    this.session.updateTime(time);
-    this.session.notify();
-    return true;
+    return this.session.batch(() => {
+      if (!this.drag) return false;
+      const { key, originalKeys, originalPrimary } = this.drag;
+      const time = key.time;
+      this.drag = null;
+      this.selection.setKeys(originalKeys, originalPrimary, false);
+      this.session.updateTime(time);
+      this.session.notify();
+      return true;
+    });
   }
   /** A new document session discards the gesture without restoring old navigation or notifying midway. */
   resetSession(): void {
@@ -350,20 +391,22 @@ export class AnimationEditorKeyframeCommands {
   }
   /** All selected authored properties are removed before installing one validated history snapshot. */
   deleteSelectedKeyframes(): boolean {
-    this.cancelKeyframeDrag();
-    if (!this.selectedKeys.length || !this.working || !this.rig) return false;
-    return this.session.commit((animation, rig) => {
-      const next = removeBonePropertyKeyframes(
-        animation,
-        rig,
-        this.selectedKeys.map((key) => ({
-          boneId: key.boneId,
-          property: key.property,
-          timeMs: toMilliseconds(key.time),
-        })),
-      );
-      this.selection.clearKey();
-      return next;
+    return this.session.run(false, () => {
+      this.cancelKeyframeDrag();
+      if (!this.selectedKeys.length || !this.working || !this.rig) return false;
+      return this.session.commit((animation, rig) => {
+        const next = removeBonePropertyKeyframes(
+          animation,
+          rig,
+          this.selectedKeys.map((key) => ({
+            boneId: key.boneId,
+            property: key.property,
+            timeMs: toMilliseconds(key.time),
+          })),
+        );
+        this.selection.clearKey();
+        return next;
+      });
     });
   }
   /** Authoring uses continuous seconds, defaulting to the sole editor clock. */

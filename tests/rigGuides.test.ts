@@ -118,7 +118,7 @@ test.each([false, true])(
     rig.editBone(rig.workingCopy.root, 'x', 19);
     if (animation.animationIds.length) {
       animation.selectAnimation(animation.animationIds[0]!);
-      animation.setBonePropertyKeyframe(rig.workingCopy.root, 'x', 23);
+      animation.keyframes.setBonePropertyKeyframe(rig.workingCopy.root, 'x', 23);
     }
     const before = {
       rig: rig.workingCopy,

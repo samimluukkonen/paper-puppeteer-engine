@@ -101,7 +101,7 @@ test.each([undefined, 'linear'] as const)(
     const state = new AnimationEditorState(rig, [input]);
     state.selectAnimation(input.name);
     state.selectKeyframes(keys);
-    assert.isTrue(state.duplicateSelectedKeyframes());
+    assert.isTrue(state.keyframes.duplicateSelectedKeyframes());
     assert.equal(state.selectedKeys.length, 2);
     assert.equal(state.findBonePropertyKeyframe('root', 'x', 0.01)?.value, 1);
     assert.equal(state.findBonePropertyKeyframe('root', 'x', 10.0000005 / 1000)?.value, 2);
@@ -128,11 +128,11 @@ test('paste rejects translated group identities lost to floating point precision
   const state = new AnimationEditorState(rig, [input]);
   state.selectAnimation(input.name);
   state.selectKeyframes([key(0, 'x'), key(0.001, 'x')]);
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setCurrentTime(1e17);
   const held = state.workingAnimation;
   const selection = state.selectedKeys;
-  assert.isFalse(state.pasteKeyframes());
+  assert.isFalse(state.keyframes.pasteKeyframes());
   assert.strictEqual(state.workingAnimation, held);
   assert.strictEqual(state.selectedKeys, selection);
   assert.equal(state.historyLength, 0);
@@ -175,10 +175,10 @@ test('multi-key paste replaces external tolerant collisions while keeping group 
   const state = new AnimationEditorState(rig, [input]);
   state.selectAnimation(input.name);
   state.selectKeyframes([key(0, 'x'), key(0.0000005 / 1000, 'x')]);
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setCurrentTime(0.2);
   const baseline = state.workingAnimation;
-  state.pasteKeyframes();
+  state.keyframes.pasteKeyframes();
   const result = state.workingAnimation;
   checkState(state);
   state.undo();
@@ -203,19 +203,19 @@ for (const interpolation of [undefined, 'linear'] as const) {
       assert.isTrue(state.setAuthoredInterpolation(interpolation === undefined ? 'linear' : undefined));
       const authored = state.workingAnimation!.interpolation;
       capture();
-      assert.isTrue(state.moveSelectedKeyframe(0.1));
+      assert.isTrue(state.keyframes.moveSelectedKeyframe(0.1));
       assert.equal(state.workingAnimation!.interpolation, authored);
       assert.deepEqual(state.selectedKeys, [key(0.1), key(0.6), key(0.3, 'x', 'arm')]);
       capture();
-      assert.isTrue(state.copySelectedKeyframes());
-      const clipboard = state.keyframeClipboard;
+      assert.isTrue(state.keyframes.copySelectedKeyframes());
+      const clipboard = state.keyframes.keyframeClipboard;
       state.setCurrentTime(0.6); // Replace the destination rotation and extend the group.
-      assert.isTrue(state.pasteKeyframes());
+      assert.isTrue(state.keyframes.pasteKeyframes());
       assert.equal(state.findBonePropertyKeyframe('root', 'rotation', 0.6)?.value, 0);
       assert.equal(state.duration, 1.1);
       capture();
-      assert.isTrue(state.duplicateSelectedKeyframes());
-      assert.strictEqual(state.keyframeClipboard, clipboard);
+      assert.isTrue(state.keyframes.duplicateSelectedKeyframes());
+      assert.strictEqual(state.keyframes.keyframeClipboard, clipboard);
       assert.equal(state.workingAnimation!.interpolation, authored);
       capture();
       assert.isTrue(state.deleteSelectedKeyframes());
@@ -252,10 +252,10 @@ test.each([undefined, 'linear'] as const)(
     const state = new AnimationEditorState(rig, [input, destination]);
     state.selectAnimation(input.name);
     state.selectKeyframes(outgoing);
-    state.copySelectedKeyframes();
+    state.keyframes.copySelectedKeyframes();
     state.selectAnimation(destination.name);
     const baseline = state.workingAnimation;
-    assert.isTrue(state.pasteKeyframes());
+    assert.isTrue(state.keyframes.pasteKeyframes());
     assert.equal(state.workingAnimation!.interpolation, interpolation);
     assert.equal(Object.hasOwn(state.workingAnimation!, 'interpolation'), interpolation !== undefined);
     assert.strictEqual(state.workingAnimation!.playback, baseline!.playback);
@@ -281,15 +281,15 @@ test.each([{}, { root: [{ time: 400, x: 9 }] }])(
       reason: tracks.root ? 'no-outgoing-segment' : 'empty-selection',
     });
     if (tracks.root) {
-      assert.isTrue(state.copySelectedKeyframes());
+      assert.isTrue(state.keyframes.copySelectedKeyframes());
       state.setCurrentTime(1);
-      assert.isTrue(state.pasteKeyframes());
+      assert.isTrue(state.keyframes.pasteKeyframes());
       assert.deepEqual(state.selectedInterpolation, { kind: 'unavailable', reason: 'no-outgoing-segment' });
       state.selectKeyframe(key(0.4, 'x'));
       assert.equal(state.selectedInterpolation.kind, 'uniform', 'the original singleton gains an outgoing segment');
     } else {
-      assert.isFalse(state.copySelectedKeyframes());
-      assert.isFalse(state.duplicateSelectedKeyframes());
+      assert.isFalse(state.keyframes.copySelectedKeyframes());
+      assert.isFalse(state.keyframes.duplicateSelectedKeyframes());
     }
     checkState(state);
   },
@@ -300,7 +300,7 @@ test.each(['smooth', 'stepped', 'bezier', '', null, 42])(
   (mode) => {
     const { state } = session('linear');
     state.selectKeyframes(outgoing);
-    state.moveSelectedKeyframe(0.1);
+    state.keyframes.moveSelectedKeyframe(0.1);
     const held = state.workingAnimation;
     const selection = state.selectedKeys;
     const invalid = { ...held, interpolation: mode };
@@ -317,7 +317,7 @@ test('group collision replacement restores destination values, siblings and clip
   const { state } = session('linear');
   const baseline = state.workingAnimation;
   state.selectKeyframes([key(0), key(0.2, 'x', 'arm')]);
-  state.moveSelectedKeyframe(0.5);
+  state.keyframes.moveSelectedKeyframe(0.5);
   assert.deepEqual(state.workingAnimation!.tracks.root, [
     { time: 0, y: 7 },
     { time: 500, rotation: 0 },

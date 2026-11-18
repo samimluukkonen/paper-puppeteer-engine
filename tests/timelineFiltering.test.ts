@@ -241,7 +241,7 @@ test('filtering preserves source, working animation, rig, dirty/history/redo, ex
   const { state, input, rig } = fixture();
   const original = JSON.stringify(input);
   const skeleton = JSON.stringify(rig);
-  state.setBonePropertyKeyframe('hand', 'y', 8);
+  state.keyframes.setBonePropertyKeyframe('hand', 'y', 8);
   state.undo();
   const working = state.workingAnimation;
   const source = state.sourceAnimation;
@@ -362,8 +362,8 @@ test.each(['key', 'event'])('changing filters cancels an active %s drag without 
   const { state } = fixture();
   if (kind === 'key') {
     state.selectKeyframe({ boneId: 'rightForearm', property: 'rotation', time: 0 });
-    assert.isTrue(state.beginKeyframeDrag(state.primaryKey!));
-    assert.isTrue(state.previewKeyframeDrag(0.4));
+    assert.isTrue(state.keyframes.beginKeyframeDrag(state.primaryKey!));
+    assert.isTrue(state.keyframes.previewKeyframeDrag(0.4));
   } else {
     assert.isTrue(state.beginEventDrag(state.eventTimelineTrack.markers[0]!.ref));
     assert.isTrue(state.previewEventDrag(0.8));
@@ -372,7 +372,7 @@ test.each(['key', 'event'])('changing filters cancels an active %s drag without 
   const keys = [...state.selectedKeys];
   const event = state.selectedEvent;
   state.setTimelineFilters({ search: 'nothing-matches', showEvents: false });
-  assert.isNull(state.keyframeDrag);
+  assert.isNull(state.keyframes.keyframeDrag);
   assert.isNull(state.eventDrag);
   assert.deepEqual(state.selectedKeys, keys);
   assert.strictEqual(state.selectedEvent, event);

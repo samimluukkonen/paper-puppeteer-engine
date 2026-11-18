@@ -187,7 +187,7 @@ test('live animation references protect deletion, rename, reset and rig undo wit
   state.createBone('animated', 'root');
   animation.updatePreviewRig(new Rig(state.workingCopy));
   assert.isTrue(animation.createAnimation({ name: 'motion' }));
-  assert.isTrue(animation.setBonePropertyKeyframe('animated', 'rotation', 0.5));
+  assert.isTrue(animation.keyframes.setBonePropertyKeyframe('animated', 'rotation', 0.5));
   const tracks = animation.workingAnimation;
   const before = state.workingCopy;
   const history = state.historyLength;

@@ -109,18 +109,18 @@ test.each(['key', 'event'] as const)(
     const working = state.workingAnimation;
     const ref = state.eventTimelineTrack.markers[0]!.ref;
     if (drag === 'key') {
-      assert.isTrue(state.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 }));
-      assert.isTrue(state.previewKeyframeDrag(1));
+      assert.isTrue(state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 }));
+      assert.isTrue(state.keyframes.previewKeyframeDrag(1));
     } else {
       assert.isTrue(state.beginEventDrag(ref));
       assert.isTrue(state.previewEventDrag(1));
     }
     assert.strictEqual(state.workingAnimation, working);
-    assert.equal(state.keyframeDrag?.previewTime ?? state.eventDrag?.previewTime, 1);
+    assert.equal(state.keyframes.keyframeDrag?.previewTime ?? state.eventDrag?.previewTime, 1);
     const observations: unknown[] = [];
     state.subscribe(() => {
       assert.strictEqual(state.workingAnimation, working);
-      assert.isNull(state.keyframeDrag);
+      assert.isNull(state.keyframes.keyframeDrag);
       assert.isNull(state.eventDrag);
       assert.isFalse(state.dirty);
       assert.equal(state.historyLength, 0);
@@ -223,14 +223,14 @@ test('inspector mutations refresh markers and invalidate only removed selection;
   const { state } = session();
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
   const selected = state.selectedKeyframe;
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   assert.strictEqual(state.selectedKeyframe, selected);
   assert.equal(markers(state)[1]!.value, 12);
-  state.removeBonePropertyKeyframe('root', 'y');
+  state.keyframes.removeBonePropertyKeyframe('root', 'y');
   assert.strictEqual(state.selectedKeyframe, selected);
   state.deleteBonePropertyKey('x');
   assert.isNull(state.selectedKeyframe);
-  state.setBonePropertyKeyframe('root', 'x', 15, 1.25);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 15, 1.25);
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 1.25 });
   state.undo();
   assert.isNull(state.selectedKeyframe);
@@ -270,7 +270,7 @@ test('bone/track/animation navigation clears key selection coherently; failed sw
   assert.equal(state.selectedTimelineProperty, 'x');
   assert.equal(state.currentTime, 0.5);
   select();
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   assert.isFalse(state.selectAnimation('empty'));
   assert.isNotNull(state.selectedKeyframe);
   state.selectAnimation('empty', { discardChanges: true });

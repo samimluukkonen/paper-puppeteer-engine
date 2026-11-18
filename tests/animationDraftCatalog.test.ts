@@ -47,7 +47,7 @@ function fixture() {
   };
   const create = (state: AnimationEditorState, name: string, x = 42) => {
     assert.isTrue(state.createAnimation({ name, durationSeconds: 2, fps: 17, loop: false }));
-    assert.isTrue(state.setBonePropertyKeyframe('root', 'x', x, 0));
+    assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', x, 0));
   };
   return { values, confirm, rig, open, create };
 }

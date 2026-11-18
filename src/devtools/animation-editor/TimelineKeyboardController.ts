@@ -29,7 +29,7 @@ export class TimelineKeyboardController {
         // Body/canvas focus supports playback; controls outside this editor own their shortcuts.
         if (event.target instanceof Element && !this.app.contains(event.target) && event.target.tagName !== 'BODY')
           return;
-        if (event.key === 'Escape' && (this.state.keyframeDrag || this.state.eventDrag)) {
+        if (event.key === 'Escape' && (this.state.keyframes.keyframeDrag || this.state.eventDrag)) {
           event.preventDefault();
           this.gestures.cancelGesture();
           return;

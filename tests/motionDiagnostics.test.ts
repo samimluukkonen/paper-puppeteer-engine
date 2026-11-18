@@ -271,7 +271,7 @@ test('preview invalidates on selection, edits, options, playback, sessions, mode
   assert.isNull(controller.getSnapshot().preview);
   state.pause();
   controller.previewCleanup();
-  state.setBonePropertyKeyframe('free', 'y', 5);
+  state.keyframes.setBonePropertyKeyframe('free', 'y', 5);
   assert.isNull(controller.getSnapshot().report);
   assert.isNull(controller.getSnapshot().preview);
   controller.run();

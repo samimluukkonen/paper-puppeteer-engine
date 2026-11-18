@@ -206,8 +206,8 @@ test.each([0, -1, NaN, Infinity, -Infinity])('invalid scale %s changes no source
   const before = state.workingAnimation;
   const selection = state.selectedKeys;
   const original = JSON.stringify(input);
-  assert.throws(() => state.previewKeyframeRetiming({ scale, anchor: 'earliest' }));
-  assert.isFalse(state.retimeSelectedKeyframes({ scale, anchor: 'earliest' }));
+  assert.throws(() => state.keyframes.previewKeyframeRetiming({ scale, anchor: 'earliest' }));
+  assert.isFalse(state.keyframes.retimeSelectedKeyframes({ scale, anchor: 'earliest' }));
   assert.strictEqual(state.workingAnimation, before);
   assert.strictEqual(state.selectedKeys, selection);
   assert.equal(state.historyLength, 0);
@@ -252,8 +252,8 @@ test('zero span, scale one, empty selection and repeated references avoid redund
   const { state } = session();
   state.selectKeyframes([key(0.5), key(0.5, 'y')]);
   const before = state.workingAnimation;
-  assert.isFalse(state.retimeSelectedKeyframes({ scale: 2, anchor: 'earliest' }));
-  assert.isFalse(state.retimeSelectedKeyframes({ scale: 1, anchor: 'playhead' }));
+  assert.isFalse(state.keyframes.retimeSelectedKeyframes({ scale: 2, anchor: 'earliest' }));
+  assert.isFalse(state.keyframes.retimeSelectedKeyframes({ scale: 1, anchor: 'playhead' }));
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
   assert.equal(
@@ -282,8 +282,8 @@ test.each(['missing', 'bone', 'property', 'ik', 'anchor', 'playhead'])(
 
 test('commit keeps primary and new keys selected, synchronizes preview once and restores exact history/export', () => {
   const { input, state } = session();
-  state.beginKeyframeDrag(group[3]!);
-  state.commitKeyframeDrag();
+  state.keyframes.beginKeyframeDrag(group[3]!);
+  state.keyframes.commitKeyframeDrag();
   state.setCurrentTime(0.7);
   state.setKeyframeSnapMode('frame');
   state.play();
@@ -293,13 +293,13 @@ test('commit keeps primary and new keys selected, synchronizes preview once and 
   const notify = vi.fn();
   state.onAnimationEvent(events);
   state.subscribe(notify);
-  const candidate = state.previewKeyframeRetiming({ scale: 0.5, anchor: 'earliest' });
+  const candidate = state.keyframes.previewKeyframeRetiming({ scale: 0.5, anchor: 'earliest' });
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
   assert.isTrue(state.isPlaying);
   assert.equal(notify.mock.calls.length, 0);
-  assert.isTrue(state.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' }));
+  assert.isTrue(state.keyframes.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' }));
   assert.equal(notify.mock.calls.length, 1);
   assert.isFalse(state.isPlaying);
   assert.equal(state.currentTime, 0.7);
@@ -328,7 +328,7 @@ test('selected IK key retimes with coherent typed selection and one Undo', () =>
   state.ik.selectIKKeyframe({ kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.8 });
   state.setCurrentTime(0.2);
   const before = state.workingAnimation;
-  assert.isTrue(state.retimeSelectedKeyframes({ scale: 0.5, anchor: 'playhead' }));
+  assert.isTrue(state.keyframes.retimeSelectedKeyframes({ scale: 0.5, anchor: 'playhead' }));
   assert.deepEqual(state.ik.selectedIKKeyframe, { kind: 'ik', constraintId: 'reach', property: 'mix', time: 0.5 });
   assert.equal(state.ik.findIKPropertyKeyframe('reach', 'mix', 0.5)?.value, 0.8);
   assert.equal(state.historyLength, 1);
@@ -339,18 +339,18 @@ test('selected IK key retimes with coherent typed selection and one Undo', () =>
 
 test('rejected apply retains navigation, playback, drafts, history and redo', () => {
   const { state } = session();
-  state.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' });
+  state.keyframes.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' });
   state.undo();
   state.selectKeyframes(group);
   state.setTemporaryBoneProperty('x', 42);
   const draft = state.boneTransformDraft;
-  assert.isFalse(state.retimeSelectedKeyframes({ scale: 4, anchor: 'earliest' }));
+  assert.isFalse(state.keyframes.retimeSelectedKeyframes({ scale: 4, anchor: 'earliest' }));
   assert.strictEqual(state.boneTransformDraft, draft);
   state.play();
   const before = state.workingAnimation;
   const keys = state.selectedKeys;
   const time = state.currentTime;
-  assert.isFalse(state.retimeSelectedKeyframes({ scale: 4, anchor: 'earliest' }));
+  assert.isFalse(state.keyframes.retimeSelectedKeyframes({ scale: 4, anchor: 'earliest' }));
   assert.strictEqual(state.workingAnimation, before);
   assert.strictEqual(state.selectedKeys, keys);
   assert.equal(state.currentTime, time);

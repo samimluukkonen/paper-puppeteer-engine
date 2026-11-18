@@ -83,7 +83,7 @@ test('missing character, no clip, empty clip, bone keys and optional IK have liv
     'Create a bone property key first',
   );
   assert.include(JSON.stringify(launcher.getAvailability('animation-ik-targets')), 'Add an IK constraint');
-  animation.setBonePropertyKeyframe('root', 'x', 1);
+  animation.keyframes.setBonePropertyKeyframe('root', 'x', 1);
   rig.createBone('segment', 'root');
   rig.editBone('segment', 'x', 20);
   rig.createBone('tip', 'segment');
@@ -117,7 +117,7 @@ test.each(['no-clip', 'empty', 'existing', 'ik', 'draft', 'library'] as const)(
     }
     if (kind === 'existing' || kind === 'ik') {
       animation.selectAnimation(animation.animationIds[0]!);
-      animation.setBonePropertyKeyframe(rig.workingCopy.root, 'x', 23);
+      animation.keyframes.setBonePropertyKeyframe(rig.workingCopy.root, 'x', 23);
     }
     if (kind === 'ik') {
       const id = rig.workingCopy.ik![0]!.name;

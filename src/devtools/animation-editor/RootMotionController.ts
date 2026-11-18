@@ -160,7 +160,7 @@ export class RootMotionController {
     drag.moved = true;
     let time = drag.ref.time + ((event.clientX - drag.startX) / this.width) * state.duration;
     if (!event.shiftKey && state.timelineSnapSettings.enabled && state.timelineSnapSettings.frames)
-      time = Math.round(time * state.keyframeFPS) / state.keyframeFPS;
+      time = Math.round(time * state.keyframes.keyframeFPS) / state.keyframes.keyframeFPS;
     time = Math.max(0, Math.min(state.duration, time));
     if (this.run(() => state.previewGraphEdit({ time })))
       drag.marker.style.left = `${timeToTimelineX(time, state.duration, this.width)}px`;

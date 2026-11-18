@@ -124,10 +124,10 @@ test('Escape cancels active gestures while empty selection clears normally', () 
   assert.equal(gestures.cancelGesture.mock.calls.length, 1);
   assert.isNotNull(state.selectedKeyframe);
   gestures.hasMarquee.mockReturnValue(false);
-  state.beginKeyframeDrag(state.selectedKeyframe);
+  state.keyframes.beginKeyframeDrag(state.selectedKeyframe);
   browser.dispatchEvent(key('Escape'));
   assert.equal(gestures.cancelGesture.mock.calls.length, 2);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   browser.dispatchEvent(key('Escape'));
   assert.isNull(state.selectedKeyframe);
   keyboard.dispose();

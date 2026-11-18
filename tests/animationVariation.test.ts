@@ -88,7 +88,7 @@ test('variation owns every authored branch and preserves curves, events, setting
   const before = JSON.stringify(source);
   const original = state.workingAnimation!;
   const revision = state.sessionRevision;
-  state.setBonePropertyKeyframe('root', 'y', 5);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 5);
   const authored = state.workingAnimation!;
   const listener = vi.fn();
   state.subscribe(listener);
@@ -163,7 +163,7 @@ test.each([0, -1, NaN, Infinity, Number.MAX_VALUE])(
   'invalid scale %s leaves documents and histories intact',
   (timeScale) => {
     const { state } = fixture();
-    state.setBonePropertyKeyframe('root', 'y', 2);
+    state.keyframes.setBonePropertyKeyframe('root', 'y', 2);
     const before = state.workingAnimation,
       ids = state.animationIds,
       revision = state.sessionRevision;
@@ -279,14 +279,14 @@ test.each(['edit', 'selection', 'mode', 'rig', 'undo', 'unbind'])(
   'preview and stale dialog proposals are discarded on %s',
   (action) => {
     const { state } = fixture();
-    state.setBonePropertyKeyframe('root', 'y', 2);
+    state.keyframes.setBonePropertyKeyframe('root', 'y', 2);
     const controller = new AnimationVariationController();
     controller.bind(state);
     controller.begin();
     controller.preview({ name: 'proposed' }, 0.5);
     switch (action) {
       case 'edit':
-        state.setBonePropertyKeyframe('root', 'y', 3);
+        state.keyframes.setBonePropertyKeyframe('root', 'y', 3);
         break;
       case 'selection':
         state.selectAnimation('attack-basic', { keepChanges: true });
@@ -333,7 +333,9 @@ test('variations retain independent Graph Editor, Pose Library, mirroring, IK an
   state.setCurrentTime(0.5);
   assert.isTrue(state.applyLibraryPose(pose));
   assert.isTrue(state.ik.setIKPropertyKeyframe('reach', 'x', 25));
-  assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right', { boneIds: ['arm_L'], properties: ['rotation'] }));
+  assert.isTrue(
+    state.keyframes.mirrorCurrentPoseToKeys('left-to-right', { boneIds: ['arm_L'], properties: ['rotation'] }),
+  );
   const first = state.workingAnimation!;
   assert.isTrue(state.createVariation({ name: 'heavy-final', timeScale: 0.5 }));
   assert.deepEqual(state.animationIds, ['attack-basic', 'heavy', 'heavy-final']);
@@ -344,7 +346,7 @@ test('variations retain independent Graph Editor, Pose Library, mirroring, IK an
   state.selectAnimation('attack-basic', { keepChanges: true });
   assert.strictEqual(state.workingAnimation, original);
   assert.isFalse(state.canUndo);
-  state.setBonePropertyKeyframe('root', 'y', 100);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 100);
   state.selectAnimation('heavy', { keepChanges: true });
   assert.strictEqual(state.workingAnimation, first, 'later source edits do not propagate');
 });

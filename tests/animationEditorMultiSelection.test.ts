@@ -187,7 +187,7 @@ test('clear/navigation/switch discard selection; failed animation switch preserv
     assert.isNull(state.primaryKey);
   }
   state.selectKeyframe(key(0.5));
-  state.setBonePropertyKeyframe('root', 'x', 9, 0.5);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 9, 0.5);
   assert.isFalse(state.selectAnimation('move'));
   assert.deepEqual(state.selectedKeys, [key(0.5)]);
 });
@@ -195,9 +195,9 @@ test('clear/navigation/switch discard selection; failed animation switch preserv
 test('reconciliation retains value edits, drops deleted keys, resolves normalized times, and deduplicates', () => {
   const { state } = session();
   state.selectKeyframes([key(0.5), key(0.75, 'rotation', 'arm')]);
-  state.setBonePropertyKeyframe('root', 'x', 99, 0.5);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99, 0.5);
   assert.equal(state.selectedKeys.length, 2);
-  state.removeBonePropertyKeyframe('root', 'x', 0.5);
+  state.keyframes.removeBonePropertyKeyframe('root', 'x', 0.5);
   assert.deepEqual(state.selectedKeys, [key(0.75, 'rotation', 'arm')]);
   assert.equal(state.selectedBoneId, 'arm');
   assert.equal(state.selectedTimelineProperty, 'rotation');
@@ -229,7 +229,7 @@ test('distinct authored times within tolerance stay distinct and deletion never 
   const near = next.tracks.root![2]!.time / 1000;
   state.selectKeyframes([key(0.5), key(near)]);
   assert.equal(state.selectedKeys.length, 2);
-  state.removeBonePropertyKeyframe('root', 'x', 0.5);
+  state.keyframes.removeBonePropertyKeyframe('root', 'x', 0.5);
   assert.deepEqual(state.selectedKeys, [key(near)]);
   state.deleteSelectedKeyframes();
   assert.deepEqual(state.selectedKeys, []);
@@ -238,22 +238,22 @@ test('distinct authored times within tolerance stay distinct and deletion never 
 test('single-key and group moves follow selection, and dragging an unselected key replaces the set', () => {
   const { state } = session();
   state.selectKeyframe(key(0.5));
-  state.moveSelectedKeyframe(0.6);
+  state.keyframes.moveSelectedKeyframe(0.6);
   assert.deepEqual(state.primaryKey, key(0.6));
   state.selectKeyframe(key(0.75, 'rotation', 'arm'), { additive: true });
   assert.isTrue(state.nudgeSelectedKeyframe(1));
   assert.deepEqual(state.selectedKeys, [key(0.61), key(0.76, 'rotation', 'arm')]);
-  assert.isTrue(state.moveSelectedKeyframe(0.8));
+  assert.isTrue(state.keyframes.moveSelectedKeyframe(0.8));
   assert.deepEqual(state.selectedKeys, [key(0.8), key(0.95, 'rotation', 'arm')]);
   assert.deepEqual(state.primaryKey, key(0.8));
-  assert.isTrue(state.beginKeyframeDrag(key(0.8)));
-  state.previewKeyframeDrag(0.7);
-  state.commitKeyframeDrag();
+  assert.isTrue(state.keyframes.beginKeyframeDrag(key(0.8)));
+  state.keyframes.previewKeyframeDrag(0.7);
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.selectedKeys, [key(0.7), key(0.85, 'rotation', 'arm')]);
-  assert.isTrue(state.beginKeyframeDrag(key(1)));
+  assert.isTrue(state.keyframes.beginKeyframeDrag(key(1)));
   assert.deepEqual(state.selectedKeys, [key(1)]);
-  state.previewKeyframeDrag(1.1);
-  state.commitKeyframeDrag();
+  state.keyframes.previewKeyframeDrag(1.1);
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.selectedKeys, [key(1.1)]);
 });
 
@@ -298,9 +298,9 @@ test('deleting unrelated or secondary keys preserves pending drafts in the uncha
   const { state } = session();
   state.selectKeyframes([key(0.5), key(0.75, 'rotation', 'arm')]);
   state.setTemporaryBoneProperty('y', 123);
-  state.removeBonePropertyKeyframe('root', 'x', 1);
+  state.keyframes.removeBonePropertyKeyframe('root', 'x', 1);
   assert.equal(state.boneTransformDraft.y, 123);
-  state.removeBonePropertyKeyframe('arm', 'rotation', 0.75);
+  state.keyframes.removeBonePropertyKeyframe('arm', 'rotation', 0.75);
   assert.equal(state.boneTransformDraft.y, 123);
   assert.deepEqual(state.selectedKeys, [key(0.5)]);
 });

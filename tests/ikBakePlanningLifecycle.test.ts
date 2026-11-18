@@ -57,7 +57,7 @@ test('closed panels do not plan and rapid option edits start only the latest job
   const { controller, state, jobs, start, finish } = pendingEditor();
   controller.setConstraint('arm', true);
   controller.setFPS('5');
-  state.setBonePropertyKeyframe('upper', 'rotation', 0.3);
+  state.keyframes.setBonePropertyKeyframe('upper', 'rotation', 0.3);
   await vi.advanceTimersByTimeAsync(1000);
   assert.equal(start.mock.calls.length, 0);
   assert.isFalse(controller.getSnapshot().pending);
@@ -82,7 +82,7 @@ test('authored edits cancel in-flight work and a late reply cannot publish the o
   controller.setPanelOpen(true);
   controller.setConstraint('arm', true);
   await vi.advanceTimersByTimeAsync(200);
-  state.setBonePropertyKeyframe('upper', 'rotation', 0.4);
+  state.keyframes.setBonePropertyKeyframe('upper', 'rotation', 0.4);
   assert.equal(jobs[0]!.cancel.mock.calls.length, 1);
   await finish(0);
   assert.isNull(controller.getSnapshot().plan);
@@ -189,7 +189,7 @@ test('a source edit during pause prevents installation of a previously verified 
   const release = state.subscribe(() => {
     if (!state.isPlaying && !edited) {
       edited = true;
-      state.setBonePropertyKeyframe('upper', 'rotation', 0.8);
+      state.keyframes.setBonePropertyKeyframe('upper', 'rotation', 0.8);
     }
   });
   assert.isFalse(controller.commit());

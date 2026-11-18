@@ -166,7 +166,7 @@ export class TimelineInputController {
           gesture.tracks !== this.state.timelineTracks ||
           this.state.isPlaying
         : gesture.kind === 'key-drag'
-          ? !this.state.keyframeDrag
+          ? !this.state.keyframes.keyframeDrag
           : gesture.kind === 'event-drag'
             ? !this.state.eventDrag
             : !this.state.isScrubbing);
@@ -208,7 +208,7 @@ export class TimelineInputController {
       this.state.selectKeyframe(key, { additive: event.ctrlKey || event.metaKey, range: event.shiftKey });
       return;
     }
-    if (!this.state.beginKeyframeDrag(key)) return;
+    if (!this.state.keyframes.beginKeyframeDrag(key)) return;
     const bounds = this.timeline.getBoundingClientRect();
     this.gesture = {
       kind: 'key-drag',
@@ -254,7 +254,7 @@ export class TimelineInputController {
     const preview =
       pointer.kind === 'event-drag'
         ? this.state.previewEventDrag.bind(this.state)
-        : this.state.previewKeyframeDrag.bind(this.state);
+        : this.state.keyframes.previewKeyframeDrag.bind(this.state.keyframes);
     preview(
       timelineXToTime(pointer.clientX - bounds.left - pointer.offset, this.state.duration, bounds.width),
       pointer.shift,
@@ -360,8 +360,8 @@ export class TimelineInputController {
         this.state.endScrub();
         break;
       case 'key-drag':
-        if (commit) this.state.commitKeyframeDrag();
-        else this.state.cancelKeyframeDrag();
+        if (commit) this.state.keyframes.commitKeyframeDrag();
+        else this.state.keyframes.cancelKeyframeDrag();
         break;
       case 'event-drag':
         if (commit) this.state.commitEventDrag();
@@ -376,7 +376,7 @@ export class TimelineInputController {
   cancelGesture(): void {
     this.endGesture(false);
     // State-only commands can begin/cancel a drag before a DOM pointer is acquired.
-    this.state.cancelKeyframeDrag();
+    this.state.keyframes.cancelKeyframeDrag();
     this.state.cancelEventDrag();
     this.state.endScrub();
   }

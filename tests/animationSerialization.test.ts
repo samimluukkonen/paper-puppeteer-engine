@@ -115,10 +115,10 @@ test('key edits cannot push an exportable document past the shared export budget
   const state = new AnimationEditorState(rig);
   assert.isTrue(state.importJson(JSON.stringify(input)));
   assert.isTrue(state.exportAnimation().success);
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 1, 0));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', 1, 0));
   const working = state.workingAnimation;
   const history = state.historyLength;
-  assert.isFalse(state.setBonePropertyKeyframe('root', 'x', 2, 0.1));
+  assert.isFalse(state.keyframes.setBonePropertyKeyframe('root', 'x', 2, 0.1));
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.historyLength, history);
   assert.match(state.validationIssues[0]!.message, /byte size limit/);
@@ -217,11 +217,11 @@ test('export does not mutate source, working copy, input or any editor session s
   const original = structuredClone(animation);
   const state = new AnimationEditorState(rig, [animation]);
   state.selectAnimation('move');
-  state.setBonePropertyKeyframe('root', 'x', 0.1 + 0.2, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 0.1 + 0.2, 0);
   state.selectBone('root');
   state.setCurrentTime(0.25);
   state.selectKeyframe({ boneId: 'arm', property: 'rotation', time: 0.25 });
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setTemporaryBoneProperty('y', 99);
   state.setPreviewLoop(false);
   state.setPlaybackSpeed(2);

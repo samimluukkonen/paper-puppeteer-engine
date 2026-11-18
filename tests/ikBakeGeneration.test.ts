@@ -437,8 +437,8 @@ test('proposals own immutable data without freezing or changing mutable samples,
   const source = animation();
   const state = new AnimationEditorState(skeleton, [source]);
   state.selectAnimation(source.name);
-  state.setBonePropertyKeyframe('upper', 'x', 5, 0);
-  state.setBonePropertyKeyframe('upper', 'x', 6, 0);
+  state.keyframes.setBonePropertyKeyframe('upper', 'x', 5, 0);
+  state.keyframes.setBonePropertyKeyframe('upper', 'x', 6, 0);
   state.undo();
   state.selectBone('upper');
   state.setTemporaryBoneProperty('rotation', 0.4);

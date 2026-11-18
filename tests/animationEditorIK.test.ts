@@ -165,7 +165,7 @@ test.each([1001, 1003, 1001.123456789])('inspectors and canvas retain the exact 
   assert.strictEqual(state.workingAnimation, working);
   assert.isTrue(state.ik.setIKPropertyKeyframe('arm', 'y', 75));
   assert.equal(state.workingAnimation!.ikTracks!.arm!.at(-1)!.time, duration);
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'y', 12));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'y', 12));
   assert.equal(state.workingAnimation!.tracks.root!.at(-1)!.time, duration);
   preview.dispose();
   puppet.destroy();

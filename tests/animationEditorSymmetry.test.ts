@@ -69,7 +69,7 @@ test('mapping preferences preserve authored data, preview, clock, selection, pla
 test('mapping changes preserve existing animation undo and redo', () => {
   const state = new AnimationEditorState(rig, [animation]);
   state.selectAnimation('wave');
-  state.setBonePropertyKeyframe('leftArm', 'rotation', 1, 0);
+  state.keyframes.setBonePropertyKeyframe('leftArm', 'rotation', 1, 0);
   state.undo();
   const working = state.workingAnimation;
   const history = state.historyLength;

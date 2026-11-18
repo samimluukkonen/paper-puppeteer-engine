@@ -143,7 +143,7 @@ test('moving onto a distinct near-source key honors nearest-match identity and r
   const state = new AnimationEditorState(rig, [animation]);
   state.selectAnimation('move');
   state.selectKeyframe({ boneId: 'root', property: 'rotation', time: 0.5 });
-  state.moveSelectedKeyframe(near / 1000);
+  state.keyframes.moveSelectedKeyframe(near / 1000);
   assert.equal(state.selectedKeyframe?.time, near / 1000);
   assert.equal(state.selectedBoneTransform?.rotation, 0.3);
   assert.equal(state.historyLength, 1);
@@ -168,10 +168,10 @@ test('provisional drag follows the sole clock and blocks playback without histor
   const before = state.workingAnimation;
   const source = state.sourceAnimation;
   state.play();
-  assert.isTrue(state.beginKeyframeDrag(state.selectedKeyframe!));
-  state.previewKeyframeDrag(0.8);
+  assert.isTrue(state.keyframes.beginKeyframeDrag(state.selectedKeyframe!));
+  state.keyframes.previewKeyframeDrag(0.8);
   assert.equal(state.currentTime, 0.8);
-  assert.equal(state.keyframeDrag?.previewTime, 0.8);
+  assert.equal(state.keyframes.keyframeDrag?.previewTime, 0.8);
   assert.equal(state.selectedKeyframe?.time, 0.5);
   state.play();
   state.advancePlayback(0.1);
@@ -180,13 +180,13 @@ test('provisional drag follows the sole clock and blocks playback without histor
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
-  state.previewKeyframeDrag(0.7);
-  state.previewKeyframeDrag(0.8);
-  assert.isTrue(state.commitKeyframeDrag());
+  state.keyframes.previewKeyframeDrag(0.7);
+  state.keyframes.previewKeyframeDrag(0.8);
+  assert.isTrue(state.keyframes.commitKeyframeDrag());
   const moved = state.workingAnimation;
   assert.equal(state.historyLength, 1);
   assert.isTrue(state.dirty);
-  assert.isNull(state.keyframeDrag);
+  assert.isNull(state.keyframes.keyframeDrag);
   assert.equal(state.selectedKeyframe?.time, 0.8);
   assert.equal(state.selectedTimelineProperty, 'rotation');
   assert.equal(state.selectedBoneTransform?.rotation, 0.3);
@@ -205,9 +205,9 @@ test('provisional drag follows the sole clock and blocks playback without histor
 test('collision Undo/Redo restores exact immutable snapshots and sparse destination siblings', () => {
   const { state } = session();
   const before = state.workingAnimation;
-  state.beginKeyframeDrag(state.selectedKeyframe!);
-  state.previewKeyframeDrag(9);
-  state.commitKeyframeDrag();
+  state.keyframes.beginKeyframeDrag(state.selectedKeyframe!);
+  state.keyframes.previewKeyframeDrag(9);
+  state.keyframes.commitKeyframeDrag();
   const moved = state.workingAnimation;
   assert.equal(state.selectedKeyframe?.time, 1);
   assert.deepEqual(state.workingAnimation?.tracks.root![2], { time: 1000, rotation: 0.3, y: 8 });
@@ -220,24 +220,24 @@ test('collision Undo/Redo restores exact immutable snapshots and sparse destinat
 
 test('cancelled drag and unchanged gestures preserve authored data, saved state, history and redo', () => {
   const { state } = session();
-  state.moveSelectedKeyframe(0.8);
+  state.keyframes.moveSelectedKeyframe(0.8);
   state.undo();
   state.selectKeyframe({ boneId: 'root', property: 'rotation', time: 0.5 });
   const before = state.workingAnimation;
-  state.beginKeyframeDrag(state.selectedKeyframe!);
-  state.previewKeyframeDrag(-4);
+  state.keyframes.beginKeyframeDrag(state.selectedKeyframe!);
+  state.keyframes.previewKeyframeDrag(-4);
   assert.equal(state.currentTime, 0);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   assert.equal(state.currentTime, 0.5);
   assert.strictEqual(state.workingAnimation, before);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.isTrue(state.canRedo);
-  state.beginKeyframeDrag(state.selectedKeyframe!);
-  state.commitKeyframeDrag();
+  state.keyframes.beginKeyframeDrag(state.selectedKeyframe!);
+  state.keyframes.commitKeyframeDrag();
   assert.equal(state.historyLength, 0);
   assert.isTrue(state.canRedo);
-  assert.isFalse(state.commitKeyframeDrag());
+  assert.isFalse(state.keyframes.commitKeyframeDrag());
 });
 
 test('snap preference is transient, authored FPS drives gestures, Shift bypasses drag snapping', () => {
@@ -247,12 +247,12 @@ test('snap preference is transient, authored FPS drives gestures, Shift bypasses
   state.markSaved();
   state.setKeyframeSnapMode('frame');
   const history = state.historyLength;
-  state.beginKeyframeDrag(state.selectedKeyframe!);
-  state.previewKeyframeDrag(0.143);
+  state.keyframes.beginKeyframeDrag(state.selectedKeyframe!);
+  state.keyframes.previewKeyframeDrag(0.143);
   assert.equal(state.currentTime, 0.15);
-  state.previewKeyframeDrag(0.143, true);
+  state.keyframes.previewKeyframeDrag(0.143, true);
   assert.equal(state.currentTime, 0.143);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, history);
   assert.notInclude(state.exportJson(), 'snap');
@@ -288,8 +288,8 @@ test.each(['undo', 'navigation', 'selection', 'settings', 'scrub', 'animation', 
   'drag cancels at %s boundary',
   (boundary) => {
     const { state } = session();
-    state.beginKeyframeDrag(state.selectedKeyframe!);
-    state.previewKeyframeDrag(0.8);
+    state.keyframes.beginKeyframeDrag(state.selectedKeyframe!);
+    state.keyframes.previewKeyframeDrag(0.8);
     const before = state.workingAnimation;
     if (boundary === 'undo') state.undo();
     if (boundary === 'navigation') state.setCurrentTime(0.2);
@@ -298,7 +298,7 @@ test.each(['undo', 'navigation', 'selection', 'settings', 'scrub', 'animation', 
     if (boundary === 'scrub') state.beginScrub();
     if (boundary === 'animation') state.selectAnimation(null);
     if (boundary === 'collapse') state.setTimelineBoneExpanded('root', false);
-    assert.isNull(state.keyframeDrag);
+    assert.isNull(state.keyframes.keyframeDrag);
     if (boundary !== 'settings' && boundary !== 'animation') assert.strictEqual(state.workingAnimation, before);
     assert.equal(state.historyLength, boundary === 'settings' ? 1 : 0);
   },

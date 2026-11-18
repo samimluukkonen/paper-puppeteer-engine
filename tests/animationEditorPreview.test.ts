@@ -217,10 +217,10 @@ test.each(['smooth', 'stepped'] as const)(
     const preview = new AnimationEditorPreview(state, puppet);
     const before = JSON.stringify(input);
     try {
-      state.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 });
-      state.previewKeyframeDrag(0.8);
+      state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 });
+      state.keyframes.previewKeyframeDrag(0.8);
       assert.equal(puppet.getBone('root').pose.x, 28, 'provisional seek evaluates unchanged authored keys');
-      state.commitKeyframeDrag();
+      state.keyframes.commitKeyframeDrag();
       assert.equal(puppet.getBone('root').pose.x, 40);
       assert.equal(state.selectedBoneTransform?.x, 40);
       state.undo();
@@ -274,7 +274,7 @@ test('canvas and inspector share compilation while independently evaluating time
     assert.equal(puppet.getBone('root').pose.x, 25);
     assert.equal(state.getEvaluatedBonePropertyValue('root', 'x', 0.5), 50);
     assert.equal(compile.mock.calls.length, 1);
-    state.setBonePropertyKeyframe('root', 'x', 30);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 30);
     assert.equal(state.selectedBoneTransform?.x, 30);
     assert.equal(puppet.getBone('root').pose.x, 30);
     assert.equal(compile.mock.calls.length, 2, 'new authored snapshots compile once for both consumers');
@@ -358,7 +358,7 @@ test('held stepped frames skip projection while drafts, authored edits and endpo
   assert.equal(puppet.getBone('root').pose.x, 77);
   state.cancelTransformEdit();
   assert.equal(puppet.getBone('root').pose.x, 50);
-  state.setBonePropertyKeyframe('root', 'y', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 12);
   assert.equal(puppet.getBone('root').pose.y, 12);
   state.setCurrentTime(1.049);
   assert.equal(puppet.getBone('root').pose.x, 100);
@@ -398,12 +398,12 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
       assert.equal(state.currentTime, 0.5);
     };
     assertValue(4);
-    state.setBonePropertyKeyframe('root', 'x', 10);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
     assertValue(10);
     assert.isFalse(state.isPlaying);
-    state.setBonePropertyKeyframe('root', 'x', 20);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 20);
     assertValue(20);
-    state.removeBonePropertyKeyframe('root', 'x');
+    state.keyframes.removeBonePropertyKeyframe('root', 'x');
     assertValue(4);
     state.undo();
     assertValue(20);
@@ -412,7 +412,7 @@ test.each<AnimationPlaybackMode>([{ mode: 'smooth' }, { mode: 'stepped', fps: 10
 
     // Active edits remain safe and keep the existing playback intent and clock.
     state.play();
-    state.setBonePropertyKeyframe('root', 'x', 30);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 30);
     assertValue(30);
     assert.isTrue(state.isPlaying);
     state.advancePlayback(0.1);

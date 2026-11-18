@@ -310,8 +310,8 @@ test('portable scene exports retain root tracks, policy, evaluated travel and as
   const assets = assetFixture();
   const editor = new AnimationEditorState(new Rig({ root: 'root', bones: [{ id: 'root' }] }));
   assert.isTrue(editor.createAnimation({ name: 'wave', durationSeconds: 1, loop: false }));
-  editor.setBonePropertyKeyframe('root', 'rotation', -0.3, 0.25);
-  editor.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.6);
+  editor.keyframes.setBonePropertyKeyframe('root', 'rotation', -0.3, 0.25);
+  editor.keyframes.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.6);
   editor.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
   editor.rootMotion.setRootPosition({ x: 0, y: 0 }, 0.25);
   editor.rootMotion.setRootPosition({ x: 80, y: 0 }, 0.6);

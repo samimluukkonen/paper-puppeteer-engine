@@ -329,7 +329,7 @@ test('whole-clip variations scale root times; unrelated edits and history preser
   assert.deepEqual(edited.rootMotion, motion);
   const state = new AnimationEditorState(rig, [source]);
   state.selectAnimation(source.name);
-  assert.isTrue(state.setBonePropertyKeyframe('pelvis', 'y', 42, 0));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('pelvis', 'y', 42, 0));
   assert.isTrue(state.undo());
   assert.deepEqual(state.workingAnimation!.rootMotion, motion);
   assert.isTrue(state.redo());

@@ -154,16 +154,16 @@ test('group anchor resolves once, excludes all moving keys, preserves spacing an
   const source = state.sourceAnimation;
   state.setTimelineSnapSettings({ frames: false, playhead: false });
   state.selectKeyframes([a, b]);
-  state.beginKeyframeDrag(a);
-  state.previewKeyframeDrag(0.355);
+  state.keyframes.beginKeyframeDrag(a);
+  state.keyframes.previewKeyframeDrag(0.355);
   assert.isNull(state.timelineSnapGuide, 'the other selected key is excluded');
-  state.previewKeyframeDrag(0.755);
+  state.keyframes.previewKeyframeDrag(0.755);
   assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 0.75 });
-  assert.closeTo(state.keyframeDrag!.previewDelta, 0.55, 1e-12);
+  assert.closeTo(state.keyframes.keyframeDrag!.previewDelta, 0.55, 1e-12);
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
-  assert.isTrue(state.commitKeyframeDrag());
+  assert.isTrue(state.keyframes.commitKeyframeDrag());
   const after = state.workingAnimation;
   assert.deepEqual(
     state.selectedKeys.map((key) => key.time),
@@ -182,11 +182,11 @@ test('group anchor resolves once, excludes all moving keys, preserves spacing an
 test('ineligible group-bound targets never produce a misleading guide or change relative timing', () => {
   const { state } = session();
   state.selectKeyframes([a, { ...a, time: 0.8 }]);
-  state.beginKeyframeDrag(a);
-  state.previewKeyframeDrag(1.99);
-  assert.closeTo(state.keyframeDrag!.previewTime, 1.4, 1e-12);
+  state.keyframes.beginKeyframeDrag(a);
+  state.keyframes.previewKeyframeDrag(1.99);
+  assert.closeTo(state.keyframes.keyframeDrag!.previewTime, 1.4, 1e-12);
   assert.equal(state.timelineSnapGuide?.time, 1.4);
-  state.commitKeyframeDrag();
+  state.keyframes.commitKeyframeDrag();
   assert.closeTo(state.selectedKeys[1]!.time - state.selectedKeys[0]!.time, 0.6, 1e-12);
 });
 
@@ -194,16 +194,16 @@ test('playhead snap holds the time captured before selection and never chases dr
   const { state } = session();
   state.setTimelineSnapSettings({ frames: false, keyframes: false, events: false });
   state.setCurrentTime(1.234);
-  state.beginKeyframeDrag(a);
-  state.previewKeyframeDrag(1.24);
+  state.keyframes.beginKeyframeDrag(a);
+  state.keyframes.previewKeyframeDrag(1.24);
   assert.deepEqual(state.timelineSnapGuide, { type: 'playhead', time: 1.234 });
-  state.previewKeyframeDrag(1.255);
+  state.keyframes.previewKeyframeDrag(1.255);
   assert.equal(state.currentTime, 1.255);
   assert.isNull(state.timelineSnapGuide);
-  state.previewKeyframeDrag(1.24, true);
+  state.keyframes.previewKeyframeDrag(1.24, true);
   assert.equal(state.currentTime, 1.24);
   assert.isNull(state.timelineSnapGuide);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   assert.isNull(state.timelineSnapGuide);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
@@ -213,10 +213,10 @@ test('snapped key collisions preserve siblings and Undo/Redo restores destinatio
   const { state } = session();
   state.setTimelineSnapSettings({ frames: false, events: false, playhead: false });
   const before = state.workingAnimation;
-  state.beginKeyframeDrag(a);
-  state.previewKeyframeDrag(0.807);
+  state.keyframes.beginKeyframeDrag(a);
+  state.keyframes.previewKeyframeDrag(0.807);
   assert.equal(state.timelineSnapGuide?.type, 'keyframe');
-  state.commitKeyframeDrag();
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.workingAnimation!.tracks.root!.at(-1), { time: 800, x: 10, y: 4 });
   state.undo();
   assert.strictEqual(state.workingAnimation, before);
@@ -286,16 +286,16 @@ test('preferences/geometry do not dirty or serialize and targets rebuild after h
   assert.isTrue(targets.some((target) => target.key && 'kind' in target.key));
   assert.isTrue(Object.isFrozen(targets));
   assert.equal(JSON.stringify(input), sourceJson);
-  state.beginKeyframeDrag(a);
-  state.previewKeyframeDrag(0.809);
+  state.keyframes.beginKeyframeDrag(a);
+  state.keyframes.previewKeyframeDrag(0.809);
   assert.isNull(state.timelineSnapGuide, '18 pixels misses');
-  state.cancelKeyframeDrag();
-  state.moveSelectedKeyframe(0.6);
+  state.keyframes.cancelKeyframeDrag();
+  state.keyframes.moveSelectedKeyframe(0.6);
   state.undo();
-  state.beginKeyframeDrag(b);
-  state.previewKeyframeDrag(0.605);
+  state.keyframes.beginKeyframeDrag(b);
+  state.keyframes.previewKeyframeDrag(0.605);
   assert.isNull(state.timelineSnapGuide, 'undone key target no longer exists');
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
 });
 
 test.each(['key', 'event'] as const)(
@@ -303,9 +303,10 @@ test.each(['key', 'event'] as const)(
   (kind) => {
     const { state } = session();
     state.setTimelineSnapSettings({ frames: false, keyframes: false, playhead: false });
-    if (kind === 'key') state.beginKeyframeDrag(a);
+    if (kind === 'key') state.keyframes.beginKeyframeDrag(a);
     else state.beginEventDrag(state.eventTimelineTrack.markers[1]!.ref);
-    const preview = (time: number) => (kind === 'key' ? state.previewKeyframeDrag(time) : state.previewEventDrag(time));
+    const preview = (time: number) =>
+      kind === 'key' ? state.keyframes.previewKeyframeDrag(time) : state.previewEventDrag(time);
     preview(0.755);
     assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 0.75 });
     let notifications = 0;
@@ -320,7 +321,7 @@ test.each(['key', 'event'] as const)(
     assert.equal(state.currentTime, 0.75);
     assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 0.75 });
     preview(0.755);
-    if (kind === 'key') state.previewKeyframeDrag(0.755, true);
+    if (kind === 'key') state.keyframes.previewKeyframeDrag(0.755, true);
     else state.previewEventDrag(0.755, true);
     state.setTimelineSnapSettings({ events: false });
     state.setTimelineSnapSettings({ events: true });

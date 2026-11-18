@@ -168,7 +168,7 @@ test('dedicated marker model stably sorts authored events, preserves duplicates 
   state.play();
   state.advancePlayback(0.2);
   assert.strictEqual(state.eventTimelineTrack, track);
-  state.setBonePropertyKeyframe('root', 'y', 3);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 3);
   assert.strictEqual(state.eventTimelineTrack, track, 'unrelated key edits share the event model');
   const animation = clip();
   const mutableTrack = buildEventTimelineTrack(animation);

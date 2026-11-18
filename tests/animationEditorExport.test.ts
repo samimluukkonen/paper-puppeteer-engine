@@ -19,7 +19,7 @@ function state() {
     { name: 'idle', duration: 1000, loop: false, tracks: {} },
   ]);
   current.selectAnimation('move');
-  current.setBonePropertyKeyframe('root', 'x', 2);
+  current.keyframes.setBonePropertyKeyframe('root', 'x', 2);
   return current;
 }
 
@@ -100,7 +100,7 @@ test('delayed copy saves its snapshot and retains edits made while the clipboard
   const copied = current.workingAnimation;
   await query('#animation-copy-json').click();
   assert.isTrue(current.dirty);
-  current.setBonePropertyKeyframe('root', 'x', 3);
+  current.keyframes.setBonePropertyKeyframe('root', 'x', 3);
   pending.resolve();
   await pending.promise;
   assert.isTrue(current.dirty);
@@ -115,7 +115,7 @@ test('an older copy cannot replace a newer successful download checkpoint or fee
   const pending = deferred();
   vi.stubGlobal('navigator', { clipboard: { writeText: () => pending.promise } });
   await query('#animation-copy-json').click();
-  current.setBonePropertyKeyframe('root', 'x', 3);
+  current.keyframes.setBonePropertyKeyframe('root', 'x', 3);
   await query('#animation-download').click();
   const feedback = query('#animation-export-feedback').textContent;
   pending.resolve();
@@ -142,7 +142,7 @@ for (const action of ['switch', 'switch-back', 'revert', 'discard', 'dispose', '
     if (action === 'discard') {
       vi.stubGlobal('window', { confirm: () => true });
       await query('#animation-discard').click();
-      current.setBonePropertyKeyframe('root', 'x', 4);
+      current.keyframes.setBonePropertyKeyframe('root', 'x', 4);
     }
     if (action === 'dispose') controller.dispose();
     if (action === 'bind') {

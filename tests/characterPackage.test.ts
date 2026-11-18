@@ -780,7 +780,7 @@ test('package checkpoints cover each domain and delayed download cannot clean ne
   });
   const animations = new AnimationEditorState(current.definition.rig, current.animations);
   animations.selectAnimation('move');
-  animations.setBonePropertyKeyframe('child', 'x', 42, 0.5);
+  animations.keyframes.setBonePropertyKeyframe('child', 'x', 42, 0.5);
   current = { ...current, animations: animations.packageAnimations() };
   controller.refresh();
   assert.deepEqual(controller.getSnapshot().modified, ['Animations']);
@@ -1108,7 +1108,7 @@ test('package skin and artwork checkpoints survive undo/revert and retain rig-an
   assert.isFalse(controller.hasUnsavedChanges);
   const animation = new AnimationEditorState(source.definition.rig, source.animations);
   animation.selectAnimation('move');
-  animation.setBonePropertyKeyframe('child', 'rotation', 0.5, 0.25);
+  animation.keyframes.setBonePropertyKeyframe('child', 'rotation', 0.5, 0.25);
   const working = animation.workingAnimation,
     history = animation.historyLength;
   const files = await buildCharacterPackage({ ...source, animations: animation.packageAnimations() }, fetchImage);

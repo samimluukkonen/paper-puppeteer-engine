@@ -63,8 +63,8 @@ test('copy snapshots every authored value/track and relative time without touchi
   state.setCurrentTime(0.35);
   state.setTemporaryBoneProperty('x', 999);
   const selection = state.selectedKeys;
-  assert.isTrue(state.copySelectedKeyframes());
-  assert.deepEqual(state.keyframeClipboard, {
+  assert.isTrue(state.keyframes.copySelectedKeyframes());
+  assert.deepEqual(state.keyframes.keyframeClipboard, {
     anchorTimeMs: 500,
     entries: [
       { boneId: 'torso', property: 'x', relativeTimeMs: 0, value: Math.PI },
@@ -83,24 +83,24 @@ test('copy snapshots every authored value/track and relative time without touchi
   assert.equal(state.historyLength, 0);
   assert.equal(JSON.stringify(input), before);
   assert.isFalse(Object.isFrozen(input));
-  assert.isTrue(Object.isFrozen(state.keyframeClipboard));
-  assert.isTrue(Object.isFrozen(state.keyframeClipboard!.entries));
-  assert.isTrue(state.keyframeClipboard!.entries.every(Object.isFrozen));
-  const clipboard = state.keyframeClipboard;
+  assert.isTrue(Object.isFrozen(state.keyframes.keyframeClipboard));
+  assert.isTrue(Object.isFrozen(state.keyframes.keyframeClipboard!.entries));
+  assert.isTrue(state.keyframes.keyframeClipboard!.entries.every(Object.isFrozen));
+  const clipboard = state.keyframes.keyframeClipboard;
   state.clearKeyframeSelection();
-  assert.isFalse(state.copySelectedKeyframes());
-  assert.strictEqual(state.keyframeClipboard, clipboard);
+  assert.isFalse(state.keyframes.copySelectedKeyframes());
+  assert.strictEqual(state.keyframes.keyframeClipboard, clipboard);
 });
 
 test('empty clipboard/selection and unloaded sessions are safe no-ops', () => {
   const unloaded = new AnimationEditorState();
   for (const state of [unloaded, session().state]) {
     state.clearKeyframeSelection();
-    assert.isFalse(state.pasteKeyframes());
-    assert.isFalse(state.copySelectedKeyframes());
-    assert.isFalse(state.duplicateSelectedKeyframes());
+    assert.isFalse(state.keyframes.pasteKeyframes());
+    assert.isFalse(state.keyframes.copySelectedKeyframes());
+    assert.isFalse(state.keyframes.duplicateSelectedKeyframes());
     assert.equal(state.historyLength, 0);
-    assert.isNull(state.keyframeClipboard);
+    assert.isNull(state.keyframes.keyframeClipboard);
   }
   assert.isNull(copyKeyframeSelection(session().input, [key(123)]));
 });
@@ -108,7 +108,7 @@ test('empty clipboard/selection and unloaded sessions are safe no-ops', () => {
 test('paste anchors at the held clock, extends duration, selects all five keys and refreshes one installed snapshot', () => {
   const { state, input, rig } = session();
   const source = state.sourceAnimation;
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.play();
   state.setTemporaryBoneProperty('x', 500);
   state.setCurrentTime(2);
@@ -119,7 +119,7 @@ test('paste anchors at the held clock, extends duration, selects all five keys a
       assert.equal(state.selectedKeys.length, 5, 'observers see pasted selection with the authored snapshot');
     }
   });
-  assert.isTrue(state.pasteKeyframes());
+  assert.isTrue(state.keyframes.pasteKeyframes());
   unsubscribe();
   assert.equal(installed.length, 1);
   assert.equal(state.currentTime, 2);
@@ -153,10 +153,10 @@ test('paste anchors at the held clock, extends duration, selects all five keys a
 
 test('one Undo/Redo restores exact source/result snapshots including extension and replacement', () => {
   const { state } = session();
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   const before = state.workingAnimation;
   state.setCurrentTime(1.8);
-  state.pasteKeyframes();
+  state.keyframes.pasteKeyframes();
   const after = state.workingAnimation;
   assert.isTrue(state.undo());
   assert.strictEqual(state.workingAnimation, before);
@@ -202,11 +202,11 @@ test('paste uses the exact movement collision policy, including tolerant duplica
   assert.isTrue(state.replaceWorkingAnimation({ ...source, name: 'idle', version: ANIMATION_FORMAT_VERSION }));
   state.markSaved();
   state.selectKeyframe(key(0.5));
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setCurrentTime(1);
   const original = state.workingAnimation;
   const length = state.historyLength;
-  state.pasteKeyframes();
+  state.keyframes.pasteKeyframes();
   const replaced = state.workingAnimation;
   assert.equal(state.historyLength, length + 1);
   state.undo();
@@ -221,12 +221,12 @@ test.each([{ mode: 'smooth' } as const, { mode: 'stepped', fps: 20 } as const])(
   (playback) => {
     const { state } = session(playback);
     state.selectKeyframe(key(1.2, 'scaleX'));
-    state.copySelectedKeyframes();
-    const clipboard = state.keyframeClipboard;
+    state.keyframes.copySelectedKeyframes();
+    const clipboard = state.keyframes.keyframeClipboard;
     state.selectKeyframes(group);
     state.setCurrentTime(0.9);
     const before = state.workingAnimation;
-    assert.isTrue(state.duplicateSelectedKeyframes());
+    assert.isTrue(state.keyframes.duplicateSelectedKeyframes());
     const step = playback.mode === 'stepped' ? 0.05 : 0.01;
     for (const [index, selected] of state.selectedKeys.entries()) {
       assert.approximately(selected.time, group[index]!.time + step, 1e-12);
@@ -234,7 +234,7 @@ test.each([{ mode: 'smooth' } as const, { mode: 'stepped', fps: 20 } as const])(
       assert.equal(selected.property, group[index]!.property);
     }
     assert.equal(state.currentTime, 0.9);
-    assert.strictEqual(state.keyframeClipboard, clipboard);
+    assert.strictEqual(state.keyframes.keyframeClipboard, clipboard);
     assert.equal(state.historyLength, 1);
     const after = state.workingAnimation;
     state.undo();
@@ -246,12 +246,12 @@ test.each([{ mode: 'smooth' } as const, { mode: 'stepped', fps: 20 } as const])(
 
 test('duplicate replaces frame-offset collisions and extends end keys without clamping the group', () => {
   const { state } = session({ mode: 'stepped', fps: 10 });
-  state.setBonePropertyKeyframe('torso', 'x', 999, 0.6);
+  state.keyframes.setBonePropertyKeyframe('torso', 'x', 999, 0.6);
   state.markSaved();
   state.selectKeyframes([key(0.5), key(0.6)]);
   const before = state.workingAnimation;
   const length = state.historyLength;
-  state.duplicateSelectedKeyframes();
+  state.keyframes.duplicateSelectedKeyframes();
   assert.equal(state.findBonePropertyKeyframe('torso', 'x', 0.6)?.value, Math.PI);
   assert.equal(
     state.findBonePropertyKeyframe('torso', 'x', 0.7)?.value,
@@ -263,32 +263,32 @@ test('duplicate replaces frame-offset collisions and extends end keys without cl
   state.undo();
   assert.strictEqual(state.workingAnimation, before);
   state.selectKeyframes(group);
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setCurrentTime(2);
-  state.pasteKeyframes();
-  state.duplicateSelectedKeyframes();
+  state.keyframes.pasteKeyframes();
+  state.keyframes.duplicateSelectedKeyframes();
   assert.approximately(state.duration, 2.8, 1e-12);
   assert.equal(state.selectedKeys.length, 5);
 });
 
 test('clipboard survives selection, playback, key edits, history and animation switching; compatible rigs need no existing tracks', () => {
   const { state, rig } = session();
-  state.copySelectedKeyframes();
-  const clipboard = state.keyframeClipboard;
+  state.keyframes.copySelectedKeyframes();
+  const clipboard = state.keyframes.keyframeClipboard;
   state.clearKeyframeSelection();
   state.play();
   state.advancePlayback(0.4);
   state.pause();
-  state.setBonePropertyKeyframe('torso', 'x', 900, 0.5);
+  state.keyframes.setBonePropertyKeyframe('torso', 'x', 900, 0.5);
   state.undo();
   assert.isTrue(state.canRedo);
   state.selectKeyframes(group);
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   assert.isTrue(state.canRedo, 'copy must retain redo history');
   state.selectAnimation('walk');
   assert.deepEqual(state.selectedKeys, []);
   state.setCurrentTime(1.8);
-  assert.isTrue(state.pasteKeyframes());
+  assert.isTrue(state.keyframes.pasteKeyframes());
   assert.equal(state.workingAnimation!.name, 'walk');
   assert.equal(state.workingAnimation!.tracks.torso![0]!.x, Math.PI);
   assert.deepEqual(state.sourceAnimation!.tracks, {});
@@ -303,8 +303,8 @@ test('clipboard survives selection, playback, key edits, history and animation s
 
 test('invalid destination bone/property/value/time rejects the entire group without source mutation', () => {
   const { state, input, rig } = session();
-  state.copySelectedKeyframes();
-  const clipboard = state.keyframeClipboard!;
+  state.keyframes.copySelectedKeyframes();
+  const clipboard = state.keyframes.keyframeClipboard!;
   const incompatible = new Rig({ root: 'torso', bones: [{ id: 'torso' }] });
   const before = structuredClone(input);
   assert.throws(() => pasteKeyframeClipboard(input, incompatible, clipboard, 1000));
@@ -331,7 +331,7 @@ test('invalid destination bone/property/value/time rejects the entire group with
   const lookup = vi.spyOn(rig, 'getBone').mockImplementation(() => {
     throw new Error('Clipboard bone is missing from destination rig.');
   });
-  assert.isFalse(state.pasteKeyframes());
+  assert.isFalse(state.keyframes.pasteKeyframes());
   lookup.mockRestore();
   assert.strictEqual(state.workingAnimation, working);
   assert.strictEqual(state.selectedKeys, selection);
@@ -342,13 +342,13 @@ test('invalid destination bone/property/value/time rejects the entire group with
 
 test('pasting identical values is a selected no-op preserving dirty baseline and redo', () => {
   const { state } = session();
-  state.copySelectedKeyframes();
+  state.keyframes.copySelectedKeyframes();
   state.setCurrentTime(1.5);
-  state.pasteKeyframes();
+  state.keyframes.pasteKeyframes();
   state.undo();
   assert.isTrue(state.canRedo);
   state.setCurrentTime(0.5);
-  assert.isTrue(state.pasteKeyframes());
+  assert.isTrue(state.keyframes.pasteKeyframes());
   assert.equal(state.selectedKeys.length, 5);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);

@@ -231,7 +231,7 @@ test('pose → graph → independent variation → cleanup → package/Character
   assert.isTrue(state.commitGraphEdit());
   const source = state.workingAnimation!;
   state.createVariation({ name: 'variant', timeScale: 2 });
-  state.setBonePropertyKeyframe('root', 'y', 7, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 7, 0);
   diagnostics.run();
   const candidates = diagnostics.getSnapshot().report!.candidates;
   assert.isNotEmpty(candidates);

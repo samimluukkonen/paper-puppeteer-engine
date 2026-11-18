@@ -109,15 +109,15 @@ test.each([400, -150])('all eight selected properties preserve spacing and value
   const source = JSON.stringify(input);
   const before = state.workingAnimation;
   state.play();
-  assert.isTrue(state.beginKeyframeDrag(group[0]!));
+  assert.isTrue(state.keyframes.beginKeyframeDrag(group[0]!));
   assert.isFalse(state.isPlaying);
-  state.previewKeyframeDrag((200 + deltaMs) / 1000);
-  assert.deepEqual(state.keyframeDrag?.originalKeys, group);
-  assert.approximately(state.keyframeDrag!.previewDelta, deltaMs / 1000, 1e-12);
+  state.keyframes.previewKeyframeDrag((200 + deltaMs) / 1000);
+  assert.deepEqual(state.keyframes.keyframeDrag?.originalKeys, group);
+  assert.approximately(state.keyframes.keyframeDrag!.previewDelta, deltaMs / 1000, 1e-12);
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
-  state.commitKeyframeDrag();
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.selectedKeys, shifted(group, deltaMs));
   assert.deepEqual(state.primaryKey, shifted(group, deltaMs)[0]);
   checkValues(state, state.selectedKeys);
@@ -139,11 +139,11 @@ test.each([400, -150])('all eight selected properties preserve spacing and value
 
 test.each([-10, 10])('one boundary constraint preserves the whole group at target %s seconds', (time) => {
   const { state } = session();
-  state.beginKeyframeDrag(group[2]!); // Middle key is the drag anchor/primary.
-  state.previewKeyframeDrag(time);
+  state.keyframes.beginKeyframeDrag(group[2]!); // Middle key is the drag anchor/primary.
+  state.keyframes.previewKeyframeDrag(time);
   const delta = time < 0 ? -200 : 800;
   assert.approximately(state.currentTime, (500 + delta) / 1000, 1e-12);
-  state.commitKeyframeDrag();
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.selectedKeys, shifted(group, delta));
   assert.deepEqual(state.primaryKey, shifted(group, delta)[2]);
   checkValues(state, state.selectedKeys);
@@ -162,9 +162,9 @@ test('group filling duration and zero-duration clips cannot move or create histo
   state.selectAnimation('zero');
   state.selectKeyframes([key(0), key(0, 'y')]);
   const before = state.workingAnimation;
-  state.beginKeyframeDrag(key(0));
-  state.previewKeyframeDrag(10);
-  state.commitKeyframeDrag();
+  state.keyframes.beginKeyframeDrag(key(0));
+  state.keyframes.previewKeyframeDrag(10);
+  state.keyframes.commitKeyframeDrag();
   state.nudgeSelectedKeyframe(1);
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.historyLength, 0);
@@ -177,16 +177,16 @@ test('group filling duration and zero-duration clips cannot move or create histo
 test('frame snapping comes only from the anchor; off-frame offsets and boundary spacing survive', () => {
   const { state } = session();
   state.setKeyframeSnapMode('frame');
-  state.beginKeyframeDrag(group[5]!); // 0.35 seconds, on another bone.
-  state.previewKeyframeDrag(0.67);
+  state.keyframes.beginKeyframeDrag(group[5]!); // 0.35 seconds, on another bone.
+  state.keyframes.previewKeyframeDrag(0.67);
   assert.equal(state.currentTime, 0.7);
-  assert.approximately(state.keyframeDrag!.previewDelta, 0.35, 1e-12);
+  assert.approximately(state.keyframes.keyframeDrag!.previewDelta, 0.35, 1e-12);
   assert.equal(state.primaryKey?.boneId, 'arm');
   assert.equal(state.selectedTimelineProperty, 'rotation');
-  state.previewKeyframeDrag(0.673, true);
+  state.keyframes.previewKeyframeDrag(0.673, true);
   assert.equal(state.currentTime, 0.673);
-  state.previewKeyframeDrag(0.67);
-  state.commitKeyframeDrag();
+  state.keyframes.previewKeyframeDrag(0.67);
+  state.keyframes.commitKeyframeDrag();
   assert.deepEqual(state.selectedKeys, shifted(group, 350));
   assert.deepEqual(state.primaryKey, key(0.7, 'rotation', 'arm'));
   assert.equal(state.selectedKeys[0]?.time, 0.55, 'other keys do not snap independently');
@@ -195,7 +195,7 @@ test('frame snapping comes only from the anchor; off-frame offsets and boundary 
 test('source positions of selected keys never cause self-collisions', () => {
   const { state } = session();
   state.selectKeyframes([group[0]!, group[2]!]);
-  state.moveSelectedKeyframe(0.5); // Earliest moves onto the selected second key's original time.
+  state.keyframes.moveSelectedKeyframe(0.5); // Earliest moves onto the selected second key's original time.
   assert.deepEqual(state.selectedKeys, [key(0.5), key(0.8)]);
   assert.equal(state.findBonePropertyKeyframe('root', 'x', 0.5)?.value, 1);
   assert.equal(state.findBonePropertyKeyframe('root', 'x', 0.8)?.value, 2);
@@ -205,7 +205,7 @@ test('source positions of selected keys never cause self-collisions', () => {
 test('simultaneous external collisions replace properties atomically and Undo/Redo restores exact rows', () => {
   const { state } = session();
   const before = state.workingAnimation;
-  state.moveSelectedKeyframe(0.7);
+  state.keyframes.moveSelectedKeyframe(0.7);
   const moved = state.workingAnimation;
   assert.deepEqual(
     state.workingAnimation?.tracks.root?.find((row) => row.time === 1400),
@@ -282,15 +282,15 @@ test.each(['missing', 'bone', 'property', 'nonfinite', 'source-time'])(
 
 test('cancel restores the original set and primary, with no authored/history/dirty changes or redo loss', () => {
   const { state } = session();
-  state.moveSelectedKeyframe(0.7);
+  state.keyframes.moveSelectedKeyframe(0.7);
   state.undo();
   state.selectKeyframes(group);
   const before = state.workingAnimation;
-  state.beginKeyframeDrag(group[5]!);
-  state.previewKeyframeDrag(1.1);
+  state.keyframes.beginKeyframeDrag(group[5]!);
+  state.keyframes.previewKeyframeDrag(1.1);
   state.play();
   assert.isFalse(state.isPlaying);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   assert.strictEqual(state.workingAnimation, before);
   assert.deepEqual(state.selectedKeys, group);
   assert.deepEqual(state.primaryKey, group[0]);
@@ -325,21 +325,21 @@ test('group arrow nudge uses frame/small/large steps and one snapshot per change
 
 test('copy/paste/duplicate/delete and marquee resolve moved authored times with no stale selection', () => {
   const { state } = session();
-  state.moveSelectedKeyframe(0.6);
-  state.copySelectedKeyframes();
-  assert.equal(state.keyframeClipboard?.anchorTimeMs, 600);
+  state.keyframes.moveSelectedKeyframe(0.6);
+  state.keyframes.copySelectedKeyframes();
+  assert.equal(state.keyframes.keyframeClipboard?.anchorTimeMs, 600);
   assert.deepEqual(
-    state.keyframeClipboard?.entries.map((entry) => entry.relativeTimeMs),
+    state.keyframes.keyframeClipboard?.entries.map((entry) => entry.relativeTimeMs),
     [0, 0, 150, 300, 400, 700, 700, 1000],
   );
   state.setCurrentTime(2);
-  state.pasteKeyframes();
+  state.keyframes.pasteKeyframes();
   assert.deepEqual(
     state.selectedKeys,
     shifted(group, 1800).sort((a, b) => a.time - b.time),
   );
   checkValues(state, shifted(group, 1800));
-  state.duplicateSelectedKeyframes();
+  state.keyframes.duplicateSelectedKeyframes();
   assert.deepEqual(
     state.selectedKeys,
     shifted(group, 1810).sort((a, b) => a.time - b.time),
@@ -359,16 +359,16 @@ test('copy/paste/duplicate/delete and marquee resolve moved authored times with 
 
 test('animation switching and authored mutation cancel group previews and reconcile selection', () => {
   const { state } = session();
-  state.beginKeyframeDrag(group[0]!);
-  state.previewKeyframeDrag(0.7);
+  state.keyframes.beginKeyframeDrag(group[0]!);
+  state.keyframes.previewKeyframeDrag(0.7);
   state.selectAnimation('other');
-  assert.isNull(state.keyframeDrag);
+  assert.isNull(state.keyframes.keyframeDrag);
   assert.deepEqual(state.selectedKeys, []);
   state.selectKeyframes(group);
-  state.beginKeyframeDrag(group[0]!);
-  state.previewKeyframeDrag(0.7);
-  state.removeBonePropertyKeyframe('root', 'x', 0.2);
-  assert.isNull(state.keyframeDrag);
+  state.keyframes.beginKeyframeDrag(group[0]!);
+  state.keyframes.previewKeyframeDrag(0.7);
+  state.keyframes.removeBonePropertyKeyframe('root', 'x', 0.2);
+  assert.isNull(state.keyframes.keyframeDrag);
   assert.equal(state.selectedKeys.length, 7);
   state.undo();
   assert.isTrue(
@@ -399,7 +399,7 @@ test('unrepresentable destination spacing rejects a valid group without partial 
   state.selectKeyframes([key(0.001), key(0.002)]);
   const animation = state.workingAnimation;
   const selection = state.selectedKeys;
-  assert.isFalse(state.moveSelectedKeyframe(1e17));
+  assert.isFalse(state.keyframes.moveSelectedKeyframe(1e17));
   assert.strictEqual(state.workingAnimation, animation);
   assert.strictEqual(state.selectedKeys, selection);
   assert.equal(state.historyLength, 0);

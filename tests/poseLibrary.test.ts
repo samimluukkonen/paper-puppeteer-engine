@@ -421,9 +421,9 @@ test('applied FK keys remain editable and work with the existing mirror command'
   state.selectAnimation('target');
   state.selectBone('leftArm');
   assert.isTrue(state.applyLibraryPose(id));
-  assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right'));
+  assert.isTrue(state.keyframes.mirrorCurrentPoseToKeys('left-to-right'));
   assert.equal(state.getEvaluatedBonePropertyValue('rightArm', 'rotation'), -0.5);
-  assert.isTrue(state.setBonePropertyKeyframe('leftArm', 'rotation', 0.8));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('leftArm', 'rotation', 0.8));
   assert.equal(state.getEvaluatedBonePropertyValue('leftArm', 'rotation'), 0.8);
 });
 

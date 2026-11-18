@@ -132,7 +132,7 @@ test('navigation preserves frozen snapshots, caller/source data, dirty state, au
   const before = JSON.stringify(input);
   const source = state.sourceAnimation;
   const sourceJson = JSON.stringify(source);
-  state.setBonePropertyKeyframe('hand', 'y', 5);
+  state.keyframes.setBonePropertyKeyframe('hand', 'y', 5);
   state.undo();
   const working = state.workingAnimation;
   const history = state.historyLength;
@@ -193,13 +193,13 @@ test('authored edits and undo/redo refresh key presence while keeping track navi
   state.selectTimelineProperty('hand', 'y');
   const hasKeys = () => state.timelineTracks.some((row) => 'boneId' in row && row.boneId === 'hand' && row.hasKeys);
   assert.isFalse(hasKeys());
-  state.setBonePropertyKeyframe('hand', 'y', 4);
+  state.keyframes.setBonePropertyKeyframe('hand', 'y', 4);
   assert.isTrue(hasKeys());
   state.undo();
   assert.isFalse(hasKeys());
   state.redo();
   assert.isTrue(hasKeys());
-  state.removeBonePropertyKeyframe('hand', 'y');
+  state.keyframes.removeBonePropertyKeyframe('hand', 'y');
   assert.isFalse(hasKeys());
   assert.isTrue(state.isTimelineBoneExpanded('hand'));
   assert.equal(state.selectedTimelineProperty, 'y');
@@ -258,7 +258,7 @@ test('editing one bone retains unrelated row identity through history and expans
   for (const id of ['root', 'zArm']) state.setTimelineBoneExpanded(id, true);
   const before = state.timelineTracks;
   const armRows = before.filter((row) => 'boneId' in row && row.boneId === 'zArm');
-  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0);
   for (const read of [() => {}, () => state.undo(), () => state.redo()]) {
     read();
     const rows = state.timelineTracks.filter((row) => 'boneId' in row && row.boneId === 'zArm');

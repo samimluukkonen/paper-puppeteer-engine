@@ -634,8 +634,8 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const rigJson = JSON.stringify(skeleton);
     const state = new AnimationEditorState(skeleton, [source]);
     state.selectAnimation(source.name);
-    state.setBonePropertyKeyframe('upper', 'x', 7, 0);
-    state.setBonePropertyKeyframe('upper', 'y', 9, 0);
+    state.keyframes.setBonePropertyKeyframe('upper', 'x', 7, 0);
+    state.keyframes.setBonePropertyKeyframe('upper', 'y', 9, 0);
     state.undo();
     state.selectBone('upper');
     state.setCurrentTime(0.5);

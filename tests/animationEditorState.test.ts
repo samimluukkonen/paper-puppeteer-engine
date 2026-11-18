@@ -48,7 +48,7 @@ test('subscriber failures still publish committed edits to every view and preser
   });
   const observed: number[] = [];
   state.subscribe(() => observed.push(state.workingAnimation!.tracks.root![0]!.x!));
-  assert.throws(() => state.setBonePropertyKeyframe('root', 'x', 42, 0), /View failed/);
+  assert.throws(() => state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0), /View failed/);
   assert.deepEqual(observed, [42]);
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
@@ -101,7 +101,7 @@ test('export filenames preserve owned manifest paths and fall back to sanitized 
   paths.move = 'replacement.json';
   state.selectAnimation('move');
   assert.equal(state.selectedAnimationFilename, 'combat idle.json');
-  state.setBonePropertyKeyframe('root', 'x', 9);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 9);
   state.undo();
   assert.equal(state.selectedAnimationFilename, 'combat idle.json');
   const fallback = new AnimationEditorState(rig, [clip({ name: 'custom/move' })]);
@@ -116,7 +116,7 @@ test('animation export round-trips authored data without saving drafts or changi
   state.selectAnimation('move');
   state.selectBone('root');
   state.setCurrentTime(0.5);
-  state.setBonePropertyKeyframe('root', 'y', 17);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 17);
   state.setTemporaryBoneProperty('x', 99);
   state.setPreviewLoop(true);
   state.setPlaybackSpeed(2);
@@ -154,7 +154,7 @@ test('owned frozen snapshots share source data while isolating caller inputs and
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.isFalse(Object.isFrozen(input));
-  state.setBonePropertyKeyframe('root', 'x', 99, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99, 0);
   assert.equal(state.sourceAnimation!.tracks.root![0]!.x, 0);
   assert.equal(input.tracks.root![0]!.x, 0);
   state.selectAnimation('move', { discardChanges: true });

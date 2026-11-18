@@ -121,7 +121,7 @@ test('editor payload rejection preserves its clock, authored edits, history and 
   const listener = vi.fn();
   state.onAnimationEvent(listener);
   state.selectBone('root');
-  state.setBonePropertyKeyframe('root', 'x', 123);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 123);
   state.play();
   const working = state.workingAnimation;
   const history = state.historyLength;

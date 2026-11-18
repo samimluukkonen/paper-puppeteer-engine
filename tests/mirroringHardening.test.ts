@@ -219,13 +219,13 @@ for (const interpolation of [undefined, 'linear'] as const) {
       const baseline = state.workingAnimation;
       state.selectBone('leftForearm');
       state.setCurrentTime(0.2);
-      assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right'));
+      assert.isTrue(state.keyframes.mirrorCurrentPoseToKeys('left-to-right'));
       const pose = state.workingAnimation;
       state.selectKeyframes([
         { boneId: 'leftForearm', property: 'rotation', time: 0.4 },
         { boneId: 'leftFoot', property: 'x', time: 0.4 },
       ]);
-      assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+      assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
       const mirrored = state.workingAnimation;
       assert.deepEqual(Object.keys(mirrored!.tracks.rightForearm!.find((row) => row.time === 400)!).sort(), [
         'rotation',
@@ -233,11 +233,11 @@ for (const interpolation of [undefined, 'linear'] as const) {
         'y',
       ]);
       assert.deepEqual(Object.keys(mirrored!.tracks.rightFoot![0]!).sort(), ['time', 'x']);
-      assert.isTrue(state.copySelectedKeyframes());
+      assert.isTrue(state.keyframes.copySelectedKeyframes());
       state.setCurrentTime(0.6);
-      assert.isTrue(state.pasteKeyframes());
+      assert.isTrue(state.keyframes.pasteKeyframes());
       const pasted = state.workingAnimation;
-      assert.isTrue(state.moveSelectedKeyframe(0.7));
+      assert.isTrue(state.keyframes.moveSelectedKeyframe(0.7));
       const moved = state.workingAnimation;
       assert.isTrue(state.setAuthoredInterpolation(interpolation === undefined ? 'linear' : undefined));
       const declared = state.workingAnimation;
@@ -248,7 +248,7 @@ for (const interpolation of [undefined, 'linear'] as const) {
       assert.isTrue(state.redo());
       assert.strictEqual(state.workingAnimation, moved);
       state.selectKeyframes([{ boneId: 'rightForearm', property: 'rotation', time: 0.4 }]);
-      assert.isTrue(state.mirrorSelectedKeyframes('right-to-left'));
+      assert.isTrue(state.keyframes.mirrorSelectedKeyframes('right-to-left'));
       const opposite = state.workingAnimation;
       assert.isTrue(state.undo());
       assert.strictEqual(state.workingAnimation, moved);
@@ -287,7 +287,7 @@ test.each(['smooth', 'stepped'] as const)(
     state.selectKeyframes([0, 0.4, 1].map((time) => ({ boneId: 'leftForearm', property: 'rotation', time })));
     const events = vi.fn<(event: FiredAnimationEvent) => void>();
     state.onAnimationEvent(events);
-    assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+    assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
     assert.equal(events.mock.calls.length, 0);
     const authored = state.workingAnimation!;
     const joints = new Map(rig.bones.map((bone) => [bone.id, new Joint(bone.id, bone)]));
@@ -341,7 +341,7 @@ test.each([undefined, 'linear'] as const)(
   async (interpolation) => {
     const { rig, state, animation } = session({ mode: 'stepped', fps: 17 }, interpolation);
     state.selectKeyframes([0, 0.4, 1].map((time) => ({ boneId: 'leftForearm', property: 'rotation', time })));
-    state.mirrorSelectedKeyframes('left-to-right');
+    state.keyframes.mirrorSelectedKeyframes('left-to-right');
     const json = state.exportJson();
     const file: unknown = JSON.parse(json);
     const parsed = parseAnimationClip(file, rig);

@@ -97,8 +97,8 @@ function fixture() {
   animation.setMeshOffsets({ 'top-left': { x: 0.3, y: -0.2 }, [mesh.vertices.at(-1)!.id]: { x: 0.1, y: 0.2 } });
   animation.setCurrentTime(1);
   animation.setMeshOffsets({ 'top-left': { x: 0, y: 0 }, [mesh.vertices.at(-1)!.id]: { x: 0, y: 0 } });
-  animation.setBonePropertyKeyframe('lower', 'rotation', 0, 0);
-  animation.setBonePropertyKeyframe('lower', 'rotation', 0.8, 1);
+  animation.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0, 0);
+  animation.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0.8, 1);
   animation.rootMotion.setRootPosition({ x: 0, y: 0 }, 0);
   animation.rootMotion.setRootPosition({ x: 40, y: 10 }, 1);
   const image = artworkFixture().documents['images/paper.png'];

@@ -59,7 +59,7 @@ test('full authoring workflow keeps checkpoints, history and loaded/imported sou
   const source = state.sourceAnimation;
   const original = state.exportJson();
   assert.isFalse(state.dirty);
-  state.setBonePropertyKeyframe('root', 'x', 8, 0.25);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 8, 0.25);
   state.setAuthoredInterpolation('linear');
   const event = getAnimationEventReferences(state.workingAnimation)[1]!;
   state.updateAnimationEvent(event, { ...state.workingAnimation!.events![1]!, name: 'changed', data: [1, null] });
@@ -76,7 +76,7 @@ test('full authoring workflow keeps checkpoints, history and loaded/imported sou
   assert.isTrue(state.dirty);
   state.redo();
   assert.isFalse(state.dirty);
-  state.setBonePropertyKeyframe('root', 'y', 9);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 9);
   assert.isTrue(state.dirty);
   assert.isFalse(state.revertAnimation());
   assert.equal(state.historyLength, 4);
@@ -92,7 +92,7 @@ test('full authoring workflow keeps checkpoints, history and loaded/imported sou
   assert.equal(state.exportJson(), original, 'revert also resets the stored checkpoint');
   state.importJson(edited);
   const imported = state.sourceAnimation;
-  state.setBonePropertyKeyframe('root', 'x', 99);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99);
   state.undo();
   assert.isFalse(state.dirty);
   state.redo();
@@ -107,14 +107,14 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
   'revert resets %s state, preview time and history silently without fetching',
   (kind) => {
     const state = session();
-    state.setBonePropertyKeyframe('root', 'x', 12);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
     state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
-    state.copySelectedKeyframes();
+    state.keyframes.copySelectedKeyframes();
     const clipboard = state.timelineClipboard;
     const source = state.sourceAnimation;
     if (kind === 'key') {
-      state.beginKeyframeDrag(state.primaryKey!);
-      state.previewKeyframeDrag(0.4);
+      state.keyframes.beginKeyframeDrag(state.primaryKey!);
+      state.keyframes.previewKeyframeDrag(0.4);
     }
     if (kind === 'event') {
       state.beginEventDrag(getAnimationEventReferences(state.workingAnimation)[1]!);
@@ -142,7 +142,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.isFalse(state.hasTemporaryTransform);
     assert.isNull(state.selectedBoneId);
     assert.isNull(state.selectedEvent);
-    assert.isNull(state.keyframeDrag);
+    assert.isNull(state.keyframes.keyframeDrag);
     assert.isNull(state.eventDrag);
     assert.deepEqual(state.selectedKeys, []);
     assert.equal(state.currentTime, 0);
@@ -156,7 +156,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
 
 test('clip navigation keeps pending edits and history without a discard dialog', async () => {
   const { state, query, confirm, dispose } = fixture();
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   state.setCurrentTime(0.4);
   state.play();
   const before = state.workingAnimation;
@@ -178,7 +178,7 @@ test('clip navigation keeps pending edits and history without a discard dialog',
 
 test('valid import/reload confirms only after validation, cancellation preserves edits, and clean replacement needs no dialog', async () => {
   const { state, query, confirm, dispose } = fixture();
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   const working = state.workingAnimation;
   query('#animation-import-text').value = '{broken';
   await query('#animation-import-submit').click();
@@ -202,14 +202,14 @@ test('valid import/reload confirms only after validation, cancellation preserves
 
 test('revert works after a clean export and rejects empty sessions', async () => {
   const { state, query, confirm, dispose } = fixture();
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   state.markSaved();
   await query('#animation-revert').click();
   assert.equal(confirm.mock.calls.length, 0);
   assert.equal(state.workingAnimation!.tracks.root![0]!.x, 1);
   assert.isFalse(state.dirty);
   assert.match(query('#animation-export-feedback').textContent, /reverted.*source/);
-  state.setBonePropertyKeyframe('root', 'x', 14);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 14);
   await query('#animation-revert').click();
   assert.equal(state.workingAnimation!.tracks.root![0]!.x, 14);
   confirm.mockReturnValue(true);
@@ -236,7 +236,7 @@ test('clock-only updates skip file controls while edits, history, and imports re
   assert.strictEqual(state.animationIds, ids);
   assert.isTrue(Object.isFrozen(ids));
   state.pause();
-  state.setBonePropertyKeyframe('root', 'x', 12);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 12);
   assert.isTrue(lookups.mock.calls.length > 0);
   assert.isFalse(query('#animation-undo').disabled);
   assert.equal(query('#animation-dirty').textContent, 'Unsaved changes');

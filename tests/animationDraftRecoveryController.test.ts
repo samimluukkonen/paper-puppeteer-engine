@@ -69,7 +69,7 @@ test('multiple new clips recover authored data and Undo/Redo independently of pe
       ['new-two', 84],
     ] as const) {
       assert.isTrue(state.createAnimation({ name }));
-      assert.isTrue(state.setBonePropertyKeyframe('root', 'x', x, 0));
+      assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', x, 0));
     }
     controller.dispose();
     recovery.dispose();
@@ -118,7 +118,7 @@ test('binds source identity and updates edits/playback without replacing recover
   assert.isFalse(bound.validate({ ...state.workingAnimation, name: 'other' }));
   assert.isFalse(bound.dirty());
   state.setCurrentTime(0.25);
-  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0);
   assert.equal(recovery.bind.mock.calls.length, 1);
   assert.isTrue(bound.dirty());
   assert.strictEqual(bound.snapshot(), state.workingAnimation);
@@ -248,7 +248,7 @@ test('rig tweaks and restored rig drafts retain animation recovery identity and 
   const original = session();
   const tweaked = new Rig({ root: 'root', bones: [{ id: 'root', x: 20 }] });
   state.updatePreviewRig(tweaked);
-  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0);
   const snapshot = original.snapshot();
   assert.equal(recovery.bind.mock.calls.length, 1);
   controller.unbind();
@@ -303,7 +303,7 @@ test('animation navigation binds separate keys and deselection releases the curr
 test('returning to an in-memory dirty clip never offers to overwrite it with a browser draft', () => {
   const { state, recovery, controller } = fixture();
   controller.bind(state, 'character');
-  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0);
   const authored = state.workingAnimation;
   state.selectAnimation('second', { keepChanges: true });
   state.selectAnimation('first', { keepChanges: true });
@@ -315,14 +315,14 @@ test('returning to an in-memory dirty clip never offers to overwrite it with a b
 test('same-name imports clear the prior draft before binding and skip restoration for the new baseline', () => {
   const { state, recovery, controller, calls, session } = fixture();
   controller.bind(state, 'character');
-  state.setBonePropertyKeyframe('root', 'x', 42, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0);
   calls.length = 0;
   assert.isTrue(state.importJson(JSON.stringify({ ...state.sourceAnimation, duration: 2000 })));
   assert.deepEqual(calls, ['update', 'bind', 'update']);
   assert.deepEqual(recovery.bind.mock.lastCall![1], { recover: false });
   assert.isFalse(session().dirty());
   assert.equal(session().source, draftSource({ rig: state.rig, animation: state.sourceAnimation }));
-  state.setBonePropertyKeyframe('root', 'x', 99, 0);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99, 0);
   const bindings = recovery.bind.mock.calls.length;
   assert.isTrue(state.revertAnimation({ discardChanges: true }));
   assert.equal(recovery.bind.mock.calls.length, bindings);

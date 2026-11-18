@@ -35,7 +35,7 @@ function workspace(registry = guideRegistry) {
 test('launch navigates before activating the registry first step and preserves unsaved documents/history', () => {
   const { launcher, rigState, animation, navigate } = workspace();
   rigState.editBone('root', 'x', 12);
-  animation.setBonePropertyKeyframe('root', 'x', 8);
+  animation.keyframes.setBonePropertyKeyframe('root', 'x', 8);
   const rig = rigState.workingCopy;
   const clip = animation.workingAnimation;
   const rigHistory = rigState.historyLength;

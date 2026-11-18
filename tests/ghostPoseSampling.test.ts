@@ -292,7 +292,7 @@ test('bounded sampling cache reuses six held stepped frames without sharing muta
     state.sampleGhostPose(0);
     assert.equal(evaluate.mock.calls.length, count + 1);
 
-    assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 222, 0.4));
+    assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', 222, 0.4));
     assert.equal(state.sampleGhostPose(0.4)!.get('root')!.x, 222);
     state.undo();
     assert.equal(state.sampleGhostPose(0.4)!.get('root')!.x, 40);
@@ -325,8 +325,8 @@ test.each(['paused', 'playing', 'scrubbing'] as const)(
     const original = structuredClone(input);
     const state = new AnimationEditorState(rig, [input]);
     state.selectAnimation('ghost');
-    state.setBonePropertyKeyframe('root', 'y', 88, 0);
-    state.setBonePropertyKeyframe('root', 'scaleY', 3, 0);
+    state.keyframes.setBonePropertyKeyframe('root', 'y', 88, 0);
+    state.keyframes.setBonePropertyKeyframe('root', 'scaleY', 3, 0);
     state.undo();
     state.selectBone('upper');
     state.setTemporaryBoneProperty('rotation', 0.6);

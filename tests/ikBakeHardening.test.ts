@@ -258,19 +258,19 @@ test('ordinary baked keys support group edit/clipboard/duplicate/delete/interpol
   assert.isTrue(state.commitIKBake(plan));
   const snapshots = [original, state.workingAnimation];
   state.selectKeyframes(['leftUpperArm', 'leftForearm'].map((boneId) => ({ boneId, property: 'rotation', time: 0.2 })));
-  assert.isTrue(state.moveSelectedKeyframe(0.25));
+  assert.isTrue(state.keyframes.moveSelectedKeyframe(0.25));
   snapshots.push(state.workingAnimation);
   assert.deepEqual(
     state.selectedKeys.map((key) => key.time),
     [0.25, 0.25],
   );
-  assert.isTrue(state.copySelectedKeyframes());
+  assert.isTrue(state.keyframes.copySelectedKeyframes());
   state.setCurrentTime(0.45);
-  assert.isTrue(state.pasteKeyframes());
+  assert.isTrue(state.keyframes.pasteKeyframes());
   snapshots.push(state.workingAnimation);
-  assert.isTrue(state.duplicateSelectedKeyframes());
+  assert.isTrue(state.keyframes.duplicateSelectedKeyframes());
   snapshots.push(state.workingAnimation);
-  assert.isTrue(state.setBonePropertyKeyframe('leftForearm', 'rotation', 0.75, 0.45));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('leftForearm', 'rotation', 0.75, 0.45));
   snapshots.push(state.workingAnimation);
   assert.isTrue(state.deleteSelectedKeyframes());
   snapshots.push(state.workingAnimation);
@@ -309,7 +309,7 @@ test('onion poses refresh after bake/edit/undo; mirroring preserves IK tracks an
   assert.lengthOf(ghosts, 6);
   assert.notEqual(ghosts[0]!.pose.get('leftForearm')!.rotation, before);
   for (const ghost of ghosts) assert.deepEqual(ghost.pose, state.sampleGhostPose(ghost.time));
-  assert.isTrue(state.setBonePropertyKeyframe('leftForearm', 'rotation', 0.7, 0.4));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('leftForearm', 'rotation', 0.7, 0.4));
   assert.closeTo(state.sampleGhostPose(0.4)!.get('leftForearm')!.rotation!, 0.7, 1e-12);
   state.undo();
   assert.strictEqual(state.workingAnimation, authored);
@@ -317,7 +317,7 @@ test('onion poses refresh after bake/edit/undo; mirroring preserves IK tracks an
   assert.isTrue(mapping.success);
   state.setSymmetryMapping(mapping.mapping);
   state.selectKeyframes([{ boneId: 'leftForearm', property: 'rotation', time: 0.4 }]);
-  assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+  assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   assert.isDefined(state.findBonePropertyKeyframe('rightForearm', 'rotation', 0.4));
   assert.deepEqual(state.workingAnimation!.ikTracks, authored.ikTracks);
   assert.deepEqual(state.workingAnimation!.disabledIKConstraints, ['left']);
@@ -339,7 +339,7 @@ test('bake/edit/undo/undo/redo/export/import/revert preserves source and canonic
   });
   assert.isTrue(state.commitIKBake(plan));
   const baked = state.workingAnimation;
-  state.setBonePropertyKeyframe('leftForearm', 'rotation', 0.5, 0.5);
+  state.keyframes.setBonePropertyKeyframe('leftForearm', 'rotation', 0.5, 0.5);
   state.undo();
   assert.strictEqual(state.workingAnimation, baked);
   state.undo();
@@ -358,7 +358,7 @@ test('bake/edit/undo/undo/redo/export/import/revert preserves source and canonic
   assert.isTrue(state.importJson(json, { confirmDiscard: () => true }));
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
-  state.setBonePropertyKeyframe('leftForearm', 'rotation', 0.9, 0.5);
+  state.keyframes.setBonePropertyKeyframe('leftForearm', 'rotation', 0.9, 0.5);
   assert.isTrue(state.revertAnimation({ discardChanges: true }));
   assert.equal(state.exportJson(), json);
   assert.isFalse(state.dirty);

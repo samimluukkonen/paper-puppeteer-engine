@@ -298,7 +298,7 @@ test('bone mirroring retains IK tracks, and ghost refresh never solves or change
   state.setSymmetryMapping(mapping.mapping);
   const tracks = state.workingAnimation!.ikTracks;
   state.setCurrentTime(0.5);
-  assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right', { boneIds: ['leftUpper', 'leftLower'] }));
+  assert.isTrue(state.keyframes.mirrorCurrentPoseToKeys('left-to-right', { boneIds: ['leftUpper', 'leftLower'] }));
   assert.strictEqual(state.workingAnimation!.ikTracks, tracks);
   const scene = puppetScene();
   const puppet = new Puppet(scene, { rig, autoUpdate: false });

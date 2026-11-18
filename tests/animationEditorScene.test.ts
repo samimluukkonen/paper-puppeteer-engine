@@ -691,7 +691,7 @@ test('mirror commits refresh active/previous/next authored poses while arm and l
     state.selectKeyframes(
       bones.flatMap((boneId) => [0, 1].map((time) => ({ boneId, property: 'rotation' as const, time }))),
     );
-    assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+    assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
     const committed = state.workingAnimation;
     assert.strictEqual(committed!.events, original!.events);
     const checkGhosts = () => {

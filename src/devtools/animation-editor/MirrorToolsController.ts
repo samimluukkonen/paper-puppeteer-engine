@@ -192,13 +192,13 @@ export class MirrorToolsController {
   commitPose(): boolean {
     const state = this.state;
     if (!state || this.snapshot.poseReason) return false;
-    return this.commit(() => state.mirrorCurrentPoseToKeys(this.direction), 'Current pose mirrored.');
+    return this.commit(() => state.keyframes.mirrorCurrentPoseToKeys(this.direction), 'Current pose mirrored.');
   }
 
   commitKeys(): boolean {
     const state = this.state;
     if (!state || this.snapshot.keysReason) return false;
-    return this.commit(() => state.mirrorSelectedKeyframes(this.direction), 'Selected keys mirrored.');
+    return this.commit(() => state.keyframes.mirrorSelectedKeyframes(this.direction), 'Selected keys mirrored.');
   }
 
   private commit(command: () => boolean, message: string): boolean {

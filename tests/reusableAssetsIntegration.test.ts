@@ -57,7 +57,7 @@ test('sword-cut reuse survives target corrections, variants, choreography, templ
   const target = targetDocuments.animation;
   expect(target.createDerivedAnimation(session.acceptedAnimation())).toBe(true);
   const retargeted = target.workingAnimation;
-  expect(target.setBonePropertyKeyframe('lower', 'rotation', 0.65, 0.5)).toBe(true);
+  expect(target.keyframes.setBonePropertyKeyframe('lower', 'rotation', 0.65, 0.5)).toBe(true);
   const corrected = target.workingAnimation;
   expect(target.undo()).toBe(true);
   expect(target.workingAnimation).toEqual(retargeted);

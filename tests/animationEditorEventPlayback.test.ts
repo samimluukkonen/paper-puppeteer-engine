@@ -66,7 +66,7 @@ test('navigation across all markers, key/event selection, editing and Undo/Redo 
   state.restart();
   for (const marker of state.eventTimelineTrack.markers) state.selectAnimationEvent(marker.ref);
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
-  state.setBonePropertyKeyframe('root', 'x', 10);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   state.undo();
   state.redo();
   state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);

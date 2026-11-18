@@ -61,7 +61,7 @@ export function consumerCharacter(): PackageSnapshot {
   });
   const animations = new AnimationEditorState(demoCharacter.rig, demoCharacter.animations);
   animations.selectAnimation('idle');
-  animations.setBonePropertyKeyframe('torso', 'rotation', 0.12, 0.5);
+  animations.keyframes.setBonePropertyKeyframe('torso', 'rotation', 0.12, 0.5);
   const chain = demoCharacter.rig.ik![0]!;
   const reach: AnimationClip = {
     name: 'reach',

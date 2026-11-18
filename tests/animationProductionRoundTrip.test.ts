@@ -164,7 +164,7 @@ test('empty and single-key clips are valid; zero duration and wrong/unknown docu
   ]) {
     const state = new AnimationEditorState(rig, [animation()]);
     state.selectAnimation('walk');
-    state.setBonePropertyKeyframe('root', 'x', 55);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 55);
     const before = state.workingAnimation;
     assert.isFalse(state.importJson(json));
     assert.strictEqual(state.workingAnimation, before);
@@ -233,7 +233,7 @@ test('exported walk.json loads from a normal on-disk character folder and plays 
     const source = { ...animation(), playback: { mode: 'stepped' as const, fps: 12.5 } };
     const state = new AnimationEditorState(rig, [source], { animationPaths: { walk: 'animations/walk.json' } });
     state.selectAnimation('walk');
-    state.setBonePropertyKeyframe('root', 'y', 7, 0.2);
+    state.keyframes.setBonePropertyKeyframe('root', 'y', 7, 0.2);
     await writeFile(join(folder, 'animations', state.selectedAnimationFilename!), state.exportJson());
     const definition = await CharacterLoader.load(pathToFileURL(join(folder, 'character.json')).href, fetcher);
     assert.equal(definition.animationPaths.walk, 'animations/walk.json');

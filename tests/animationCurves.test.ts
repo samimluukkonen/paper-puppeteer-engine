@@ -425,7 +425,7 @@ test('editor read-only segment metadata and history preserve property overrides'
   const state = new AnimationEditorState(rig, [source]);
   state.selectAnimation(source.name);
   const original = state.exportJson();
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 42, 0));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', 42, 0));
   assert.deepEqual(state.workingAnimation!.tracks.root![0]!.curves?.x, ease);
   const edited = state.exportJson();
   assert.isTrue(state.undo());

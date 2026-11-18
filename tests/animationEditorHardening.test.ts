@@ -143,7 +143,7 @@ test('mixed authored commands each publish one coherent history entry and export
     assert.equal(notifications.mock.calls.length, 1);
     assert.strictEqual(state.sourceAnimation, source);
   };
-  commit(() => state.setBonePropertyKeyframe('leftArm', 'rotation', 0.6, 0.4));
+  commit(() => state.keyframes.setBonePropertyKeyframe('leftArm', 'rotation', 0.6, 0.4));
   state.ik.selectIKConstraint('reach');
   state.setCurrentTime(0.4);
   state.ik.setTemporaryIKProperty('x', 35);
@@ -153,10 +153,10 @@ test('mixed authored commands each publish one coherent history entry and export
   const event = state.eventTimelineTrack.markers[0]!.ref;
   commit(() => state.updateAnimationEvent(event, { time: 550, name: 'contact', data: { retain: [true, null] } }));
   state.selectKeyframes([0, 0.4, 0.8].map((time) => ({ boneId: 'leftArm', property: 'rotation', time })));
-  commit(() => state.mirrorSelectedKeyframes('left-to-right'));
+  commit(() => state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   state.setTimelineFilters({ search: 'no matching row', showIK: false, showEvents: false });
   state.setTimelineSnapSettings({ enabled: true, frames: false, keyframes: true, events: true, playhead: true });
-  commit(() => state.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' }));
+  commit(() => state.keyframes.retimeSelectedKeyframes({ scale: 0.5, anchor: 'earliest' }));
   const plan = planIKBake({ rig: definition, animation: state.workingAnimation!, constraintIds: ['reach'], fps: 10 });
   assert.isTrue(plan.success);
   if (!plan.success) return;
@@ -330,7 +330,7 @@ test('authored-property queries preserve immutable sources and stay fresh for ca
   properties.push('x');
   assert.deepEqual(getAuthoredBoneProperties(source, 'leftArm'), ['rotation']);
   assert.deepEqual(getAuthoredBoneProperties(source, 'absent'), []);
-  state.setBonePropertyKeyframe('leftArm', 'y', 4, 0.5);
+  state.keyframes.setBonePropertyKeyframe('leftArm', 'y', 4, 0.5);
   assert.deepEqual(getAuthoredBoneProperties(state.workingAnimation!, 'leftArm'), ['y', 'rotation']);
   assert.deepEqual(getAuthoredBoneProperties(source, 'leftArm'), ['rotation']);
   assert.equal(JSON.stringify(clip), before);

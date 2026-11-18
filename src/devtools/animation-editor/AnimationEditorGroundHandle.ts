@@ -56,7 +56,7 @@ export class AnimationEditorGroundHandle {
     if (
       pointer.button !== 0 ||
       this.state.ik.ikTargetDrag ||
-      this.state.keyframeDrag ||
+      this.state.keyframes.keyframeDrag ||
       this.state.eventDrag ||
       this.state.isScrubbing
     )

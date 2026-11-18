@@ -261,7 +261,7 @@ export class TimelineController {
       state.selectedTimelineProperty,
       state.selectedKeys,
       state.selectedEvent,
-      state.keyframeDrag,
+      state.keyframes.keyframeDrag,
       state.eventDrag,
       width,
       this.navigation.view.scrollLeft,

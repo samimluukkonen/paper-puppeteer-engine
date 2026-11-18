@@ -22,7 +22,7 @@ function fixture() {
   const rig = new Rig({ root: 'root', bones: [{ id: 'root' }] });
   const state = new AnimationEditorState(rig, [{ name: 'old', duration: 1000, loop: true, tracks: {} }]);
   state.selectAnimation('old');
-  state.setBonePropertyKeyframe('root', 'x', 33);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 33);
   const query = stubRigEditorDom();
   vi.stubGlobal('Option', EditorElement);
   vi.stubGlobal('window', { confirm: vi.fn(() => true) });
@@ -157,7 +157,7 @@ for (const action of [
     if (action === 'bind') controller.bind('other');
     if (action === 'dispose') controller.dispose();
     if (action === 'cancel') await query('#animation-import-cancel').click();
-    if (action === 'edit') state.setBonePropertyKeyframe('root', 'x', 99);
+    if (action === 'edit') state.keyframes.setBonePropertyKeyframe('root', 'x', 99);
     if (action === 'direct-import') state.importJson(file());
     if (action === 'new-file') {
       query('#animation-import-file').files = [{ name: 'fast.json', text: async () => file('fast') }];

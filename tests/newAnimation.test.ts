@@ -94,7 +94,7 @@ test('creation resets session atomically and preserves earlier work and independ
   const state = new AnimationEditorState(rig(), [existing]);
   state.selectAnimation('existing');
   state.selectBone('head');
-  state.setBonePropertyKeyframe('head', 'rotation', 0.7);
+  state.keyframes.setBonePropertyKeyframe('head', 'rotation', 0.7);
   const previous = state.workingAnimation;
   state.selectKeyframe({ boneId: 'head', property: 'rotation', time: 0 });
   state.setCurrentTime(0.5);
@@ -119,7 +119,7 @@ test('creation resets session atomically and preserves earlier work and independ
   state.selectBone('head');
   for (const time of [0, 0.5, 1]) {
     state.setCurrentTime(time);
-    assert.isTrue(state.setBonePropertyKeyframe('head', 'rotation', time + 0.2));
+    assert.isTrue(state.keyframes.setBonePropertyKeyframe('head', 'rotation', time + 0.2));
   }
   const authored = state.workingAnimation;
   assert.isTrue(state.createAnimation({ name: 'walk' }));
@@ -197,7 +197,7 @@ test.each(['bone draft', 'key drag', 'event drag', 'IK drag', 'scrub'])(
         state.setTemporaryBoneProperty('rotation', 2);
         break;
       case 'key drag':
-        state.beginKeyframeDrag({ boneId: 'head', property: 'x', time: 0 });
+        state.keyframes.beginKeyframeDrag({ boneId: 'head', property: 'x', time: 0 });
         break;
       case 'event drag':
         state.createAnimationEvent();
@@ -285,7 +285,7 @@ test('new in-memory animations register manifest paths and play through Characte
   const source = JSON.stringify(definition.manifest);
   const state = new AnimationEditorState(definition.rig);
   state.createAnimation({ name: 'idle' });
-  for (const time of [0, 0.5, 1]) state.setBonePropertyKeyframe('head', 'rotation', time, time);
+  for (const time of [0, 0.5, 1]) state.keyframes.setBonePropertyKeyframe('head', 'rotation', time, time);
   const authored = state.workingAnimation;
   state.createAnimation({ name: 'second' });
   const files = decodePackageZip(

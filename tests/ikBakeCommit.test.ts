@@ -218,7 +218,7 @@ test('failed, stale and forged plans preserve working data, drafts, clock, histo
   const state = new AnimationEditorState(rig, [source]);
   state.selectAnimation('reach');
   const valid = planFor(state.workingAnimation!, rig);
-  state.setBonePropertyKeyframe('upper', 'x', 8, 0);
+  state.keyframes.setBonePropertyKeyframe('upper', 'x', 8, 0);
   const stale = planFor(state.workingAnimation!, rig);
   state.undo();
   state.selectBone('upper');

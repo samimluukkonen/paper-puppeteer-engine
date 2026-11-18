@@ -12,7 +12,7 @@ export interface RootMotionContext {
   readonly animationAuthoringEnabled: boolean;
   readonly currentTime: number;
   readonly currentTimeMilliseconds: number;
-  readonly keyframeFPS: number;
+  readonly keyframes: { readonly keyframeFPS: number };
   readonly duration: number;
   readonly previewAnimation: ReadonlyAnimation | null;
   readonly previewTimeMilliseconds: number;
@@ -141,7 +141,7 @@ export class AnimationEditorRootMotion {
     const key = this.selectedRootKey;
     if (!key || !this.context.workingAnimation || !this.context.rig || !this.context.animationAuthoringEnabled)
       return false;
-    const destination = time === key.time ? time + 1 / this.context.keyframeFPS : time;
+    const destination = time === key.time ? time + 1 / this.context.keyframes.keyframeFPS : time;
     if (
       destination > this.context.duration ||
       rootKeys(this.context.workingAnimation, key.property).some((entry) => entry.time / 1000 === destination)

@@ -198,8 +198,8 @@ test('clamped endpoints and near-equal authoring retain sorted, deduplicated loc
   assert.equal(state.findBonePropertyKeyframe('child', 'rotation')!.value, 0.8);
   assert.deepEqual(validateAnimationDefinition(state.workingAnimation, rig), []);
   const held = state.workingAnimation;
-  assert.isFalse(state.setBonePropertyKeyframe('child', 'rotation', Infinity));
-  assert.isFalse(state.setBonePropertyKeyframe('child', 'rotation', 1, 2));
+  assert.isFalse(state.keyframes.setBonePropertyKeyframe('child', 'rotation', Infinity));
+  assert.isFalse(state.keyframes.setBonePropertyKeyframe('child', 'rotation', 1, 2));
   assert.strictEqual(state.workingAnimation, held);
 });
 

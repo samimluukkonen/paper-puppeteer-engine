@@ -252,7 +252,7 @@ export class MeshDeformationController {
     if (drag.key) {
       let time = drag.key.time / 1000 + ((event.clientX - drag.startX) / this.width) * drag.state.duration;
       if (!event.shiftKey && drag.state.timelineSnapSettings.enabled && drag.state.timelineSnapSettings.frames)
-        time = Math.round(time * drag.state.keyframeFPS) / drag.state.keyframeFPS;
+        time = Math.round(time * drag.state.keyframes.keyframeFPS) / drag.state.keyframes.keyframeFPS;
       time = Math.max(0, Math.min(drag.state.duration, time));
       if (this.run(() => drag.state.previewDeformationMove(drag.key!, time * 1000))) {
         drag.time = time;

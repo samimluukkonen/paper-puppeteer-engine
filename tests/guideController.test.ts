@@ -242,7 +242,7 @@ test.each([false, true])(
     // Exercise both untouched sessions and existing unsaved authored work.
     if (dirty) {
       rigState.editBone('root', 'x', 8);
-      animation.setBonePropertyKeyframe('root', 'x', 9);
+      animation.keyframes.setBonePropertyKeyframe('root', 'x', 9);
     }
     animation.play();
     const rigData = rigState.workingCopy;

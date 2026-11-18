@@ -89,7 +89,7 @@ test('single selected bone commits bind-relative authored rotation, ignores draf
   assert.isFalse(state.dirty);
   const notified = vi.fn();
   state.subscribe(notified);
-  assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right', { properties: ['rotation'] }));
+  assert.isTrue(state.keyframes.mirrorCurrentPoseToKeys('left-to-right', { properties: ['rotation'] }));
   assert.closeTo(state.findBonePropertyKeyframe('rightArm', 'rotation', 0.5)!.value, -0.85, 1e-9);
   assert.deepEqual(state.selectedKeys, [{ boneId: 'rightArm', property: 'rotation', time: 0.5 }]);
   assert.equal(state.selectedBoneId, 'rightArm');
@@ -304,7 +304,7 @@ test('one mirror action restores replaced destinations exactly through Undo/Redo
   const before = state.workingAnimation!;
   const notify = vi.fn();
   state.subscribe(notify);
-  assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+  assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   const after = state.workingAnimation!;
   assert.equal(state.historyLength, 1);
   assert.equal(notify.mock.calls.length, 1);
@@ -322,7 +322,7 @@ test('one mirror action restores replaced destinations exactly through Undo/Redo
   assert.isTrue(state.dirty);
   assert.equal(state.currentTime, 0.55);
   state.markSaved();
-  assert.isTrue(state.mirrorSelectedKeyframes('right-to-left'));
+  assert.isTrue(state.keyframes.mirrorSelectedKeyframes('right-to-left'));
   state.undo();
   assert.isFalse(state.dirty, 'history returns to the saved mirror checkpoint');
 });
@@ -363,7 +363,7 @@ test('failed commands retain drafts, gestures, playback, selection, history and 
   const before = state.workingAnimation;
   const notify = vi.fn();
   state.subscribe(notify);
-  assert.isFalse(state.mirrorCurrentPoseToKeys('right-to-left'));
+  assert.isFalse(state.keyframes.mirrorCurrentPoseToKeys('right-to-left'));
   assert.strictEqual(state.workingAnimation, before);
   assert.equal(state.boneTransformDraft.rotation, 1.5);
   assert.equal(state.selectedBoneId, 'leftArm');
@@ -372,18 +372,18 @@ test('failed commands retain drafts, gestures, playback, selection, history and 
   assert.isFalse(state.dirty);
   assert.include(state.validationIssues[0]!.message, 'source side');
   assert.equal(notify.mock.calls.length, 1);
-  state.beginKeyframeDrag({ boneId: 'rightArm', property: 'rotation', time: 0.3 });
-  state.previewKeyframeDrag(0.6);
-  const drag = state.keyframeDrag;
+  state.keyframes.beginKeyframeDrag({ boneId: 'rightArm', property: 'rotation', time: 0.3 });
+  state.keyframes.previewKeyframeDrag(0.6);
+  const drag = state.keyframes.keyframeDrag;
   const keys = state.selectedKeys;
-  assert.isFalse(state.mirrorSelectedKeyframes('left-to-right'));
-  assert.strictEqual(state.keyframeDrag, drag);
+  assert.isFalse(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
+  assert.strictEqual(state.keyframes.keyframeDrag, drag);
   assert.strictEqual(state.selectedKeys, keys);
   assert.equal(state.currentTime, 0.6);
-  state.cancelKeyframeDrag();
+  state.keyframes.cancelKeyframeDrag();
   state.selectBone('leftArm');
   state.play();
-  assert.isFalse(state.mirrorCurrentPoseToKeys('right-to-left'));
+  assert.isFalse(state.keyframes.mirrorCurrentPoseToKeys('right-to-left'));
   assert.isTrue(state.isPlaying);
 });
 
@@ -419,7 +419,7 @@ test('scoped mirroring excludes unsupported unrelated source transforms and empt
     mirrorSelectedKeyframes(clip, rig, mapping, [key('leftArm', 'rotation', 300)], 'left-to-right'),
   );
   assert.strictEqual(mirrorSelectedKeyframes(animation, rig, mapping, [], 'swap').animation, animation);
-  assert.isFalse(state.mirrorSelectedKeyframes('swap'));
+  assert.isFalse(state.keyframes.mirrorSelectedKeyframes('swap'));
   assert.equal(state.historyLength, 0);
   assert.isFalse(state.dirty);
 });
@@ -445,7 +445,7 @@ test('shipped mirrored keys use pre-IK authored values and leave events, attachm
   assert.isTrue(expected.success);
   constraint.apply({ worldToParent: (_id, point) => point });
   assert.notEqual(joints.get('leftUpperArm')!.pose.rotation, pose.get('leftUpperArm')!.rotation);
-  assert.isTrue(state.mirrorCurrentPoseToKeys('left-to-right', { properties: ['rotation'] }));
+  assert.isTrue(state.keyframes.mirrorCurrentPoseToKeys('left-to-right', { properties: ['rotation'] }));
   assert.closeTo(
     state.findBonePropertyKeyframe('rightUpperArm', 'rotation')!.value,
     expected.pose.get('rightUpperArm')!.rotation!,
@@ -473,7 +473,7 @@ test('twelve selected keys form one transaction and restore every replaced desti
   state.selectKeyframes(times.map((time) => ({ boneId: 'leftArm', property: 'rotation', time: time / 1000 })));
   state.setCurrentTime(0.99);
   const before = state.workingAnimation;
-  assert.isTrue(state.mirrorSelectedKeyframes('left-to-right'));
+  assert.isTrue(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   const after = state.workingAnimation;
   assert.equal(state.historyLength, 1);
   assert.equal(state.selectedKeys.length, 12);
@@ -506,7 +506,7 @@ test('later-time mirror math failure leaves an earlier valid key uncommitted and
   ]);
   const before = state.workingAnimation;
   const selected = state.selectedKeys;
-  assert.isFalse(state.mirrorSelectedKeyframes('left-to-right'));
+  assert.isFalse(state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   assert.strictEqual(state.workingAnimation, before);
   assert.strictEqual(state.selectedKeys, selected);
   assert.equal(state.historyLength, 0);
@@ -520,14 +520,14 @@ test('swap command is one undoable snapshot and successful gesture cancellation 
     { boneId: 'leftArm', property: 'rotation', time: 0.3 },
     { boneId: 'rightArm', property: 'rotation', time: 0.3 },
   ]);
-  state.beginKeyframeDrag(state.primaryKey!);
-  state.previewKeyframeDrag(0.6);
+  state.keyframes.beginKeyframeDrag(state.primaryKey!);
+  state.keyframes.previewKeyframeDrag(0.6);
   const before = state.workingAnimation;
   const notified = vi.fn();
   state.subscribe(notified);
-  assert.isTrue(state.mirrorSelectedKeyframes('swap'));
+  assert.isTrue(state.keyframes.mirrorSelectedKeyframes('swap'));
   assert.equal(state.currentTime, 0.6);
-  assert.isNull(state.keyframeDrag);
+  assert.isNull(state.keyframes.keyframeDrag);
   assert.equal(state.historyLength, 1);
   assert.equal(notified.mock.calls.length, 1);
   assert.closeTo(state.findBonePropertyKeyframe('leftArm', 'rotation', 0.3)!.value, -0.3, 1e-9);

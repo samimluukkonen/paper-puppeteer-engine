@@ -74,8 +74,8 @@ function session() {
     { name: 'old', duration: 2000, loop: true, tracks: { root: [{ time: 0, x: 1 }] } },
   ]);
   state.selectAnimation('old');
-  state.setBonePropertyKeyframe('root', 'x', 5);
-  state.setBonePropertyKeyframe('root', 'y', 7);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 5);
+  state.keyframes.setBonePropertyKeyframe('root', 'y', 7);
   state.undo(); // Both undo and redo stacks exist before import.
   return state;
 }
@@ -98,7 +98,7 @@ function snapshot(state: AnimationEditorState) {
     draft: state.boneTransformDraft,
     bone: state.selectedBoneId,
     property: state.selectedTimelineProperty,
-    keyDrag: state.keyframeDrag,
+    keyDrag: state.keyframes.keyframeDrag,
     eventDrag: state.eventDrag,
     clipboard: state.timelineClipboard,
   };
@@ -123,7 +123,7 @@ test('compact imports exceeding formatted export capacity retain the active sess
   const json = JSON.stringify(animation);
   assert.isBelow(json.length, 100_000);
   const state = session();
-  state.setBonePropertyKeyframe('root', 'x', 99);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99);
   state.play();
   const before = snapshot(state);
   const confirmDiscard = vi.fn(() => true);
@@ -165,7 +165,7 @@ for (const [label, json, message] of invalid) {
   test(`rejected ${label} import preserves authored session, history, playback, selection and drafts`, () => {
     const state = session();
     state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
-    state.copySelectedKeyframes();
+    state.keyframes.copySelectedKeyframes();
     state.setTemporaryBoneProperty('x', 44);
     state.setCurrentTime(0.4);
     state.play();
@@ -210,11 +210,11 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     state.setPlaybackSpeed(2);
     state.setKeyframeSnapMode('frame');
     state.selectKeyframe({ boneId: 'root', property: 'x', time: 0 });
-    state.copySelectedKeyframes();
+    state.keyframes.copySelectedKeyframes();
     const clipboard = state.timelineClipboard;
     if (kind === 'key') {
-      state.beginKeyframeDrag(state.primaryKey!);
-      state.previewKeyframeDrag(0.6);
+      state.keyframes.beginKeyframeDrag(state.primaryKey!);
+      state.keyframes.previewKeyframeDrag(0.6);
     } else if (kind === 'event') {
       state.createAnimationEvent();
       state.beginEventDrag(state.selectedEvent!);
@@ -240,7 +240,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.isFalse(state.canRedo);
     assert.equal(state.historyLength, 0);
     assert.isFalse(state.isScrubbing);
-    assert.isNull(state.keyframeDrag);
+    assert.isNull(state.keyframes.keyframeDrag);
     assert.isNull(state.eventDrag);
     assert.deepEqual(state.selectedKeys, []);
     assert.isNull(state.primaryKey);
@@ -251,7 +251,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.strictEqual(state.timelineClipboard, clipboard);
     assert.isTrue(state.previewLoop);
     assert.equal(state.playbackSpeed, 2);
-    assert.equal(state.keyframeSnapMode, 'frame');
+    assert.equal(state.keyframes.keyframeSnapMode, 'frame');
     assert.deepEqual(state.workingAnimation, file());
     assert.deepEqual(state.sourceAnimation, file());
     assert.strictEqual(state.sourceAnimation, state.workingAnimation);
@@ -269,7 +269,7 @@ test('import can start on an empty character, replace the same name, and retains
   const source = state.sourceAnimation;
   assert.isTrue(state.importJson(JSON.stringify(file())));
   assert.notStrictEqual(state.sourceAnimation, source);
-  state.setBonePropertyKeyframe('root', 'x', 100);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 100);
   assert.isTrue(state.dirty);
   assert.equal(state.sourceAnimation!.tracks.root![0]!.x, 3);
   state.selectAnimation(null, { discardChanges: true });
@@ -290,7 +290,7 @@ test.each(['smooth', 'stepped', 'implicit'] as const)(
     }
     animation.tracks.root![0]!.x = 0.1 + 0.2;
     assert.isTrue(state.importJson(JSON.stringify(animation)));
-    state.setBonePropertyKeyframe('arm', 'y', 9, 0.3);
+    state.keyframes.setBonePropertyKeyframe('arm', 'y', 9, 0.3);
     const json = state.exportJson();
     const before = state.sourceAnimation;
     assert.isTrue(state.importJson(json));
@@ -312,9 +312,9 @@ test('post-import key, interpolation, event edits and Undo/Redo keep the source 
   state.importJson(JSON.stringify(file()));
   const source = state.sourceAnimation;
   const baseline = state.exportJson();
-  state.setBonePropertyKeyframe('arm', 'y', 9, 0.3);
+  state.keyframes.setBonePropertyKeyframe('arm', 'y', 9, 0.3);
   state.selectKeyframe({ boneId: 'arm', property: 'y', time: 0.3 });
-  state.moveSelectedKeyframe(0.4);
+  state.keyframes.moveSelectedKeyframe(0.4);
   state.setAuthoredInterpolation(undefined);
   const ref = getAnimationEventReferences(state.workingAnimation)[1]!;
   state.selectAnimationEvent(ref);
@@ -360,7 +360,7 @@ test('preview immediately samples the imported clip through the runtime evaluato
   assert.equal(joints.get('arm')!.pose.rotation, -0.2);
   const json = state.exportJson();
   const original = joints.get('root')!.pose.x;
-  state.setBonePropertyKeyframe('root', 'x', 99);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 99);
   assert.equal(joints.get('root')!.pose.x, 99);
   state.importJson(json);
   assert.equal(joints.get('root')!.pose.x, original);

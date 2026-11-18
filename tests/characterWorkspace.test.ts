@@ -21,7 +21,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 test('pending clips retain independent documents, baselines, context and undo/redo through navigation', () => {
   const state = workspace();
-  state.setBonePropertyKeyframe('root', 'x', 10);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   state.setCurrentTime(0.6);
   state.selectKeyframes([{ boneId: 'root', property: 'x', time: 0 }]);
   state.setCurrentTime(0.6);
@@ -29,7 +29,7 @@ test('pending clips retain independent documents, baselines, context and undo/re
   state.selectAnimation('idle', { keepChanges: true });
   assert.isFalse(state.dirty);
   assert.isTrue(state.hasUnsavedChanges);
-  state.setBonePropertyKeyframe('root', 'x', 20);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 20);
   const idle = state.workingAnimation;
   assert.deepEqual(
     state.packageAnimations().map((clip) => clip.tracks.root![0]!.x),
@@ -53,7 +53,7 @@ test('pending clips retain independent documents, baselines, context and undo/re
 
 test('invalid imports and canceled inactive document replacement preserve all authored clips', () => {
   const state = workspace();
-  state.setBonePropertyKeyframe('root', 'x', 10);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   state.selectAnimation('idle', { keepChanges: true });
   const before = state.packageAnimations();
   assert.isFalse(state.importJson('{broken'));
@@ -67,7 +67,7 @@ test('invalid imports and canceled inactive document replacement preserve all au
 
 test('importing a different clip retains the pending old document and its history', () => {
   const state = workspace();
-  state.setBonePropertyKeyframe('root', 'x', 10);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   const old = state.workingAnimation;
   assert.isTrue(state.importJson(JSON.stringify({ ...clips[1], version: 1 }), { confirmDiscard: () => true }));
   assert.isFalse(state.dirty);
@@ -80,7 +80,7 @@ test('importing a different clip retains the pending old document and its histor
 
 test('mode UI offers cancel for uncommitted previews while committed edits are retained', () => {
   const state = workspace();
-  state.setBonePropertyKeyframe('root', 'x', 10);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   state.selectBone('root');
   state.setTemporaryBoneProperty('y', 5);
   const confirm = vi.fn(() => false);
@@ -94,7 +94,7 @@ test('mode UI offers cancel for uncommitted previews while committed edits are r
   confirm.mockReturnValue(true);
   assert.isTrue(controller.setMode('rig'));
   assert.isFalse(state.hasTemporaryTransform);
-  assert.isFalse(state.setBonePropertyKeyframe('root', 'y', 55));
+  assert.isFalse(state.keyframes.setBonePropertyKeyframe('root', 'y', 55));
   assert.strictEqual(state.workingAnimation, authored);
   controller.setMode('animation');
   assert.isTrue(state.undo());

@@ -370,7 +370,7 @@ export class GraphEditorController {
         time,
         state.duration,
         !event.shiftKey && state.timelineSnapSettings.enabled && state.timelineSnapSettings.frames ? 'frame' : 'none',
-        state.keyframeFPS,
+        state.keyframes.keyframeFPS,
       );
       edit = { time, value: drag.raw + graphLocalValue(drag.ref.channel, current.value - start.value) };
     } else {
@@ -434,7 +434,9 @@ export class GraphEditorController {
       const ref = this.ref();
       if (ref)
         this.edit({
-          time: ref.time + ((key === 'arrowleft' ? -1 : 1) * (event.shiftKey ? 10 : 1)) / this.getState().keyframeFPS,
+          time:
+            ref.time +
+            ((key === 'arrowleft' ? -1 : 1) * (event.shiftKey ? 10 : 1)) / this.getState().keyframes.keyframeFPS,
         });
     }
   }

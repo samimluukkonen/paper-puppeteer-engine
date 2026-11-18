@@ -421,7 +421,7 @@ test('state authoring changes only working snapshots, uses history/dirty state, 
   assert.equal(state.historyLength, 0);
   assert.equal(listener.mock.calls.length, 0);
 
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 1));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'rotation', 1));
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
   assert.deepEqual(state.workingAnimation!.tracks.root, [{ time: 500, rotation: 1 }]);
@@ -429,14 +429,14 @@ test('state authoring changes only working snapshots, uses history/dirty state, 
   assert.deepEqual(state.findBonePropertyKeyframe('root', 'rotation'), { time: 500, value: 1 });
   assert.isTrue(state.hasKeyframeAtTime('root', 'rotation', 0.5000000001));
   assert.deepEqual(state.getKeyedPropertiesAtTime('root'), ['rotation']);
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 2, 0.5000000001));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'rotation', 2, 0.5000000001));
   assert.equal(state.historyLength, 2);
   assert.isTrue(state.dirty);
   assert.deepEqual(state.workingAnimation!.tracks.root, [{ time: 500, rotation: 2 }]);
   assert.equal(JSON.stringify(state.sourceAnimation), sourceSnapshot);
   state.markSaved();
   assert.isFalse(state.dirty);
-  assert.isTrue(state.removeBonePropertyKeyframe('root', 'rotation'));
+  assert.isTrue(state.keyframes.removeBonePropertyKeyframe('root', 'rotation'));
   assert.isTrue(state.dirty);
   assert.deepEqual(state.workingAnimation!.tracks, {});
   assert.equal(JSON.stringify(state.sourceAnimation), sourceSnapshot);
@@ -459,18 +459,18 @@ test('state no-op and invalid edits preserve working data, playback, history, an
   state.selectAnimation('move');
   state.setCurrentTime(0.5);
   state.play();
-  state.setBonePropertyKeyframe('root', 'x', 5);
+  state.keyframes.setBonePropertyKeyframe('root', 'x', 5);
   state.undo();
   const working = state.workingAnimation;
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'x', 4));
-  assert.isTrue(state.removeBonePropertyKeyframe('root', 'rotation'));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'x', 4));
+  assert.isTrue(state.keyframes.removeBonePropertyKeyframe('root', 'rotation'));
   assert.isTrue(state.canRedo);
   assert.isFalse(state.dirty);
   for (const edit of [
-    () => state.setBonePropertyKeyframe('missing', 'x', 1),
-    () => state.setBonePropertyKeyframe('root', 'x', NaN),
-    () => state.setBonePropertyKeyframe('root', 'x', 1, 3),
-    () => state.removeBonePropertyKeyframe('root', 'x', Infinity),
+    () => state.keyframes.setBonePropertyKeyframe('missing', 'x', 1),
+    () => state.keyframes.setBonePropertyKeyframe('root', 'x', NaN),
+    () => state.keyframes.setBonePropertyKeyframe('root', 'x', 1, 3),
+    () => state.keyframes.removeBonePropertyKeyframe('root', 'x', Infinity),
   ]) {
     assert.isFalse(edit());
     assert.isNotEmpty(state.validationIssues);
@@ -491,8 +491,8 @@ test('state no-op and invalid edits preserve working data, playback, history, an
 
 test('keyframe state APIs handle unloaded and unselected sessions', () => {
   for (const state of [new AnimationEditorState(), new AnimationEditorState(rig, [clip()])]) {
-    assert.isFalse(state.setBonePropertyKeyframe('root', 'x', 1));
-    assert.isFalse(state.removeBonePropertyKeyframe('root', 'x'));
+    assert.isFalse(state.keyframes.setBonePropertyKeyframe('root', 'x', 1));
+    assert.isFalse(state.keyframes.removeBonePropertyKeyframe('root', 'x'));
     assert.isUndefined(state.findBonePropertyKeyframe('root', 'x'));
     assert.isUndefined(state.getEvaluatedBonePropertyValue('root', 'x'));
     assert.isUndefined(state.getEvaluatedBoneTransform('root'));
@@ -596,7 +596,7 @@ test('cached queries remain independent across rigs, edits, selection, and undo/
     assert.equal(state.getEvaluatedBoneTransform('root')!.scaleY, 2);
     assert.equal(compile.mock.calls.length, 2);
 
-    state.setBonePropertyKeyframe('root', 'x', 20);
+    state.keyframes.setBonePropertyKeyframe('root', 'x', 20);
     assert.equal(state.getEvaluatedBonePropertyValue('root', 'x'), 20);
     assert.equal(compile.mock.calls.length, 3);
     state.undo();
@@ -634,7 +634,7 @@ test('keyframe edits and history retain unchanged frozen tracks, rows, events, a
   const state = new AnimationEditorState(rig, [input]);
   state.selectAnimation('move');
   const baseline = state.workingAnimation!;
-  assert.isTrue(state.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.5));
+  assert.isTrue(state.keyframes.setBonePropertyKeyframe('root', 'rotation', 0.5, 0.5));
   const created = state.workingAnimation!;
   assert.notStrictEqual(created.tracks, baseline.tracks);
   assert.notStrictEqual(created.tracks.root, baseline.tracks.root);
@@ -646,11 +646,11 @@ test('keyframe edits and history retain unchanged frozen tracks, rows, events, a
   assert.isTrue(Object.isFrozen(created.tracks.root![1]));
   assert.deepEqual(validateAnimationDefinition(created, rig), []);
 
-  state.setBonePropertyKeyframe('root', 'rotation', 1, 0.5);
+  state.keyframes.setBonePropertyKeyframe('root', 'rotation', 1, 0.5);
   const updated = state.workingAnimation!;
   assert.strictEqual(updated.tracks.child, baseline.tracks.child);
   assert.strictEqual(updated.tracks.root![0], baseline.tracks.root![0]);
-  state.removeBonePropertyKeyframe('root', 'rotation', 0.5);
+  state.keyframes.removeBonePropertyKeyframe('root', 'rotation', 0.5);
   const removed = state.workingAnimation!;
   assert.deepEqual(removed, baseline);
   assert.strictEqual(removed.tracks.child, baseline.tracks.child);

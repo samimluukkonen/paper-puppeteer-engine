@@ -30,7 +30,6 @@ import {
   validateBoneSymmetryMapping,
 } from '../shared/boneSymmetry.js';
 import { freezeData } from '../shared/editorData.js';
-import type { MirrorDirection } from '../shared/poseMirroring.js';
 import { AnimationEditorDeformationCommands } from './AnimationEditorDeformationCommands.js';
 import {
   AnimationEditorDocument,
@@ -41,7 +40,10 @@ import {
 import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
 import { AnimationEditorGraphGestures } from './AnimationEditorGraphGestures.js';
 import { AnimationEditorIKCommands, type AnimationEditorIKHandle } from './AnimationEditorIKCommands.js';
-import { AnimationEditorKeyframeCommands, type KeyframeDrag } from './AnimationEditorKeyframeCommands.js';
+import {
+  AnimationEditorKeyframeCommands,
+  type AnimationEditorKeyframeHandle,
+} from './AnimationEditorKeyframeCommands.js';
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
@@ -74,12 +76,9 @@ import {
   type SegmentInterpolation,
   setAnimationInterpolation,
 } from './interpolation.js';
-import type { KeyframeClipboard } from './keyframeClipboard.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
 import type { PropertyKeyframeTarget } from './keyframeEdits.js';
-import type { MirrorCurrentPoseOptions } from './keyframeMirroring.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
-import type { RetimeOptions, RetimeResult } from './keyframeRetiming.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
 import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { PoseLibrary } from './PoseLibrary.js';
@@ -336,7 +335,9 @@ export class AnimationEditorState {
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
   private readonly snapping: AnimationEditorTimelineSnapping;
-  private readonly keyframes: AnimationEditorKeyframeCommands;
+  private readonly keyframeCommands: AnimationEditorKeyframeCommands;
+  /** Bone keyframe edits, clipboard, drag, mirroring and retiming. */
+  readonly keyframes: AnimationEditorKeyframeHandle;
   /** IK selection, drafts, target drags and IK key edits. */
   readonly ik: AnimationEditorIKHandle;
   private readonly events: AnimationEditorEventCommands;
@@ -418,13 +419,14 @@ export class AnimationEditorState {
       this.playback,
       this.session,
     );
-    this.keyframes = new AnimationEditorKeyframeCommands(
+    this.keyframes = this.keyframeCommands = new AnimationEditorKeyframeCommands(
       this.document,
       this.selection,
       this.playback,
       this.session,
       this.clipboard,
       this.snapping,
+      { symmetry: () => this.symmetry, cancelEventDrag: () => this.cancelEventDrag() },
     );
     this.events = new AnimationEditorEventCommands(
       this.document,
@@ -439,7 +441,7 @@ export class AnimationEditorState {
       navigate: (time) => this.setCurrentTime(time),
       isDragging: () =>
         !!(
-          this.keyframeDrag ||
+          this.keyframes.keyframeDrag ||
           this.eventDrag ||
           this.ik.ikTargetDrag ||
           this.graphEditActive ||
@@ -615,19 +617,19 @@ export class AnimationEditorState {
     if (this.deformationSelected) return this.copyDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
-    return this.selectedEvent ? this.copySelectedEvent() : this.copySelectedKeyframes();
+    return this.selectedEvent ? this.copySelectedEvent() : this.keyframes.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
     if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
-    return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.pasteKeyframes();
+    return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.keyframes.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
     if (this.deformationSelected) return this.duplicateDeformationKey();
     if (this.rootMotion.rootMotionSelected) return this.rootMotion.duplicateRootKey();
     if (this.ik.selectedIKConstraintId) return false;
-    return this.selectedEvent ? this.duplicateSelectedEvent() : this.duplicateSelectedKeyframes();
+    return this.selectedEvent ? this.duplicateSelectedEvent() : this.keyframes.duplicateSelectedKeyframes();
   }
   setSelectedEventDataJson(text: string): boolean {
     if (!this.animationAuthoringEnabled) return false;
@@ -667,7 +669,7 @@ export class AnimationEditorState {
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.cancelEventDrag();
-    return this.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root || deformation;
+    return this.keyframes.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root || deformation;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
     return this.selection.keys;
@@ -675,37 +677,18 @@ export class AnimationEditorState {
   get primaryKey(): KeyframeSelection | null {
     return this.selection.key;
   }
-  get keyframeClipboard(): KeyframeClipboard | null {
-    return this.keyframes.keyframeClipboard;
-  }
-  copySelectedKeyframes(): boolean {
-    return this.keyframes.copySelectedKeyframes();
-  }
-  pasteKeyframes(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    if (this.ik.selectedIKConstraintId) return false;
-    return this.batchNotifications(() => this.keyframes.pasteKeyframes());
-  }
-  duplicateSelectedKeyframes(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    if (this.ik.selectedIKConstraintId) return false;
-    return this.batchNotifications(() => this.keyframes.duplicateSelectedKeyframes());
-  }
-  get keyframeDrag(): KeyframeDrag | null {
-    return this.keyframes.keyframeDrag;
-  }
   get timelineSnapSettings(): TimelineSnapSettings {
     return this.snapping.settings;
   }
   get timelineSnapGuide() {
-    return this.keyframeDrag?.snapGuide ?? this.eventDrag?.snapGuide ?? null;
+    return this.keyframes.keyframeDrag?.snapGuide ?? this.eventDrag?.snapGuide ?? null;
   }
   setTimelineSnapSettings(patch: Partial<TimelineSnapSettings>): void {
     this.batchNotifications(() => {
       const previous = this.snapping.settings;
       this.snapping.setSettings(patch);
       if (previous === this.snapping.settings) return;
-      const key = this.keyframeDrag;
+      const key = this.keyframes.keyframeDrag;
       const event = this.eventDrag;
       if (key) this.keyframes.previewKeyframeDrag(key.proposedTime, key.disableSnapping);
       if (event) this.events.previewEventDrag(event.proposedTime, event.disableSnapping);
@@ -714,12 +697,6 @@ export class AnimationEditorState {
   /** Measured content width already includes timeline zoom; this never changes authored state. */
   setTimelineSnapContentWidth(width: number): void {
     this.snapping.setContentWidth(width);
-  }
-  get keyframeSnapMode(): KeyframeSnapMode {
-    return this.keyframes.keyframeSnapMode;
-  }
-  get keyframeFPS(): number {
-    return this.keyframes.keyframeFPS;
   }
   setKeyframeSnapMode(mode: KeyframeSnapMode): void {
     if (mode !== 'none' && mode !== 'frame') return;
@@ -731,34 +708,15 @@ export class AnimationEditorState {
       playhead: false,
     });
   }
-  beginKeyframeDrag(key: KeyframeSelection): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => {
-      this.cancelEventDrag();
-      return this.keyframes.beginKeyframeDrag(key);
-    });
-  }
-  previewKeyframeDrag(time: Seconds, disableSnapping = false): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.previewKeyframeDrag(time, disableSnapping));
-  }
-  commitKeyframeDrag(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.commitKeyframeDrag());
-  }
-  cancelKeyframeDrag(): boolean {
-    return this.batchNotifications(() => this.keyframes.cancelKeyframeDrag());
-  }
-  moveSelectedKeyframe(time: Seconds): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.moveSelectedKeyframe(time));
-  }
   nudgeSelectedKeyframe(direction: -1 | 1, large = false): boolean {
     if (this.deformationSelected) {
       const key = this.selectedDeformationKey;
       return (
         !!key &&
-        this.changeDeformationKey({ ...key, time: key.time + (direction * (large ? 10 : 1) * 1000) / this.keyframeFPS })
+        this.changeDeformationKey({
+          ...key,
+          time: key.time + (direction * (large ? 10 : 1) * 1000) / this.keyframes.keyframeFPS,
+        })
       );
     }
     if (this.rootMotion.rootMotionSelected && this.rootMotion.selectedRootKey) {
@@ -766,7 +724,7 @@ export class AnimationEditorState {
       try {
         return this.editGraphKey(
           { channel: { kind: 'root', id: 'Root Motion', property: key.property }, time: key.time },
-          { time: key.time + (direction * (large ? 10 : 1)) / this.keyframeFPS },
+          { time: key.time + (direction * (large ? 10 : 1)) / this.keyframes.keyframeFPS },
         );
       } catch (error) {
         this.document.reportError(error);
@@ -774,8 +732,7 @@ export class AnimationEditorState {
         return false;
       }
     }
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.nudgeSelectedKeyframe(direction, large));
+    return this.keyframes.nudgeSelectedKeyframe(direction, large);
   }
   /** Resolve identity through the central tolerance policy, then select and seek in one notification. */
   selectKeyframe(selection: KeyframeSelection, modifiers: KeyframeSelectionModifiers = {}): boolean {
@@ -819,9 +776,9 @@ export class AnimationEditorState {
   }
 
   deleteSelectedKeyframes(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    if (this.ik.selectedIKKeyframe) return this.ik.deleteSelectedIKKeyframe();
-    return this.batchNotifications(() => this.keyframes.deleteSelectedKeyframes());
+    return this.session.run(false, () =>
+      this.ik.selectedIKKeyframe ? this.ik.deleteSelectedIKKeyframe() : this.keyframes.deleteSelectedKeyframes(),
+    );
   }
   /** Compatibility alias: deletion operates on the whole selection. */
   deleteSelectedKeyframe(): boolean {
@@ -935,7 +892,7 @@ export class AnimationEditorState {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
       const value = this.selectedBoneTransform?.[property];
-      return value !== undefined && this.setBonePropertyKeyframe(this.selection.boneId, property, value);
+      return value !== undefined && this.keyframes.setBonePropertyKeyframe(this.selection.boneId, property, value);
     });
   }
   deleteBonePropertyKey(property: TransformProperty): boolean {
@@ -943,7 +900,7 @@ export class AnimationEditorState {
     return this.batchNotifications(() => {
       if (!this.selection.boneId || !transformProperties.includes(property)) return false;
       this.beginTransformEdit();
-      return this.removeBonePropertyKeyframe(this.selection.boneId, property);
+      return this.keyframes.removeBonePropertyKeyframe(this.selection.boneId, property);
     });
   }
   cancelTransformEdit(): void {
@@ -994,7 +951,7 @@ export class AnimationEditorState {
     return (
       this.hasTemporaryTransform ||
       Object.keys(this.ik.ikTargetDraft).length > 0 ||
-      !!this.keyframeDrag ||
+      !!this.keyframes.keyframeDrag ||
       !!this.eventDrag ||
       !!this.ik.ikTargetDrag ||
       this.graphEditActive ||
@@ -1125,46 +1082,6 @@ export class AnimationEditorState {
       if (next === this.working) return true;
       return this.session.commit(() => next, { pause: false });
     });
-  }
-
-  /** State-facing authoring uses continuous seconds, defaulting to the sole editor clock. */
-  setBonePropertyKeyframe(
-    boneId: string,
-    property: TransformProperty,
-    value: number,
-    timeSeconds = this.currentTime,
-  ): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.setBonePropertyKeyframe(boneId, property, value, timeSeconds));
-  }
-
-  /** Explicit authored mirror command; defaults to the selected bone or all mapped sources. */
-  mirrorCurrentPoseToKeys(direction: MirrorDirection, options: MirrorCurrentPoseOptions = {}): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() =>
-      this.symmetry ? this.keyframes.mirrorCurrentPoseToKeys(this.symmetry, direction, options) : false,
-    );
-  }
-
-  mirrorSelectedKeyframes(direction: MirrorDirection): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() =>
-      this.symmetry ? this.keyframes.mirrorSelectedKeyframes(this.symmetry, direction) : false,
-    );
-  }
-
-  previewKeyframeRetiming(options: RetimeOptions): RetimeResult<ReadonlyAnimation> {
-    return this.keyframes.previewKeyframeRetiming(options);
-  }
-
-  retimeSelectedKeyframes(options: RetimeOptions): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.retimeSelectedKeyframes(options));
-  }
-
-  removeBonePropertyKeyframe(boneId: string, property: TransformProperty, timeSeconds = this.currentTime): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.keyframes.removeBonePropertyKeyframe(boneId, property, timeSeconds));
   }
 
   /** Queries never install animation snapshots or change validation, history, or dirty state.
@@ -1333,7 +1250,7 @@ export class AnimationEditorState {
     this.cancelGraphEdit();
     this.ik.cancelIKTargetDrag();
     ++this.animationSessions;
-    this.keyframes.resetSession();
+    this.keyframeCommands.resetSession();
     this.events.resetSession();
     this.selection.resetAnimation();
     if (clearBone) this.selection.selectBone(null);

@@ -23,7 +23,7 @@ type DeformationState = Pick<
   | 'deformationEditing'
   | 'deformationSelected'
   | 'rootMotion'
-  | 'keyframeFPS'
+  | 'keyframes'
 >;
 
 /** Own provisional mesh corrections and key commands; the session owns the commit ordering and history. */
@@ -228,7 +228,7 @@ export class AnimationEditorDeformationCommands {
     const destination =
       this.state.currentTimeMilliseconds !== key.time
         ? this.state.currentTimeMilliseconds
-        : key.time + 1000 / this.state.keyframeFPS;
+        : key.time + 1000 / this.state.keyframes.keyframeFPS;
     return this.commitDeformationProposal(
       () =>
         editDeformationKey(this.document.workingAnimation!, this.document.rig!, this.state.selectedMeshId!, {

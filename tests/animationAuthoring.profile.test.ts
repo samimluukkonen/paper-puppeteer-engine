@@ -18,7 +18,7 @@ test.skipIf(import.meta.env.VITE_PROFILE !== '1')('33 bones, 512 keys: edit and 
   const run = (count: number) => {
     const start = performance.now();
     for (let i = 0; i < count; i++) {
-      state.setBonePropertyKeyframe('b0', 'x', i, 1);
+      state.keyframes.setBonePropertyKeyframe('b0', 'x', i, 1);
       state.getEvaluatedBoneTransform('b0');
     }
     return (performance.now() - start) / count;
