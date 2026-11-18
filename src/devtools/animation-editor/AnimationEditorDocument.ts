@@ -1,6 +1,10 @@
-import { ANIMATION_FORMAT_VERSION, AnimationValidationError, type ValidationIssue } from '../../engine/core.js';
+import {
+  ANIMATION_FORMAT_VERSION,
+  AnimationValidationError,
+  assetFilename,
+  type ValidationIssue,
+} from '../../engine/core.js';
 import type { AnimationClip, PoseDefinition, DeepReadonly, Rig } from '../../engine/data.js';
-import { assetFilename } from '../shared/assetFilename.js';
 import { equalEditorData, freezeData } from '../shared/editorData.js';
 import { assertJsonExportSize } from '../shared/jsonExportSize.js';
 import { SnapshotHistory } from '../shared/SnapshotHistory.js';

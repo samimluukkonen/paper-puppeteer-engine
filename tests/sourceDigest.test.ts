@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { assert, test, vi } from 'vitest';
-import { sourceDigest } from '../src/devtools/shared/sourceDigest.js';
+import { sourceDigest } from '../src/engine/core.js';
 
 test.each(['', 'abc', 'a'.repeat(55), 'a'.repeat(56), 'a'.repeat(63), 'a'.repeat(64), 'a'.repeat(65)])(
   'source digest matches Node SHA-256 at padding boundaries: %j',

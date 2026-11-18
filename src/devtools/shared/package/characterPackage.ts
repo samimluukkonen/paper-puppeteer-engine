@@ -9,6 +9,7 @@ import {
   assertMeshImageSize,
   isFullyFrozen,
   readResponseBytes,
+  safeFilename,
   withResourceResponse,
   identifierSchema,
   type CharacterManifest,
@@ -24,7 +25,6 @@ import type {
 } from '../../../engine/data.js';
 import type { ArtworkController } from '../artwork/ArtworkController.js';
 import { importSprite, inspectSpriteHeader } from '../artwork/spriteImport.js';
-import { safeFilename } from '../assetFilename.js';
 import { PackageFingerprints } from './PackageFingerprints.js';
 import { PACKAGE_MAX_FILE_BYTES, packagePath, validatePackageFiles } from './packageZip.js';
 

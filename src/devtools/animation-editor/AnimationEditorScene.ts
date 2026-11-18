@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { getFootContactWorldPosition, Rig } from '../../engine/core.js';
+import { assetFilename, getFootContactWorldPosition, Rig } from '../../engine/core.js';
 import type {
   AnimationPose,
   CharacterDefinition,
@@ -16,7 +16,6 @@ import { RigEditor } from '../rig-editor/RigEditor.js';
 import type { RigEditorState } from '../rig-editor/RigEditorState.js';
 import type { ArtworkController } from '../shared/artwork/ArtworkController.js';
 import { artworkIssue } from '../shared/artwork/artworkIssue.js';
-import { assetFilename } from '../shared/assetFilename.js';
 import { requireElement } from '../shared/editorElements.js';
 import { contactGroundDistance } from '../shared/footContactGround.js';
 import { GroundGuideOverlay } from '../shared/GroundGuideOverlay.js';

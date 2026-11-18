@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 import {
+  assetFilename,
   replacementOriginScale,
   DEFAULT_CHARACTER_TEXTURE_LIMITS as limits,
   type ArtworkAlignmentPolicy,
@@ -8,7 +9,6 @@ import {
 } from '../../../engine/core.js';
 import type { CharacterDefinition } from '../../../engine/data.js';
 import type { Puppet } from '../../../engine/runtime.js';
-import { assetFilename } from '../assetFilename.js';
 import { SnapshotHistory } from '../SnapshotHistory.js';
 import { Subscribers } from '../subscriberNotifications.js';
 import { importSprite, type ImportedSprite, type SpriteMetadata } from './spriteImport.js';

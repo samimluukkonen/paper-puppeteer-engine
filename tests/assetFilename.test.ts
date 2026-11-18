@@ -1,5 +1,5 @@
 import { assert, test } from 'vitest';
-import { assetFilename, safeFilename } from '../src/devtools/shared/assetFilename.js';
+import { assetFilename, safeFilename } from '../src/engine/core.js';
 
 test.each([
   ['rigs/rig%20v2.json?revision=2#asset', 'rig v2.json'],
