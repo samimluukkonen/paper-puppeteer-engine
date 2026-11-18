@@ -77,8 +77,8 @@ test('pose capture/apply, diagnostics cleanup and IK baking preserve independent
   state.setCurrentTime(0.5);
   const pose = state.saveCurrentPose('Anticipation');
   assert.notProperty(state.poseLibrary.get(pose).pose, 'rootMotion');
-  assert.isTrue(state.previewLibraryPose(pose));
-  state.cancelPosePreview();
+  assert.isTrue(state.previews.previewLibraryPose(pose));
+  state.previews.cancelPosePreview();
   state.setCurrentTime(0.75);
   assert.isTrue(state.applyLibraryPose(pose));
   assert.deepEqual(state.workingAnimation!.rootMotion, root);

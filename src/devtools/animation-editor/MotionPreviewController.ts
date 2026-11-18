@@ -51,7 +51,7 @@ export class MotionPreviewController {
     this.state = state;
     const sync = () => {
       if (this.synchronizing) return;
-      if (this.copy && !state.trajectoryCopyActive) {
+      if (this.copy && !state.previews.trajectoryCopyActive) {
         this.copy = undefined;
         this.publish({ copying: false });
       }
@@ -127,7 +127,7 @@ export class MotionPreviewController {
       const settings = this.snapshot.settings;
       const root = previewTrajectoryToRootMotion(settings, state.workingAnimation.duration, placement);
       const previousMode = state.rootMotion.worldDisplacementMode;
-      if (!state.previewTrajectoryCopy(root)) {
+      if (!state.previews.previewTrajectoryCopy(root)) {
         this.publish({ message: 'Commit or cancel temporary animation edits before previewing a trajectory copy.' });
         return false;
       }
@@ -147,22 +147,22 @@ export class MotionPreviewController {
     const copy = this.copy;
     this.copy = undefined;
     if (!copy) return;
-    const owned = this.state?.trajectoryCopyActive;
-    this.state?.cancelTrajectoryCopy();
+    const owned = this.state?.previews.trajectoryCopyActive;
+    this.state?.previews.cancelTrajectoryCopy();
     if (owned) this.state?.rootMotion.setWorldDisplacementView(copy.previousMode);
     this.publish({ copying: false, message: '' });
   }
   commitCopy(): boolean {
     const copy = this.copy;
     const placement = this.placement?.();
-    if (!copy || !placement || !this.state?.trajectoryCopyActive) return false;
+    if (!copy || !placement || !this.state?.previews.trajectoryCopyActive) return false;
     if (['a', 'b', 'c', 'd'].some((key) => placement[key as keyof Affine] !== copy.placement[key as keyof Affine])) {
       this.cancelCopy();
       this.publish({ message: 'Character facing, rotation or scale changed. Preview the copy again before applying.' });
       return false;
     }
     // The proposal is validated and committed through the document's single history transaction.
-    const applied = this.state.commitTrajectoryCopy();
+    const applied = this.state.previews.commitTrajectoryCopy();
     if (applied) {
       this.copy = undefined;
       this.publish({

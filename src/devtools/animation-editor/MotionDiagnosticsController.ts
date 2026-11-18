@@ -71,7 +71,7 @@ export class MotionDiagnosticsController {
   private refresh(): void {
     const dependencies = [this.state?.workingAnimation, this.state?.rig, this.state?.sessionRevision, this.reason];
     if (dependencies.every((value, index) => value === this.dependencies[index])) {
-      if (this.preview && !this.state?.cleanupPreviewActive) {
+      if (this.preview && !this.state?.previews.cleanupPreviewActive) {
         this.preview = null;
         this.publish();
       }
@@ -156,18 +156,18 @@ export class MotionDiagnosticsController {
     if (!this.preview || !this.state?.workingAnimation || this.reason) return;
     this.timeMs = timeMs;
     this.after = after;
-    this.state.previewCleanup(after ? this.preview.animation : this.state.workingAnimation, timeMs);
+    this.state.previews.previewCleanup(after ? this.preview.animation : this.state.workingAnimation, timeMs);
     this.publish();
   }
   cancel(): void {
     this.preview = null;
-    this.state?.cancelCleanupPreview();
+    this.state?.previews.cancelCleanupPreview();
     this.publish();
   }
   apply(): boolean {
     if (!this.preview || this.reason || !this.state) return false;
     try {
-      const changed = this.state.applyMotionCleanup(this.targets, this.options);
+      const changed = this.state.previews.applyMotionCleanup(this.targets, this.options);
       if (changed) {
         this.run();
         this.feedback = 'Cleanup applied and revalidated. One Undo restores all removed keys.';

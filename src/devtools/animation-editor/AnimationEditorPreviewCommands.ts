@@ -18,6 +18,22 @@ type PreviewState = Pick<
   | 'poseLibrary'
 >;
 
+/**
+ * The public `state.previews` domain handle. The facade alone composes the preview animation from the
+ * preview snapshots, clears the pose preview around history and pose apply, and resets or reconciles
+ * previews for a new session or notification.
+ */
+export type AnimationEditorPreviewHandle = Omit<
+  AnimationEditorPreviewCommands,
+  | 'reset'
+  | 'clearPose'
+  | 'reconcile'
+  | 'trajectoryAnimation'
+  | 'cleanupAnimation'
+  | 'variationAnimation'
+  | 'hasIKPreview'
+>;
+
 /** Own detached trajectory, cleanup, variation and pose comparisons outside authored document history. */
 export class AnimationEditorPreviewCommands {
   constructor(

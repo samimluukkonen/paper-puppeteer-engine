@@ -18,8 +18,6 @@ import type {
   AnimationPose,
   ValidationIssue,
   IKBakePlan,
-  PoseDefinition,
-  DeepReadonly,
   Rig,
 } from '../../engine/data.js';
 import {
@@ -46,7 +44,7 @@ import {
 import { AnimationEditorPlayback } from './AnimationEditorPlayback.js';
 import { AnimationEditorPlaybackCommands } from './AnimationEditorPlaybackCommands.js';
 import { AnimationEditorPlaybackController } from './AnimationEditorPlaybackController.js';
-import { AnimationEditorPreviewCommands } from './AnimationEditorPreviewCommands.js';
+import { AnimationEditorPreviewCommands, type AnimationEditorPreviewHandle } from './AnimationEditorPreviewCommands.js';
 import { AnimationEditorRootMotion, type AnimationEditorRootMotionHandle } from './AnimationEditorRootMotion.js';
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
@@ -76,10 +74,8 @@ import {
   setAnimationInterpolation,
 } from './interpolation.js';
 import { setBonePropertyKeyframes } from './keyframeEdits.js';
-import type { PropertyKeyframeTarget } from './keyframeEdits.js';
 import { findBonePropertyKeyframe, getKeyedPropertiesAtTime, hasKeyframeAtTime } from './keyframeQueries.js';
 import type { KeyframeMarquee, KeyframeSelectionModifiers } from './keyframeSelection.js';
-import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { PoseLibrary } from './PoseLibrary.js';
 import { rootKeys } from './rootMotionEdits.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
@@ -175,9 +171,9 @@ export class AnimationEditorState {
   }
 
   get previewElapsedTimeMilliseconds(): number {
-    return this.previewAnimation === this.workingAnimation || this.trajectoryCopyActive
+    return this.previewAnimation === this.workingAnimation || this.previews.trajectoryCopyActive
       ? this.playback.elapsedTimeMilliseconds
-      : this.previewTimeMilliseconds;
+      : this.previews.previewTimeMilliseconds;
   }
   private clearRootSelection(): void {
     const changed =
@@ -188,50 +184,14 @@ export class AnimationEditorState {
     this.rootMotion.selectedRootKey = null;
     if (changed) this.notify();
   }
-  get trajectoryCopyActive(): boolean {
-    return this.previews.trajectoryCopyActive;
-  }
-  previewTrajectoryCopy(rootMotion: NonNullable<ReadonlyAnimation['rootMotion']>): boolean {
-    return this.previews.previewTrajectoryCopy(rootMotion);
-  }
-  cancelTrajectoryCopy(): boolean {
-    return this.previews.cancelTrajectoryCopy();
-  }
-  commitTrajectoryCopy(): boolean {
-    return this.previews.commitTrajectoryCopy();
-  }
-  get cleanupPreviewActive(): boolean {
-    return this.previews.cleanupPreviewActive;
-  }
-  previewCleanup(animation: ReadonlyAnimation, timeMs: number): void {
-    this.previews.previewCleanup(animation, timeMs);
-  }
-  cancelCleanupPreview(): boolean {
-    return this.previews.cancelCleanupPreview();
-  }
-  applyMotionCleanup(
-    targets: readonly PropertyKeyframeTarget[],
-    options: Partial<MotionDiagnosticOptions> = {},
-  ): boolean {
-    return this.previews.applyMotionCleanup(targets, options);
-  }
-  get previewTimeMilliseconds(): Milliseconds {
-    return this.previews.previewTimeMilliseconds;
-  }
-  previewVariation(options: AnimationVariationOptions, progress: number): void {
-    this.previews.previewVariation(options, progress);
-  }
-  cancelVariationPreview(): boolean {
-    return this.previews.cancelVariationPreview();
-  }
 
   /** A validated provisional curve uses the ordinary preview evaluator, never document/export ownership. */
   get previewAnimation(): ReadonlyAnimation | null {
     return (
-      this.previews.trajectoryAnimation ??
-      this.previews.cleanupAnimation ??
+      this.previewCommands.trajectoryAnimation ??
+      this.previewCommands.cleanupAnimation ??
       this.deformation.previewAnimation ??
-      this.previews.variationAnimation ??
+      this.previewCommands.variationAnimation ??
       this.rootMotionCommands.previewAnimation ??
       this.graphGestures.previewAnimation ??
       this.working
@@ -257,10 +217,6 @@ export class AnimationEditorState {
   }
 
   readonly poseLibrary: PoseLibrary;
-  get previewedPose(): DeepReadonly<PoseDefinition> | null {
-    return this.previews.previewedPose;
-  }
-
   /** Capture the evaluated authored FK pose, never Puppet's post-IK/rendered transforms. */
   saveCurrentPose(name: string, boneIds?: readonly string[]): string {
     if (!this.animationAuthoringEnabled || !this.working || !this.rig)
@@ -277,13 +233,6 @@ export class AnimationEditorState {
       }),
     );
     return this.poseLibrary.add({ version: 1, name, bones }, this.rig);
-  }
-
-  previewLibraryPose(id: string): boolean {
-    return this.previews.previewLibraryPose(id);
-  }
-  cancelPosePreview(): void {
-    this.previews.cancelPosePreview();
   }
 
   /** One validated keyframe batch and one document history entry, using editor milliseconds. */
@@ -307,7 +256,7 @@ export class AnimationEditorState {
         pause: false,
         after: () => {
           this.pause();
-          this.previews.clearPose();
+          this.previewCommands.clearPose();
         },
       });
     });
@@ -329,7 +278,9 @@ export class AnimationEditorState {
   /** Root selection, world-displacement view preferences, root keys and the provisional XY drag. */
   readonly rootMotion: AnimationEditorRootMotionHandle;
   private readonly graphGestures: AnimationEditorGraphGestures;
-  private readonly previews: AnimationEditorPreviewCommands;
+  private readonly previewCommands: AnimationEditorPreviewCommands;
+  /** Detached trajectory, cleanup, variation and pose-library previews outside document history. */
+  readonly previews: AnimationEditorPreviewHandle;
   private readonly deformation: AnimationEditorDeformationCommands;
   private readonly selection: AnimationEditorSelection;
   private readonly selectionCommands: AnimationEditorSelectionCommands;
@@ -358,7 +309,7 @@ export class AnimationEditorState {
       rig,
       options.poses ?? [],
       () => {
-        this.previews.clearPose();
+        this.previewCommands.clearPose();
         this.notify();
       },
       () => this.rig,
@@ -403,11 +354,11 @@ export class AnimationEditorState {
         if (channel.kind === 'ik')
           this.selection.setIKKey({ kind: 'ik', constraintId: channel.id, property: channel.property, time });
       },
-      reconcilePreviews: () => this.previews.reconcile(),
+      reconcilePreviews: () => this.previewCommands.reconcile(),
     });
     this.rootMotion = this.rootMotionCommands = new AnimationEditorRootMotion(this, this.session);
     this.graphGestures = new AnimationEditorGraphGestures(this, this.session);
-    this.previews = new AnimationEditorPreviewCommands(this, this.document, this.session);
+    this.previews = this.previewCommands = new AnimationEditorPreviewCommands(this, this.document, this.session);
     this.selection = new AnimationEditorSelection(rig);
     this.deformation = new AnimationEditorDeformationCommands(this, this.document, this.clipboard, this.session);
     this.snapping = new AnimationEditorTimelineSnapping(
@@ -458,8 +409,8 @@ export class AnimationEditorState {
       this.snapping,
       this.session,
       () =>
-        this.graphEditActive || this.previews.hasIKPreview
-          ? { animation: this.previewAnimation!, timeMs: this.previewTimeMilliseconds }
+        this.graphEditActive || this.previewCommands.hasIKPreview
+          ? { animation: this.previewAnimation!, timeMs: this.previews.previewTimeMilliseconds }
           : null,
     );
   }
@@ -591,8 +542,8 @@ export class AnimationEditorState {
   private cancelTimelineDrag(): boolean {
     const deformation = this.cancelDeformationEdit();
     const root = this.rootMotion.cancelRootMotionDrag();
-    const cleanup = this.cancelCleanupPreview();
-    const variation = this.cancelVariationPreview();
+    const cleanup = this.previews.cancelCleanupPreview();
+    const variation = this.previews.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
     const event = this.events.cancelEventDrag();
@@ -1048,7 +999,7 @@ export class AnimationEditorState {
           boneId,
           property,
           timeSeconds === this.currentTime
-            ? this.previewTimeMilliseconds
+            ? this.previews.previewTimeMilliseconds
             : this.playback.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
@@ -1061,7 +1012,7 @@ export class AnimationEditorState {
           this.rig,
           boneId,
           timeSeconds === this.currentTime
-            ? this.previewTimeMilliseconds
+            ? this.previews.previewTimeMilliseconds
             : this.playback.resolveTimeMilliseconds(timeSeconds),
         )
       : undefined;
@@ -1092,7 +1043,7 @@ export class AnimationEditorState {
 
   play(): void {
     if (!this.animationAuthoringEnabled) return;
-    this.cancelCleanupPreview();
+    this.previews.cancelCleanupPreview();
     this.playbackController.play();
   }
 
@@ -1102,7 +1053,7 @@ export class AnimationEditorState {
 
   togglePlayback(): void {
     if (!this.animationAuthoringEnabled) return;
-    this.cancelCleanupPreview();
+    this.previews.cancelCleanupPreview();
     this.playbackController.togglePlayback();
   }
 
@@ -1173,7 +1124,7 @@ export class AnimationEditorState {
     this.rootMotion.cancelRootMotionDrag();
     this.clearRootSelection();
     this.rootMotion.rootMotionEditing = false;
-    this.previews.reset();
+    this.previewCommands.reset();
     this.cancelGraphEdit();
     this.ik.cancelIKTargetDrag();
     ++this.animationSessions;
@@ -1305,7 +1256,7 @@ export class AnimationEditorState {
     // Undo/redo is also a cancellation boundary when the requested history stack is empty.
     const cancelledDrag = this.cancelTimelineDrag();
     const cancelled = this.clearTransformDraft() || cancelledDrag || !!this.previews.previewedPose;
-    this.previews.clearPose();
+    this.previewCommands.clearPose();
     const changed = restore();
     if (changed) {
       this.updateTime(this.currentTime);

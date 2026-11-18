@@ -133,7 +133,7 @@ test('save selected bones only, reject empty/unknown selection, duplicate/invali
   state.selectBone('arm');
   state.setTemporaryBoneProperty('rotation', 2);
   assert.throws(() => state.saveCurrentPose('Draft'), /temporary edits/);
-  assert.isFalse(state.previewLibraryPose(id));
+  assert.isFalse(state.previews.previewLibraryPose(id));
   assert.isFalse(state.applyLibraryPose(id));
   assert.equal(state.poseLibrary.poses.length, 2);
 });
@@ -149,7 +149,7 @@ test('non-destructive preview and cancel restore rendered animation, including u
   const history = state.historyLength;
   const original = puppet.exportPose('Original', { onlyChanged: false });
   try {
-    assert.isTrue(state.previewLibraryPose(id));
+    assert.isTrue(state.previews.previewLibraryPose(id));
     assert.strictEqual(state.workingAnimation, before);
     assert.equal(state.historyLength, history);
     assert.isFalse(state.dirty);
@@ -157,7 +157,7 @@ test('non-destructive preview and cancel restore rendered animation, including u
     assert.equal(projected.bones.arm!.rotation, 0.1);
     assert.equal(projected.bones.root!.y, original.bones.root!.y);
     assert.equal(projected.bones.hand!.rotation, original.bones.hand!.rotation);
-    state.cancelPosePreview();
+    state.previews.cancelPosePreview();
     assert.deepEqual(puppet.exportPose('Original', { onlyChanged: false }), original);
     assert.strictEqual(state.workingAnimation, before);
     assert.isFalse(state.canUndo);
@@ -178,10 +178,10 @@ test('apply overwrites relevant keys at exact milliseconds as one Undo/Redo edit
   const second = state.workingAnimation!;
   const oldRoot = second.tracks.root;
   const ik = second.ikTracks;
-  assert.isTrue(state.previewLibraryPose(id));
+  assert.isTrue(state.previews.previewLibraryPose(id));
   assert.isTrue(state.applyLibraryPose(id));
   const applied = state.workingAnimation!;
-  assert.isNull(state.previewedPose);
+  assert.isNull(state.previews.previewedPose);
   assert.equal(state.historyLength, 1);
   assert.equal(applied.tracks.arm!.find((key) => key.time === 375)?.rotation, value);
   assert.equal(applied.tracks.arm!.length, 1);
@@ -225,7 +225,7 @@ test('IK solves once after preview/apply: capture stores FK, never final IK rota
     state.selectAnimation('second');
     state.setCurrentTime(0.375);
     const ik = state.workingAnimation!.ikTracks;
-    state.previewLibraryPose(id);
+    state.previews.previewLibraryPose(id);
     const previewRotations = [puppet.getBone('arm').pose.rotation, puppet.getBone('forearm').pose.rotation];
     state.applyLibraryPose(id);
     assert.deepEqual([puppet.getBone('arm').pose.rotation, puppet.getBone('forearm').pose.rotation], previewRotations);
@@ -261,7 +261,7 @@ test('exact compatibility rejects foreign characters, changed hierarchy/bind/IK 
     assert.match(state.poseLibrary.compatibility(id, rig)!, /changed/);
     state.updatePreviewRig(rig);
     const before = state.workingAnimation;
-    assert.isFalse(state.previewLibraryPose(id));
+    assert.isFalse(state.previews.previewLibraryPose(id));
     assert.isFalse(state.applyLibraryPose(id));
     assert.strictEqual(state.workingAnimation, before);
   }
@@ -301,9 +301,9 @@ test('library save/rename/delete use their own bounded history and invalidate pr
   const { state } = fixture();
   const id = state.saveCurrentPose('One');
   const before = state.workingAnimation;
-  state.previewLibraryPose(id);
+  state.previews.previewLibraryPose(id);
   state.poseLibrary.rename(id, 'Two');
-  assert.isNull(state.previewedPose);
+  assert.isNull(state.previews.previewedPose);
   assert.equal(state.poseLibrary.get(id).pose.name, 'Two');
   state.poseLibrary.delete(id);
   assert.throws(() => state.poseLibrary.get(id), /available pose/);
@@ -324,27 +324,27 @@ test('preview clears on clip/rig/mode/authoring/Undo boundaries; closing/unbindi
   const id = state.saveCurrentPose('One');
   const controller = new PoseLibraryController();
   controller.bind(state);
-  state.previewLibraryPose(id);
+  state.previews.previewLibraryPose(id);
   state.selectAnimation('second');
-  assert.isNull(state.previewedPose);
-  state.previewLibraryPose(id);
+  assert.isNull(state.previews.previewedPose);
+  state.previews.previewLibraryPose(id);
   state.undo();
-  assert.isNull(state.previewedPose);
-  state.previewLibraryPose(id);
+  assert.isNull(state.previews.previewedPose);
+  state.previews.previewLibraryPose(id);
   state.setEditorMode('rig-tweak');
-  assert.isNull(state.previewedPose);
+  assert.isNull(state.previews.previewedPose);
   state.setEditorMode('animation');
-  state.previewLibraryPose(id);
+  state.previews.previewLibraryPose(id);
   state.selectBone('arm');
   state.setTemporaryBoneProperty('rotation', 1);
-  assert.isNull(state.previewedPose);
+  assert.isNull(state.previews.previewedPose);
   state.cancelTransformEdit();
-  state.previewLibraryPose(id);
+  state.previews.previewLibraryPose(id);
   state.updatePreviewRig(new Rig(definition.rig));
-  assert.isNull(state.previewedPose);
-  state.previewLibraryPose(id);
+  assert.isNull(state.previews.previewedPose);
+  state.previews.previewLibraryPose(id);
   controller.unbind();
-  assert.isNull(state.previewedPose);
+  assert.isNull(state.previews.previewedPose);
   controller.dispose();
 });
 

@@ -541,7 +541,7 @@ test('entering root editing frames the first cycle once, freezes follow and can 
     assert.isTrue(f.state.rootMotion.rootMotionEditing);
     assert.isTrue(f.motion.previewCopy());
     assert.isFalse(f.state.rootMotion.rootMotionEditing);
-    assert.isTrue(f.state.trajectoryCopyActive);
+    assert.isTrue(f.state.previews.trajectoryCopyActive);
     f.motion.cancelCopy();
     assert.equal(f.state.historyLength, 0);
   } finally {

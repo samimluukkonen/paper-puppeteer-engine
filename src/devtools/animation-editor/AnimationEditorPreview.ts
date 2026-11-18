@@ -20,7 +20,7 @@ export class AnimationEditorPreview {
   private draft: Readonly<Partial<JointTransform>> | undefined;
   private ikDraft: AnimationEditorState['ik']['ikTargetDraft'] | undefined;
   private ikId: string | null | undefined;
-  private libraryPose: AnimationEditorState['previewedPose'] | undefined;
+  private libraryPose: AnimationEditorState['previews']['previewedPose'] | undefined;
   private detachPoseSource: (() => void) | undefined;
   private readonly unsubscribe: () => void;
   private readonly releasePlacement: (() => void) | undefined;
@@ -44,7 +44,7 @@ export class AnimationEditorPreview {
   refresh(force = false): void {
     if (this.disposed) return;
     const animation = this.state.previewAnimation;
-    const time = animation ? this.state.previewTimeMilliseconds : 0;
+    const time = animation ? this.state.previews.previewTimeMilliseconds : 0;
     const sampledTime = motionPreviewSampleTime(animation, time);
     // The editor owns this top-level preview instance. Bone-local root keys remain untouched;
     // preview-only world offsets stay unscaled; authored root offsets use placement/facing once.
@@ -73,7 +73,7 @@ export class AnimationEditorPreview {
     const draft = this.state.boneTransformDraft;
     const ikDraft = this.state.ik.ikTargetDraft;
     const ikId = this.state.ik.selectedIKConstraintId;
-    const libraryPose = this.state.previewedPose;
+    const libraryPose = this.state.previews.previewedPose;
     if (
       !force &&
       rig === this.rig &&

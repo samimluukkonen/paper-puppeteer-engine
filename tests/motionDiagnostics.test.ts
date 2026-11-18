@@ -231,7 +231,7 @@ test('controller manual report, preview/cancel, timeline inspection, explicit at
   assert.strictEqual(state.previewAnimation, authored);
   controller.compare(700, true);
   assert.notStrictEqual(state.previewAnimation, authored);
-  assert.equal(state.previewTimeMilliseconds, 700);
+  assert.equal(state.previews.previewTimeMilliseconds, 700);
   assert.equal(state.currentTime, 0.2);
   assert.strictEqual(state.workingAnimation, authored);
   assert.equal(state.exportJson(), json);
@@ -239,7 +239,7 @@ test('controller manual report, preview/cancel, timeline inspection, explicit at
   assert.equal(events.mock.calls.length, 0);
   controller.cancel();
   assert.strictEqual(state.previewAnimation, authored);
-  assert.equal(state.previewTimeMilliseconds, 200);
+  assert.equal(state.previews.previewTimeMilliseconds, 200);
   controller.inspect({ kind: 'bone', id: 'free', property: 'x', timeMs: 500, message: '' });
   assert.equal(state.currentTime, 0.5);
   assert.deepEqual(state.primaryKey, { boneId: 'free', property: 'x', time: 0.5 });
@@ -291,7 +291,7 @@ test('preview invalidates on selection, edits, options, playback, sessions, mode
   controller.run();
   controller.previewCleanup();
   controller.unbind();
-  assert.isFalse(state.cleanupPreviewActive);
+  assert.isFalse(state.previews.cleanupPreviewActive);
   assert.deepEqual(original!.tracks.free, linear);
   controller.dispose();
 });

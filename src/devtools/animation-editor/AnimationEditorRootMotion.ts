@@ -15,7 +15,7 @@ export interface RootMotionContext {
   readonly keyframes: { readonly keyframeFPS: number };
   readonly duration: number;
   readonly previewAnimation: ReadonlyAnimation | null;
-  readonly previewTimeMilliseconds: number;
+  readonly previews: { readonly previewTimeMilliseconds: number };
 }
 
 /** The public `state.rootMotion` domain handle; the preview snapshot is read only by the facade. */
@@ -68,7 +68,7 @@ export class AnimationEditorRootMotion {
       (this.context.previewAnimation
         ? sampleRootMotion(
             this.context.previewAnimation,
-            motionPreviewSampleTime(this.context.previewAnimation, this.context.previewTimeMilliseconds),
+            motionPreviewSampleTime(this.context.previewAnimation, this.context.previews.previewTimeMilliseconds),
           )
         : { x: 0, y: 0 })
     );

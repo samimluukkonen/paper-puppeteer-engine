@@ -250,7 +250,7 @@ test('preview scrubs the real canvas evaluator without authored clocks, event de
   state.onAnimationEvent(events);
   assert.equal(controller.begin(), 'attack-basic-variation');
   assert.equal(controller.preview({ name: 'heavy', timeScale: 2 }, 0.75), '');
-  assert.equal(state.previewTimeMilliseconds, 1500);
+  assert.equal(state.previews.previewTimeMilliseconds, 1500);
   assert.equal(puppet.getBone('root').pose.x, 15);
   assert.strictEqual(state.workingAnimation, original);
   assert.equal(state.exportJson(), json);

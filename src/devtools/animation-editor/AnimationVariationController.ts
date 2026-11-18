@@ -74,10 +74,10 @@ export class AnimationVariationController {
   preview(options: AnimationVariationOptions, progress: number): string {
     if (this.reason || !this.state) return this.reason || unavailable;
     try {
-      this.state.previewVariation(options, progress);
+      this.state.previews.previewVariation(options, progress);
       return '';
     } catch (error) {
-      this.state.cancelVariationPreview();
+      this.state.previews.cancelVariationPreview();
       return error instanceof Error ? error.message : String(error);
     }
   }
@@ -95,7 +95,7 @@ export class AnimationVariationController {
   }
 
   cancelPreview(): void {
-    this.state?.cancelVariationPreview();
+    this.state?.previews.cancelVariationPreview();
   }
 
   unbind(): void {

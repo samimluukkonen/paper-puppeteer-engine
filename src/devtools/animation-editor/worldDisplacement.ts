@@ -20,7 +20,7 @@ export function evaluateWorldDisplacement(
 ): { x: number; y: number } {
   const animation = state.previewAnimation;
   if (!animation || !state.animationAuthoringEnabled) return { x: 0, y: 0 };
-  const time = motionPreviewSampleTime(animation, state.previewTimeMilliseconds);
+  const time = motionPreviewSampleTime(animation, state.previews.previewTimeMilliseconds);
   if (state.rootMotion.worldDisplacementMode === 'preview')
     return settings ? evaluatePreviewDisplacement(settings, time) : { x: 0, y: 0 };
   if (state.rootMotion.worldDisplacementMode !== 'authored') return { x: 0, y: 0 };
@@ -37,7 +37,7 @@ export function evaluateWorldDisplacement(
     // quantize a root one frame ahead of the skeleton after many fractional updates.
     const cycles = Math.max(
       0,
-      Math.round((state.previewElapsedTimeMilliseconds - state.previewTimeMilliseconds) / animation.duration),
+      Math.round((state.previewElapsedTimeMilliseconds - state.previews.previewTimeMilliseconds) / animation.duration),
     );
     const accumulated = evaluateRootMotionAtElapsedTime(animation, cycles * animation.duration, { loop: true });
     root = { x: root.x + accumulated.x, y: root.y + accumulated.y };

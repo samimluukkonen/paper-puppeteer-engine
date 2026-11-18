@@ -39,7 +39,7 @@ export class PoseLibraryController {
       state?.sessionRevision,
       state?.poseLibrary.canUndo,
       state?.poseLibrary.canRedo,
-      state?.previewedPose?.library?.id ?? state?.previewedPose?.name,
+      state?.previews.previewedPose?.library?.id ?? state?.previews.previewedPose?.name,
     ]);
     // Immutable rig/library identities invalidate compatibility. Checking every pose here
     // would repeat the same work on every playback tick, even while the panel is closed.
@@ -52,7 +52,7 @@ export class PoseLibraryController {
   unbind(): void {
     this.release?.();
     this.release = undefined;
-    this.state?.cancelPosePreview();
+    this.state?.previews.cancelPosePreview();
     this.state = undefined;
     this.refresh();
   }

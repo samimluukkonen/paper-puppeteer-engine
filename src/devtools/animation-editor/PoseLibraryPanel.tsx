@@ -24,16 +24,16 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
         event.key === 'Escape' &&
         !event.defaultPrevented &&
         !document.querySelector('dialog[open]') &&
-        state?.previewedPose
+        state?.previews.previewedPose
       ) {
         event.preventDefault();
-        state.cancelPosePreview();
+        state.previews.cancelPosePreview();
       }
     };
     window.addEventListener('keydown', cancel);
     return () => {
       window.removeEventListener('keydown', cancel);
-      state?.cancelPosePreview();
+      state?.previews.cancelPosePreview();
     };
   }, [state]);
   const run = (action: () => void): void => {
@@ -49,7 +49,7 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
       className="animation-popover animation-pose-library"
       data-tool-panel
       onToggle={(event) => {
-        if (!event.currentTarget.open) state?.cancelPosePreview();
+        if (!event.currentTarget.open) state?.previews.cancelPosePreview();
       }}
     >
       <summary>Pose Library</summary>
@@ -110,7 +110,7 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
                 type="button"
                 aria-pressed={selected === id}
                 onClick={() => {
-                  state?.cancelPosePreview();
+                  state?.previews.cancelPosePreview();
                   setSelected(id);
                   setRenaming(false);
                   setFeedback('');
@@ -129,7 +129,7 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
             disabled={!!reason}
             onClick={() =>
               run(() => {
-                if (state?.previewLibraryPose(selected))
+                if (state?.previews.previewLibraryPose(selected))
                   setFeedback(
                     'Preview only. Apply Pose to create keys; Cancel preview or Escape restores the animation.',
                   );
@@ -140,9 +140,9 @@ export function PoseLibraryPanel({ controller }: { controller: PoseLibraryContro
           </button>
           <button
             type="button"
-            disabled={!state?.previewedPose}
+            disabled={!state?.previews.previewedPose}
             onClick={() => {
-              state?.cancelPosePreview();
+              state?.previews.cancelPosePreview();
               setFeedback('Preview cancelled.');
             }}
           >
