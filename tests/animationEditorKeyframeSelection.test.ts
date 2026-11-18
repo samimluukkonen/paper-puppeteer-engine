@@ -107,28 +107,28 @@ test.each(['key', 'event'] as const)(
   (drag) => {
     const { state } = session();
     const working = state.workingAnimation;
-    const ref = state.eventTimelineTrack.markers[0]!.ref;
+    const ref = state.events.eventTimelineTrack.markers[0]!.ref;
     if (drag === 'key') {
       assert.isTrue(state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0.5 }));
       assert.isTrue(state.keyframes.previewKeyframeDrag(1));
     } else {
-      assert.isTrue(state.beginEventDrag(ref));
-      assert.isTrue(state.previewEventDrag(1));
+      assert.isTrue(state.events.beginEventDrag(ref));
+      assert.isTrue(state.events.previewEventDrag(1));
     }
     assert.strictEqual(state.workingAnimation, working);
-    assert.equal(state.keyframes.keyframeDrag?.previewTime ?? state.eventDrag?.previewTime, 1);
+    assert.equal(state.keyframes.keyframeDrag?.previewTime ?? state.events.eventDrag?.previewTime, 1);
     const observations: unknown[] = [];
     state.subscribe(() => {
       assert.strictEqual(state.workingAnimation, working);
       assert.isNull(state.keyframes.keyframeDrag);
-      assert.isNull(state.eventDrag);
+      assert.isNull(state.events.eventDrag);
       assert.isFalse(state.dirty);
       assert.equal(state.historyLength, 0);
       observations.push([state.selectedKeyframe, state.selectedEvent, state.currentTime]);
     });
     const key = { boneId: 'arm', property: 'rotation' as const, time: 0.75 };
     if (drag === 'key') {
-      assert.isTrue(state.selectAnimationEvent(ref));
+      assert.isTrue(state.events.selectAnimationEvent(ref));
       assert.deepEqual(observations, [[null, ref, 0.5]]);
     } else {
       assert.isTrue(state.selectKeyframe(key));

@@ -197,7 +197,7 @@ test('larger animation with 32 tracks, 128 keys per track and 256 events imports
   assert.isTrue(state.importJson(JSON.stringify(source)));
   for (const bone of bones) state.setTimelineBoneExpanded(bone.id, true);
   assert.equal(state.timelineTracks.filter((row) => row.kind === 'property').length, 32 * transformProperties.length);
-  assert.equal(state.eventTimelineTrack.markers.length, 256);
+  assert.equal(state.events.eventTimelineTrack.markers.length, 256);
   const result = verifyAnimationRoundTrip(state.workingAnimation, largeRig);
   assert.isTrue(result.success && result.equivalent);
 });

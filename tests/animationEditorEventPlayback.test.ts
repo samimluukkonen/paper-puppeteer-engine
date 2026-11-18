@@ -64,17 +64,17 @@ test('navigation across all markers, key/event selection, editing and Undo/Redo 
   const { state, events } = session();
   for (const time of [0, 1, 2, 0.5, 0]) state.setCurrentTime(time);
   state.restart();
-  for (const marker of state.eventTimelineTrack.markers) state.selectAnimationEvent(marker.ref);
+  for (const marker of state.events.eventTimelineTrack.markers) state.events.selectAnimationEvent(marker.ref);
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.5 });
   state.keyframes.setBonePropertyKeyframe('root', 'x', 10);
   state.undo();
   state.redo();
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
-  state.copySelectedEvent();
-  state.pasteEvent();
-  state.duplicateSelectedEvent();
-  state.moveSelectedEvent(1.2);
-  state.deleteSelectedEvent();
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
+  state.events.copySelectedEvent();
+  state.events.pasteEvent();
+  state.events.duplicateSelectedEvent();
+  state.events.moveSelectedEvent(1.2);
+  state.events.deleteSelectedEvent();
   state.undo();
   state.redo();
   assert.deepEqual(events, []);
@@ -337,11 +337,11 @@ test.each([250.03, 3.97])('canceling an event drag restores exact %s ms without 
     ],
   });
   const authored = state.workingAnimation;
-  const ref = state.eventTimelineTrack.markers[0]!.ref;
-  assert.isTrue(state.beginEventDrag(ref));
+  const ref = state.events.eventTimelineTrack.markers[0]!.ref;
+  assert.isTrue(state.events.beginEventDrag(ref));
   assert.equal(state.currentTimeMilliseconds, timestamp);
-  assert.isTrue(state.previewEventDrag(0.8));
-  assert.isTrue(state.cancelEventDrag());
+  assert.isTrue(state.events.previewEventDrag(0.8));
+  assert.isTrue(state.events.cancelEventDrag());
   assert.equal(state.currentTimeMilliseconds, timestamp);
   assert.strictEqual(state.workingAnimation, authored);
   assert.strictEqual(state.selectedEvent, ref);
@@ -416,7 +416,7 @@ test('editor wrap distinguishes tail markers from tiny markers in the new cycle'
 test('selection seeks to exact fractional authored time and excludes it on the next playback update', () => {
   const timestamp = 0.031101767270538955;
   const { state, events } = session({ ...clip, events: [{ time: timestamp, name: 'fractional' }] });
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
   state.play();
   state.advancePlayback(0.000001);
   assert.deepEqual(events, []);

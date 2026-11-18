@@ -12,7 +12,7 @@ test('event field drafts commit once on blur; invalid JSON is retained for corre
     { name: 'move', duration: 1000, loop: false, tracks: {}, events: [{ time: 250, name: 'event' }] },
   ]);
   state.selectAnimation('move');
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
   const controller = new EventInspectorController(query('#editor-app') as unknown as HTMLElement, () => state);
   const unsubscribe = state.subscribe(() => controller.render(state));
   controller.render(state);
@@ -21,11 +21,11 @@ test('event field drafts commit once on blur; invalid JSON is retained for corre
   name.value = 'edited';
   await name.dispatch('input');
   assert.equal(state.historyLength, 0);
-  assert.equal(state.selectedEventData!.name, 'event');
+  assert.equal(state.events.selectedEventData!.name, 'event');
   await name.dispatch('blur');
   await name.dispatch('blur');
   assert.equal(state.historyLength, 1);
-  assert.equal(state.selectedEventData!.name, 'edited');
+  assert.equal(state.events.selectedEventData!.name, 'edited');
   data.value = '{invalid';
   await data.dispatch('blur');
   assert.equal(data.value, '{invalid');
@@ -33,11 +33,11 @@ test('event field drafts commit once on blur; invalid JSON is retained for corre
   assert.include(query('#animation-event-error').textContent, 'valid JSON');
   data.value = '{"safe":[1,null]}';
   await data.dispatch('blur');
-  assert.deepEqual(state.selectedEventData!.data, { safe: [1, null] });
+  assert.deepEqual(state.events.selectedEventData!.data, { safe: [1, null] });
   assert.equal(state.historyLength, 2);
   query('#animation-event-time').value = '';
   await query('#animation-event-time').dispatch('blur');
-  assert.equal(state.selectedEventData!.time, 250);
+  assert.equal(state.events.selectedEventData!.time, 250);
   state.undo();
   assert.equal(data.value, '');
   state.redo();
@@ -45,6 +45,6 @@ test('event field drafts commit once on blur; invalid JSON is retained for corre
   controller.dispose();
   name.value = 'after disposal';
   await name.dispatch('blur');
-  assert.equal(state.selectedEventData!.name, 'edited');
+  assert.equal(state.events.selectedEventData!.name, 'edited');
   unsubscribe();
 });

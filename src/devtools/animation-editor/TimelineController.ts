@@ -206,7 +206,7 @@ export class TimelineController {
     if (index >= 0) {
       const prefix =
         (state.workingAnimation ? 3 * TIMELINE_ROW_HEIGHT : 0) +
-        (state.timelineVisibility.eventVisible ? state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+        (state.timelineVisibility.eventVisible ? state.events.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
       const top = TIMELINE_RULER_HEIGHT + prefix + index * TIMELINE_ROW_HEIGHT;
       if (top < this.inset.scrollTop + TIMELINE_RULER_HEIGHT) this.inset.scrollTop = top - TIMELINE_RULER_HEIGHT;
       else if (top + TIMELINE_ROW_HEIGHT > this.inset.scrollTop + this.inset.clientHeight)
@@ -262,7 +262,7 @@ export class TimelineController {
       state.selectedKeys,
       state.selectedEvent,
       state.keyframes.keyframeDrag,
-      state.eventDrag,
+      state.events.eventDrag,
       width,
       this.navigation.view.scrollLeft,
       this.navigation.view.viewportWidth,

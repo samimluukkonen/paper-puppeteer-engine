@@ -227,30 +227,30 @@ test('snapped key collisions preserve siblings and Undo/Redo restores destinatio
 test('event identity exclusions allow same-time events and event movement stays atomic', () => {
   const { state } = session();
   state.setTimelineSnapSettings({ frames: false, keyframes: false, playhead: false });
-  const refs = state.eventTimelineTrack.markers.map((entry) => entry.ref);
+  const refs = state.events.eventTimelineTrack.markers.map((entry) => entry.ref);
   const before = state.workingAnimation;
-  state.beginEventDrag(refs[0]!);
-  state.previewEventDrag(0.755);
+  state.events.beginEventDrag(refs[0]!);
+  state.events.previewEventDrag(0.755);
   assert.isNull(state.timelineSnapGuide, 'own event is excluded');
-  state.previewEventDrag(1.105);
+  state.events.previewEventDrag(1.105);
   assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 1.1 });
   assert.strictEqual(state.workingAnimation, before);
-  state.commitEventDrag();
+  state.events.commitEventDrag();
   assert.equal(state.workingAnimation!.events!.length, 2);
   assert.deepEqual(
     state.workingAnimation!.events!.map((event) => event.time),
     [1100, 1100],
   );
-  assert.deepEqual(state.selectedEventData!.data, { keep: true });
+  assert.deepEqual(state.events.selectedEventData!.data, { keep: true });
   assert.equal(state.historyLength, 1);
   assert.isNull(state.timelineSnapGuide);
   state.undo();
   assert.strictEqual(state.workingAnimation, before);
   state.redo();
-  state.beginEventDrag(refs[0]!);
-  state.previewEventDrag(1.11);
+  state.events.beginEventDrag(refs[0]!);
+  state.events.previewEventDrag(1.11);
   assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 1.1 }, 'other same-time event remains eligible');
-  state.cancelEventDrag();
+  state.events.cancelEventDrag();
   assert.isNull(state.timelineSnapGuide);
 });
 
@@ -304,9 +304,9 @@ test.each(['key', 'event'] as const)(
     const { state } = session();
     state.setTimelineSnapSettings({ frames: false, keyframes: false, playhead: false });
     if (kind === 'key') state.keyframes.beginKeyframeDrag(a);
-    else state.beginEventDrag(state.eventTimelineTrack.markers[1]!.ref);
+    else state.events.beginEventDrag(state.events.eventTimelineTrack.markers[1]!.ref);
     const preview = (time: number) =>
-      kind === 'key' ? state.keyframes.previewKeyframeDrag(time) : state.previewEventDrag(time);
+      kind === 'key' ? state.keyframes.previewKeyframeDrag(time) : state.events.previewEventDrag(time);
     preview(0.755);
     assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 0.75 });
     let notifications = 0;
@@ -322,7 +322,7 @@ test.each(['key', 'event'] as const)(
     assert.deepEqual(state.timelineSnapGuide, { type: 'event', time: 0.75 });
     preview(0.755);
     if (kind === 'key') state.keyframes.previewKeyframeDrag(0.755, true);
-    else state.previewEventDrag(0.755, true);
+    else state.events.previewEventDrag(0.755, true);
     state.setTimelineSnapSettings({ events: false });
     state.setTimelineSnapSettings({ events: true });
     assert.equal(state.currentTime, 0.755, 'settings retain the active Shift override');
@@ -340,8 +340,8 @@ test('nudges advance past coincident sparse sibling keys, events and playhead', 
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 0.8 });
   state.nudgeSelectedKeyframe(1);
   assert.equal(state.selectedKeyframe!.time, 0.81);
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
-  state.nudgeSelectedEvent(1);
-  assert.equal(state.selectedEventData!.time, 760);
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
+  state.events.nudgeSelectedEvent(1);
+  assert.equal(state.events.selectedEventData!.time, 760);
   assert.equal(state.historyLength, 3);
 });

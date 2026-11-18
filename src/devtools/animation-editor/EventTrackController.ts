@@ -3,6 +3,12 @@ import type { AnimationEditorState } from './AnimationEditorState.js';
 import type { AnimationEventRef, EventTimelineTrack } from './animationEvents.js';
 import { timeToTimelineX } from './timeline.js';
 
+/** The event track renders and selects through the events handle. */
+type EventTrackState = Pick<
+  AnimationEditorState,
+  'events' | 'selectedEvent' | 'duration' | 'workingAnimation' | 'selectBone'
+>;
+
 /** Separate event lane: no bone ids, property keys, key collisions, or runtime callbacks. */
 export class EventTrackController {
   readonly label = document.createElement('div');
@@ -10,13 +16,13 @@ export class EventTrackController {
   private readonly select = document.createElement('button');
   private readonly presence = document.createElement('span');
   private readonly markers = new Map<AnimationEventRef, HTMLButtonElement>();
-  private state: AnimationEditorState | undefined;
+  private state: EventTrackState | undefined;
   private track: EventTimelineTrack | undefined;
   private width = -1;
   private duration = -1;
   private selected: AnimationEventRef | null | undefined;
 
-  private drag: AnimationEditorState['eventDrag'] | undefined;
+  private drag: AnimationEditorState['events']['eventDrag'] | undefined;
 
   constructor(
     private readonly onPointerDown?: (event: PointerEvent, ref: AnimationEventRef, marker: HTMLButtonElement) => void,
@@ -33,9 +39,9 @@ export class EventTrackController {
     this.lane.setAttribute('aria-label', 'Animation events');
   }
 
-  render(state: AnimationEditorState, width: number): void {
+  render(state: EventTrackState, width: number): void {
     this.state = state;
-    const track = state.eventTimelineTrack;
+    const track = state.events.eventTimelineTrack;
     const changed = track !== this.track;
     if (changed) {
       this.track = track;
@@ -63,13 +69,13 @@ export class EventTrackController {
             event.stopPropagation();
             if (event.button !== 0) return;
             event.preventDefault();
-            this.state?.selectAnimationEvent(model.ref);
+            this.state?.events.selectAnimationEvent(model.ref);
             marker!.focus({ preventScroll: true });
           });
-          marker.addEventListener('contextmenu', () => this.state?.selectAnimationEvent(model.ref));
+          marker.addEventListener('contextmenu', () => this.state?.events.selectAnimationEvent(model.ref));
           marker.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (event.detail === 0) this.state?.selectAnimationEvent(model.ref);
+            if (event.detail === 0) this.state?.events.selectAnimationEvent(model.ref);
           });
           this.markers.set(model.ref, marker);
         }
@@ -85,8 +91,8 @@ export class EventTrackController {
         if (this.lane.children[index] !== marker) this.lane.insertBefore(marker, this.lane.children[index] ?? null);
       }
     }
-    if (changed || width !== this.width || state.duration !== this.duration || state.eventDrag !== this.drag) {
-      this.drag = state.eventDrag;
+    if (changed || width !== this.width || state.duration !== this.duration || state.events.eventDrag !== this.drag) {
+      this.drag = state.events.eventDrag;
       this.width = width;
       this.duration = state.duration;
       for (const model of track.markers)

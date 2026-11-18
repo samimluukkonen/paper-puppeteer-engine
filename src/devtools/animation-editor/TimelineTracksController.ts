@@ -194,7 +194,7 @@ export class TimelineTracksController {
     }
     const prefixHeight =
       (this.root?.lanes.filter((lane) => !lane.hidden).length ?? 0) * TIMELINE_ROW_HEIGHT +
-      (visibility.eventVisible ? state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+      (visibility.eventVisible ? state.events.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
     const { first, end } = timelineRowWindow(this.layout.length, viewport.top, viewport.height, prefixHeight);
     const tracks = this.layout.slice(first, end).map(({ track }) => track);
     const rangeKey = `${viewport.left}:${viewport.width}:${width}:${state.duration}`;

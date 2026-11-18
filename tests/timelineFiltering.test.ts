@@ -141,7 +141,7 @@ test('selected target mode follows preview-style bone picks, properties, IK targ
     'IK: ReachTarget.y',
     'IK: ReachTarget.mix',
   ]);
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
   assert.deepEqual(visible(state), []);
   assert.isTrue(state.timelineVisibility.eventVisible);
 });
@@ -227,8 +227,8 @@ test('hidden IK keys and events keep their typed selections and can be revealed'
   state.revealTimelineSelection();
   assert.strictEqual(state.ik.selectedIKKeyframe, key);
   assert.isFalse(state.timelineVisibility.selectionHidden);
-  const ref = state.eventTimelineTrack.markers[0]!.ref;
-  state.selectAnimationEvent(ref);
+  const ref = state.events.eventTimelineTrack.markers[0]!.ref;
+  state.events.selectAnimationEvent(ref);
   state.setTimelineFilters({ showEvents: false, search: 'none' });
   assert.strictEqual(state.selectedEvent, ref);
   assert.isTrue(state.timelineVisibility.selectionHidden);
@@ -365,15 +365,15 @@ test.each(['key', 'event'])('changing filters cancels an active %s drag without 
     assert.isTrue(state.keyframes.beginKeyframeDrag(state.primaryKey!));
     assert.isTrue(state.keyframes.previewKeyframeDrag(0.4));
   } else {
-    assert.isTrue(state.beginEventDrag(state.eventTimelineTrack.markers[0]!.ref));
-    assert.isTrue(state.previewEventDrag(0.8));
+    assert.isTrue(state.events.beginEventDrag(state.events.eventTimelineTrack.markers[0]!.ref));
+    assert.isTrue(state.events.previewEventDrag(0.8));
   }
   const working = state.workingAnimation;
   const keys = [...state.selectedKeys];
   const event = state.selectedEvent;
   state.setTimelineFilters({ search: 'nothing-matches', showEvents: false });
   assert.isNull(state.keyframes.keyframeDrag);
-  assert.isNull(state.eventDrag);
+  assert.isNull(state.events.eventDrag);
   assert.deepEqual(state.selectedKeys, keys);
   assert.strictEqual(state.selectedEvent, event);
   assert.strictEqual(state.workingAnimation, working);

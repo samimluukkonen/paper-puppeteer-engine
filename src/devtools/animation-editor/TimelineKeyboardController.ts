@@ -29,7 +29,7 @@ export class TimelineKeyboardController {
         // Body/canvas focus supports playback; controls outside this editor own their shortcuts.
         if (event.target instanceof Element && !this.app.contains(event.target) && event.target.tagName !== 'BODY')
           return;
-        if (event.key === 'Escape' && (this.state.keyframes.keyframeDrag || this.state.eventDrag)) {
+        if (event.key === 'Escape' && (this.state.keyframes.keyframeDrag || this.state.events.eventDrag)) {
           event.preventDefault();
           this.gestures.cancelGesture();
           return;
@@ -246,7 +246,7 @@ export class TimelineKeyboardController {
       return false;
     event.preventDefault();
     const direction = event.key === 'ArrowLeft' ? -1 : 1;
-    if (state.selectedEvent) state.nudgeSelectedEvent(direction, event.shiftKey);
+    if (state.selectedEvent) state.events.nudgeSelectedEvent(direction, event.shiftKey);
     else if (state.ik.selectedIKKeyframe) state.ik.nudgeSelectedIKKeyframe(direction, event.shiftKey);
     else state.nudgeSelectedKeyframe(direction, event.shiftKey);
     return true;

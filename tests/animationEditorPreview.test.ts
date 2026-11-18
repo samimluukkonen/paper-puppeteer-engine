@@ -925,10 +925,10 @@ test('pose-only preview suppresses start, middle and end events across restart, 
   const preview = new AnimationEditorPreview(state, puppet);
   try {
     state.selectAnimation('move');
-    for (const marker of state.eventTimelineTrack.markers) {
+    for (const marker of state.events.eventTimelineTrack.markers) {
       state.play();
       state.beginScrub();
-      assert.isTrue(state.selectAnimationEvent(marker.ref));
+      assert.isTrue(state.events.selectAnimationEvent(marker.ref));
       assert.isFalse(state.isPlaying);
       assert.isFalse(state.isScrubbing);
       assert.equal(state.currentTime, marker.time);

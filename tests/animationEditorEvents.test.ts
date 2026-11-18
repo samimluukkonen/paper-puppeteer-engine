@@ -144,7 +144,7 @@ test('invalid event mutations reject bounds, fields and non-JSON data atomically
 
 test('dedicated marker model stably sorts authored events, preserves duplicates and uses shared endpoint coordinates', () => {
   const { state } = session();
-  const track = state.eventTimelineTrack;
+  const track = state.events.eventTimelineTrack;
   assert.equal(track.kind, 'events');
   assert.equal(track.stackCount, 3);
   assert.deepEqual(
@@ -167,9 +167,9 @@ test('dedicated marker model stably sorts authored events, preserves duplicates 
   state.setCurrentTime(1.3);
   state.play();
   state.advancePlayback(0.2);
-  assert.strictEqual(state.eventTimelineTrack, track);
+  assert.strictEqual(state.events.eventTimelineTrack, track);
   state.keyframes.setBonePropertyKeyframe('root', 'y', 3);
-  assert.strictEqual(state.eventTimelineTrack, track, 'unrelated key edits share the event model');
+  assert.strictEqual(state.events.eventTimelineTrack, track, 'unrelated key edits share the event model');
   const animation = clip();
   const mutableTrack = buildEventTimelineTrack(animation);
   animation.events![0]!.name = 'changed';
@@ -186,45 +186,45 @@ test('event selection atomically pauses, ends scrubbing, clears keys/drafts and 
   state.setTemporaryBoneProperty('y', 7);
   state.play();
   state.beginScrub();
-  const ref = state.eventTimelineTrack.markers[2]!.ref;
+  const ref = state.events.eventTimelineTrack.markers[2]!.ref;
   const observations: unknown[] = [];
   state.subscribe(() =>
     observations.push([state.selectedEvent, state.selectedKeys.length, state.currentTime, state.isPlaying]),
   );
-  assert.isTrue(state.selectAnimationEvent(ref));
+  assert.isTrue(state.events.selectAnimationEvent(ref));
   assert.deepEqual(observations, [[ref, 0, 0.5, false]]);
   assert.isFalse(state.isScrubbing);
   assert.isFalse(state.hasTemporaryTransform);
   assert.isNull(state.selectedBoneId);
   assert.isNull(state.selectedTimelineProperty);
-  assert.deepEqual(state.selectedEventData, { time: 500, name: 'step', data: { foot: 'right' } });
+  assert.deepEqual(state.events.selectedEventData, { time: 500, name: 'step', data: { foot: 'right' } });
   assert.strictEqual(state.workingAnimation, working);
   assert.strictEqual(state.sourceAnimation, source);
   assert.isFalse(state.dirty);
   assert.equal(state.historyLength, 0);
   assert.equal(JSON.stringify(input), before);
   state.play();
-  assert.isFalse(state.selectAnimationEvent(getAnimationEventReferences(clip())[0]!));
+  assert.isFalse(state.events.selectAnimationEvent(getAnimationEventReferences(clip())[0]!));
   assert.strictEqual(state.selectedEvent, ref);
   assert.isTrue(state.isPlaying);
   state.setCurrentTime(1.25);
   assert.strictEqual(state.selectedEvent, ref, 'navigation retains selection without forcing the clock');
   state.selectKeyframe({ boneId: 'root', property: 'x', time: 2 });
   assert.isNull(state.selectedEvent);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   state.selectKeyframes([{ boneId: 'root', property: 'x', time: 0 }], true);
   assert.isNull(state.selectedEvent);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   state.selectTimelineProperty('root', 'y');
   assert.isNull(state.selectedEvent);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   state.selectBone('root');
   assert.isNull(state.selectedEvent);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   state.clearTimelineSelection();
   assert.isNull(state.selectedEvent);
   assert.equal(state.currentTime, 0.5);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   state.selectAnimation('empty');
   assert.isNull(state.selectedEvent);
 });
@@ -233,56 +233,56 @@ test('programmatic event edits integrate dirty/history, retain references across
   const { state, input } = session();
   const before = JSON.stringify(input);
   const source = JSON.stringify(state.sourceAnimation);
-  const ref = state.eventTimelineTrack.markers[2]!.ref;
-  state.selectAnimationEvent(ref);
-  assert.isTrue(state.updateAnimationEvent(ref, { time: 1200, name: 'moved', data: { value: 1 } }));
+  const ref = state.events.eventTimelineTrack.markers[2]!.ref;
+  state.events.selectAnimationEvent(ref);
+  assert.isTrue(state.events.updateAnimationEvent(ref, { time: 1200, name: 'moved', data: { value: 1 } }));
   assert.isTrue(state.dirty);
   assert.equal(state.historyLength, 1);
   assert.strictEqual(state.selectedEvent, ref);
-  assert.equal(state.selectedEventData!.time, 1200);
+  assert.equal(state.events.selectedEventData!.time, 1200);
   assert.equal(state.currentTime, 0.5, 'authored edits do not implicitly navigate');
   state.undo();
   assert.strictEqual(state.selectedEvent, ref);
-  assert.equal(state.selectedEventData!.time, 500);
+  assert.equal(state.events.selectedEventData!.time, 500);
   assert.isFalse(state.dirty);
-  state.selectAnimationEvent(ref);
+  state.events.selectAnimationEvent(ref);
   assert.isTrue(state.canRedo);
   state.redo();
-  assert.equal(state.selectedEventData!.time, 1200);
+  assert.equal(state.events.selectedEventData!.time, 1200);
   assert.isFalse(state.selectAnimation('empty'));
   assert.strictEqual(state.selectedEvent, ref);
-  assert.isTrue(state.removeAnimationEvent(ref));
+  assert.isTrue(state.events.removeAnimationEvent(ref));
   assert.isNull(state.selectedEvent);
   state.undo();
   assert.isNull(state.selectedEvent, 'history does not restore transient selection');
-  assert.isTrue(state.selectAnimationEvent(ref));
+  assert.isTrue(state.events.selectAnimationEvent(ref));
   state.redo();
   assert.isNull(state.selectedEvent);
   const working = state.workingAnimation;
   const history = state.historyLength;
-  assert.isFalse(state.addAnimationEvent({ time: 2001, name: 'bad' }));
+  assert.isFalse(state.events.addAnimationEvent({ time: 2001, name: 'bad' }));
   assert.strictEqual(state.workingAnimation, working);
   assert.equal(state.historyLength, history);
-  assert.isTrue(state.addAnimationEvent({ time: 0, name: 'another' }));
-  const newRef = state.eventTimelineTrack.markers.find(({ name }) => name === 'another')!.ref;
-  state.selectAnimationEvent(newRef);
+  assert.isTrue(state.events.addAnimationEvent({ time: 0, name: 'another' }));
+  const newRef = state.events.eventTimelineTrack.markers.find(({ name }) => name === 'another')!.ref;
+  state.events.selectAnimationEvent(newRef);
   state.undo();
   assert.isNull(state.selectedEvent);
   state.redo();
-  assert.isTrue(state.selectAnimationEvent(newRef));
+  assert.isTrue(state.events.selectAnimationEvent(newRef));
   assert.isFalse(state.exportJson().includes('animation-event'));
   assert.equal(JSON.stringify(state.sourceAnimation), source);
   assert.equal(JSON.stringify(input), before);
   state.selectAnimation('empty', { discardChanges: true });
   assert.isNull(state.selectedEvent);
-  assert.isFalse(state.selectAnimationEvent(newRef));
+  assert.isFalse(state.events.selectAnimationEvent(newRef));
 });
 
 test('no animation, empty events, invalid events and rejected zero duration leave a safe empty track', () => {
   const missing = new AnimationEditorState();
-  assert.deepEqual(missing.eventTimelineTrack.markers, []);
-  assert.isUndefined(missing.selectedEventData);
-  assert.isFalse(missing.addAnimationEvent({ time: 0, name: 'event' }));
+  assert.deepEqual(missing.events.eventTimelineTrack.markers, []);
+  assert.isUndefined(missing.events.selectedEventData);
+  assert.isFalse(missing.events.addAnimationEvent({ time: 0, name: 'event' }));
   const invalid = new AnimationEditorState(rig, [
     { ...clip(), name: 'zero', duration: 0 },
     { ...clip(), name: 'bad', events: [{ time: 2001, name: 'event' }] },
@@ -290,13 +290,13 @@ test('no animation, empty events, invalid events and rejected zero duration leav
   for (const id of ['zero', 'bad']) {
     assert.isFalse(invalid.selectAnimation(id));
     assert.isTrue(invalid.validationIssues.length > 0);
-    assert.deepEqual(invalid.eventTimelineTrack.markers, []);
+    assert.deepEqual(invalid.events.eventTimelineTrack.markers, []);
     assert.equal(invalid.duration, 0);
   }
   const { state } = session();
   state.selectAnimation('empty');
-  assert.deepEqual(state.eventTimelineTrack.markers, []);
-  assert.equal(state.eventTimelineTrack.stackCount, 1);
+  assert.deepEqual(state.events.eventTimelineTrack.markers, []);
+  assert.equal(state.events.eventTimelineTrack.stackCount, 1);
   state.selectAnimation(null);
-  assert.deepEqual(state.eventTimelineTrack.markers, []);
+  assert.deepEqual(state.events.eventTimelineTrack.markers, []);
 });

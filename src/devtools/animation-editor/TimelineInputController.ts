@@ -168,7 +168,7 @@ export class TimelineInputController {
         : gesture.kind === 'key-drag'
           ? !this.state.keyframes.keyframeDrag
           : gesture.kind === 'event-drag'
-            ? !this.state.eventDrag
+            ? !this.state.events.eventDrag
             : !this.state.isScrubbing);
     if (invalid) this.cancelGesture();
   }
@@ -229,7 +229,7 @@ export class TimelineInputController {
     // Blurring an inspector field can commit an edit and cancel gestures. Finish
     // that focus transition before acquiring the new event drag transaction.
     marker.focus({ preventScroll: true });
-    if (!this.state.beginEventDrag(ref)) return;
+    if (!this.state.events.beginEventDrag(ref)) return;
     const bounds = this.timeline.getBoundingClientRect();
     this.gesture = {
       kind: 'event-drag',
@@ -239,7 +239,7 @@ export class TimelineInputController {
       offset:
         event.clientX -
         bounds.left -
-        timeToTimelineX(this.state.eventDrag!.originalTime, this.state.duration, bounds.width),
+        timeToTimelineX(this.state.events.eventDrag!.originalTime, this.state.duration, bounds.width),
       moved: false,
       shift: event.shiftKey,
     };
@@ -253,7 +253,7 @@ export class TimelineInputController {
     this.state.setTimelineSnapContentWidth(bounds.width);
     const preview =
       pointer.kind === 'event-drag'
-        ? this.state.previewEventDrag.bind(this.state)
+        ? this.state.events.previewEventDrag.bind(this.state.events)
         : this.state.keyframes.previewKeyframeDrag.bind(this.state.keyframes);
     preview(
       timelineXToTime(pointer.clientX - bounds.left - pointer.offset, this.state.duration, bounds.width),
@@ -331,7 +331,7 @@ export class TimelineInputController {
     const prefix =
       TIMELINE_RULER_HEIGHT +
       (this.state.workingAnimation ? 3 * TIMELINE_ROW_HEIGHT : 0) +
-      (visibility.eventVisible ? this.state.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
+      (visibility.eventVisible ? this.state.events.eventTimelineTrack.stackCount * TIMELINE_ROW_HEIGHT : 0);
     const rows = timelineRowLayout(this.state.timelineTracks, visibility.rows);
     const included = rows.flatMap(({ index }, position) => {
       const center = prefix + (position + 0.5) * TIMELINE_ROW_HEIGHT;
@@ -364,8 +364,8 @@ export class TimelineInputController {
         else this.state.keyframes.cancelKeyframeDrag();
         break;
       case 'event-drag':
-        if (commit) this.state.commitEventDrag();
-        else this.state.cancelEventDrag();
+        if (commit) this.state.events.commitEventDrag();
+        else this.state.events.cancelEventDrag();
         break;
       case 'marquee':
         if (commit) this.commitMarquee(gesture);
@@ -377,7 +377,7 @@ export class TimelineInputController {
     this.endGesture(false);
     // State-only commands can begin/cancel a drag before a DOM pointer is acquired.
     this.state.keyframes.cancelKeyframeDrag();
-    this.state.cancelEventDrag();
+    this.state.events.cancelEventDrag();
     this.state.endScrub();
   }
 

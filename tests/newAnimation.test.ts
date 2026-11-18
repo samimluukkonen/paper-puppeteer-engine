@@ -200,8 +200,8 @@ test.each(['bone draft', 'key drag', 'event drag', 'IK drag', 'scrub'])(
         state.keyframes.beginKeyframeDrag({ boneId: 'head', property: 'x', time: 0 });
         break;
       case 'event drag':
-        state.createAnimationEvent();
-        state.beginEventDrag(state.eventTimelineTrack.markers[0]!.ref);
+        state.events.createAnimationEvent();
+        state.events.beginEventDrag(state.events.eventTimelineTrack.markers[0]!.ref);
         break;
       case 'IK drag':
         state.ik.selectIKConstraint('reach');
@@ -252,7 +252,7 @@ test('missing rig, duplicate IDs and cancelled replacement preserve documents', 
 test('empty documents accept events and IK keys through ordinary history and serialization', () => {
   const state = new AnimationEditorState(rig());
   state.createAnimation({ name: 'reach' });
-  assert.isTrue(state.createAnimationEvent());
+  assert.isTrue(state.events.createAnimationEvent());
   state.ik.selectIKConstraint('reach');
   assert.isTrue(state.ik.setIKPropertyKeyframe('reach', 'x', 20));
   const exported = state.exportJson();

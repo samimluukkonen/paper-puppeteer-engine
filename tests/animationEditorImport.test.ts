@@ -99,7 +99,7 @@ function snapshot(state: AnimationEditorState) {
     bone: state.selectedBoneId,
     property: state.selectedTimelineProperty,
     keyDrag: state.keyframes.keyframeDrag,
-    eventDrag: state.eventDrag,
+    eventDrag: state.events.eventDrag,
     clipboard: state.timelineClipboard,
   };
 }
@@ -216,9 +216,9 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
       state.keyframes.beginKeyframeDrag(state.primaryKey!);
       state.keyframes.previewKeyframeDrag(0.6);
     } else if (kind === 'event') {
-      state.createAnimationEvent();
-      state.beginEventDrag(state.selectedEvent!);
-      state.previewEventDrag(0.6);
+      state.events.createAnimationEvent();
+      state.events.beginEventDrag(state.selectedEvent!);
+      state.events.previewEventDrag(0.6);
     } else if (kind === 'scrub') {
       state.setCurrentTime(1.2);
       state.play();
@@ -241,7 +241,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.equal(state.historyLength, 0);
     assert.isFalse(state.isScrubbing);
     assert.isNull(state.keyframes.keyframeDrag);
-    assert.isNull(state.eventDrag);
+    assert.isNull(state.events.eventDrag);
     assert.deepEqual(state.selectedKeys, []);
     assert.isNull(state.primaryKey);
     assert.isNull(state.selectedEvent);
@@ -317,8 +317,12 @@ test('post-import key, interpolation, event edits and Undo/Redo keep the source 
   state.keyframes.moveSelectedKeyframe(0.4);
   state.setAuthoredInterpolation(undefined);
   const ref = getAnimationEventReferences(state.workingAnimation)[1]!;
-  state.selectAnimationEvent(ref);
-  state.updateAnimationEvent(ref, { ...state.selectedEventData!, name: 'changed', data: { changed: true } });
+  state.events.selectAnimationEvent(ref);
+  state.events.updateAnimationEvent(ref, {
+    ...state.events.selectedEventData!,
+    name: 'changed',
+    data: { changed: true },
+  });
   assert.isTrue(state.dirty);
   assert.deepEqual(source, file());
   const edited = state.exportJson();
@@ -395,7 +399,7 @@ test('timeline keys and event markers rebuild from imported authored data', () =
       [0, 0.6, 1.5],
     );
   assert.equal(state.duration, 1.5);
-  assert.equal(state.eventTimelineTrack.markers.length, 5);
+  assert.equal(state.events.eventTimelineTrack.markers.length, 5);
   assert.equal(state.authoredInterpolation, 'linear');
   assert.equal(state.getSegmentInterpolation({ boneId: 'root', property: 'x', time: 0 })?.mode, 'linear');
   assert.isTrue(serializeAnimation(state.workingAnimation, rig).success);

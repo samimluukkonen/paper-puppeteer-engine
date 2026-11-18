@@ -62,7 +62,11 @@ test('full authoring workflow keeps checkpoints, history and loaded/imported sou
   state.keyframes.setBonePropertyKeyframe('root', 'x', 8, 0.25);
   state.setAuthoredInterpolation('linear');
   const event = getAnimationEventReferences(state.workingAnimation)[1]!;
-  state.updateAnimationEvent(event, { ...state.workingAnimation!.events![1]!, name: 'changed', data: [1, null] });
+  state.events.updateAnimationEvent(event, {
+    ...state.workingAnimation!.events![1]!,
+    name: 'changed',
+    data: [1, null],
+  });
   const edited = state.exportJson();
   for (let i = 0; i < 3; ++i) assert.isTrue(state.undo());
   assert.isFalse(state.dirty);
@@ -117,8 +121,8 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
       state.keyframes.previewKeyframeDrag(0.4);
     }
     if (kind === 'event') {
-      state.beginEventDrag(getAnimationEventReferences(state.workingAnimation)[1]!);
-      state.previewEventDrag(0.4);
+      state.events.beginEventDrag(getAnimationEventReferences(state.workingAnimation)[1]!);
+      state.events.previewEventDrag(0.4);
     }
     if (kind === 'scrub') {
       state.play();
@@ -143,7 +147,7 @@ test.each(['key', 'event', 'scrub', 'draft'] as const)(
     assert.isNull(state.selectedBoneId);
     assert.isNull(state.selectedEvent);
     assert.isNull(state.keyframes.keyframeDrag);
-    assert.isNull(state.eventDrag);
+    assert.isNull(state.events.eventDrag);
     assert.deepEqual(state.selectedKeys, []);
     assert.equal(state.currentTime, 0);
     assert.equal(state.historyLength, 0);

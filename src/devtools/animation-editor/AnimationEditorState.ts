@@ -11,7 +11,6 @@ import type {
   Point,
   AnimationClip,
   AnimationLibraryMetadata,
-  AnimationEvent,
   AnimationPlaybackMode,
   Interpolation,
   PropertyKeyframe,
@@ -37,7 +36,7 @@ import {
   type AnimationImportOptions,
   type ReadonlyAnimation,
 } from './AnimationEditorDocument.js';
-import { AnimationEditorEventCommands, type EventDrag } from './AnimationEditorEventCommands.js';
+import { AnimationEditorEventCommands, type AnimationEditorEventHandle } from './AnimationEditorEventCommands.js';
 import { AnimationEditorGraphGestures } from './AnimationEditorGraphGestures.js';
 import { AnimationEditorIKCommands, type AnimationEditorIKHandle } from './AnimationEditorIKCommands.js';
 import {
@@ -52,7 +51,7 @@ import { AnimationEditorRootMotion, type AnimationEditorRootMotionHandle } from 
 import { AnimationEditorSelection } from './AnimationEditorSelection.js';
 import { AnimationEditorSelectionCommands } from './AnimationEditorSelectionCommands.js';
 import { AnimationEditSession } from './AnimationEditSession.js';
-import { buildEventTimelineTrack, type AnimationEventRef, type EventTimelineTrack } from './animationEvents.js';
+import type { AnimationEventRef } from './animationEvents.js';
 import type { AnimationExportResult } from './animationSerialization.js';
 import {
   getEvaluatedAnimationPose,
@@ -84,7 +83,7 @@ import type { MotionDiagnosticOptions } from './motionDiagnostics.js';
 import { PoseLibrary } from './PoseLibrary.js';
 import { rootKeys } from './rootMotionEdits.js';
 import { animationDurationSeconds, type KeyframeSnapMode } from './timeline.js';
-import { TimelineClipboard, type EventClipboard } from './TimelineClipboard.js';
+import { TimelineClipboard } from './TimelineClipboard.js';
 import type { TimelineFilters, TimelineVisibility } from './timelineFiltering.js';
 import { AnimationEditorTimelineSnapping, type TimelineSnapSettings } from './timelineSnapping.js';
 import type { KeyframeSelection, TimelineTrack } from './timelineTracks.js';
@@ -340,7 +339,9 @@ export class AnimationEditorState {
   readonly keyframes: AnimationEditorKeyframeHandle;
   /** IK selection, drafts, target drags and IK key edits. */
   readonly ik: AnimationEditorIKHandle;
-  private readonly events: AnimationEditorEventCommands;
+  private readonly eventCommands: AnimationEditorEventCommands;
+  /** Animation event edits, event clipboard, event drag and event selection. */
+  readonly events: AnimationEditorEventHandle;
   private readonly playbackController: AnimationEditorPlaybackController;
   private readonly playbackCommands: AnimationEditorPlaybackCommands;
   private importedSessions = 0;
@@ -426,9 +427,9 @@ export class AnimationEditorState {
       this.session,
       this.clipboard,
       this.snapping,
-      { symmetry: () => this.symmetry, cancelEventDrag: () => this.cancelEventDrag() },
+      { symmetry: () => this.symmetry, cancelEventDrag: () => this.events.cancelEventDrag() },
     );
-    this.events = new AnimationEditorEventCommands(
+    this.events = this.eventCommands = new AnimationEditorEventCommands(
       this.document,
       this.selection,
       this.playback,
@@ -442,7 +443,7 @@ export class AnimationEditorState {
       isDragging: () =>
         !!(
           this.keyframes.keyframeDrag ||
-          this.eventDrag ||
+          this.events.eventDrag ||
           this.ik.ikTargetDrag ||
           this.graphEditActive ||
           this.rootMotion.rootMotionDragActive ||
@@ -556,16 +557,6 @@ export class AnimationEditorState {
   get selectedEvent(): AnimationEventRef | null {
     return this.selection.event;
   }
-  get selectedEventData() {
-    return this.events.selectedEventData;
-  }
-  get eventTimelineTrack(): EventTimelineTrack {
-    return buildEventTimelineTrack(this.working);
-  }
-  /** Transient navigation only: preview sampling never dispatches authored events. */
-  selectAnimationEvent(ref: AnimationEventRef): boolean {
-    return this.session.selectEvent(ref);
-  }
   clearTimelineSelection(): void {
     return this.batchNotifications(() => {
       if (this.rootMotion.selectedRootKey) {
@@ -576,90 +567,26 @@ export class AnimationEditorState {
       this.selectionCommands.clearTimelineSelection();
     });
   }
-  addAnimationEvent(event: DeepReadonly<AnimationEvent>): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.addAnimationEvent(event));
-  }
-  updateAnimationEvent(ref: AnimationEventRef, event: DeepReadonly<AnimationEvent>): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.updateAnimationEvent(ref, event));
-  }
-  removeAnimationEvent(ref: AnimationEventRef): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.removeAnimationEvent(ref));
-  }
-  createAnimationEvent(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.createAnimationEvent());
-  }
-  deleteSelectedEvent(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.deleteSelectedEvent());
-  }
   get timelineClipboard() {
     return this.clipboard.content;
-  }
-  get eventClipboard(): EventClipboard | null {
-    return this.events.eventClipboard;
-  }
-  copySelectedEvent(): boolean {
-    return this.events.copySelectedEvent();
-  }
-  pasteEvent(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.pasteEvent());
-  }
-  duplicateSelectedEvent(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.duplicateSelectedEvent());
   }
   copyTimelineSelection(): boolean {
     if (this.deformationSelected) return this.copyDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
-    return this.selectedEvent ? this.copySelectedEvent() : this.keyframes.copySelectedKeyframes();
+    return this.selectedEvent ? this.events.copySelectedEvent() : this.keyframes.copySelectedKeyframes();
   }
   pasteTimelineClipboard(): boolean {
     if (this.clipboard.content?.kind === 'deformation') return this.pasteDeformationKey();
     if (this.rootMotion.rootMotionSelected) return false;
     if (this.ik.selectedIKConstraintId) return false;
-    return this.clipboard.content?.kind === 'event' ? this.pasteEvent() : this.keyframes.pasteKeyframes();
+    return this.clipboard.content?.kind === 'event' ? this.events.pasteEvent() : this.keyframes.pasteKeyframes();
   }
   duplicateTimelineSelection(): boolean {
     if (this.deformationSelected) return this.duplicateDeformationKey();
     if (this.rootMotion.rootMotionSelected) return this.rootMotion.duplicateRootKey();
     if (this.ik.selectedIKConstraintId) return false;
-    return this.selectedEvent ? this.duplicateSelectedEvent() : this.keyframes.duplicateSelectedKeyframes();
-  }
-  setSelectedEventDataJson(text: string): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.setSelectedEventDataJson(text));
-  }
-  get eventDrag(): EventDrag | null {
-    return this.events.eventDrag;
-  }
-  beginEventDrag(ref: AnimationEventRef): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.beginEventDrag(ref));
-  }
-  previewEventDrag(time: Seconds, disableSnapping = false): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.previewEventDrag(time, disableSnapping));
-  }
-  commitEventDrag(): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.commitEventDrag());
-  }
-  cancelEventDrag(): boolean {
-    return this.batchNotifications(() => this.events.cancelEventDrag());
-  }
-  moveSelectedEvent(time: Seconds): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.moveSelectedEvent(time));
-  }
-  nudgeSelectedEvent(direction: -1 | 1, large = false): boolean {
-    if (!this.animationAuthoringEnabled) return false;
-    return this.batchNotifications(() => this.events.nudgeSelectedEvent(direction, large));
+    return this.selectedEvent ? this.events.duplicateSelectedEvent() : this.keyframes.duplicateSelectedKeyframes();
   }
   private cancelTimelineDrag(): boolean {
     const deformation = this.cancelDeformationEdit();
@@ -668,7 +595,7 @@ export class AnimationEditorState {
     const variation = this.cancelVariationPreview();
     const graph = this.cancelGraphEdit();
     const ik = this.ik?.cancelIKTargetDrag() ?? false;
-    const event = this.cancelEventDrag();
+    const event = this.events.cancelEventDrag();
     return this.keyframes.cancelKeyframeDrag() || event || ik || graph || variation || cleanup || root || deformation;
   }
   get selectedKeys(): readonly KeyframeSelection[] {
@@ -681,7 +608,7 @@ export class AnimationEditorState {
     return this.snapping.settings;
   }
   get timelineSnapGuide() {
-    return this.keyframes.keyframeDrag?.snapGuide ?? this.eventDrag?.snapGuide ?? null;
+    return this.keyframes.keyframeDrag?.snapGuide ?? this.events.eventDrag?.snapGuide ?? null;
   }
   setTimelineSnapSettings(patch: Partial<TimelineSnapSettings>): void {
     this.batchNotifications(() => {
@@ -689,7 +616,7 @@ export class AnimationEditorState {
       this.snapping.setSettings(patch);
       if (previous === this.snapping.settings) return;
       const key = this.keyframes.keyframeDrag;
-      const event = this.eventDrag;
+      const event = this.events.eventDrag;
       if (key) this.keyframes.previewKeyframeDrag(key.proposedTime, key.disableSnapping);
       if (event) this.events.previewEventDrag(event.proposedTime, event.disableSnapping);
     });
@@ -770,7 +697,7 @@ export class AnimationEditorState {
     if (this.deformationSelected) return this.changeDeformationKey(null);
     if (this.rootMotion.rootMotionSelected) return this.animationAuthoringEnabled && this.rootMotion.deleteRootKey();
     if (!this.animationAuthoringEnabled) return false;
-    if (this.selectedEvent) return this.deleteSelectedEvent();
+    if (this.selectedEvent) return this.events.deleteSelectedEvent();
     if (this.ik.selectedIKKeyframe) return this.ik.deleteSelectedIKKeyframe();
     return this.deleteSelectedKeyframes();
   }
@@ -816,14 +743,14 @@ export class AnimationEditorState {
   setTimelineFilters(patch: Partial<TimelineFilters>): void {
     this.batchNotifications(() => {
       this.cancelTimelineDrag();
-      this.cancelEventDrag();
+      this.events.cancelEventDrag();
       if (this.selection.setTimelineFilters(patch)) this.notify();
     });
   }
   expandTimeline(mode: 'all' | 'none' | 'selected'): void {
     this.batchNotifications(() => {
       this.cancelTimelineDrag();
-      this.cancelEventDrag();
+      this.events.cancelEventDrag();
       this.selection.expandTimeline(mode);
       this.notify();
     });
@@ -831,7 +758,7 @@ export class AnimationEditorState {
   revealTimelineSelection(): void {
     this.batchNotifications(() => {
       this.cancelTimelineDrag();
-      this.cancelEventDrag();
+      this.events.cancelEventDrag();
       this.selection.revealTimelineSelection();
       this.notify();
     });
@@ -952,7 +879,7 @@ export class AnimationEditorState {
       this.hasTemporaryTransform ||
       Object.keys(this.ik.ikTargetDraft).length > 0 ||
       !!this.keyframes.keyframeDrag ||
-      !!this.eventDrag ||
+      !!this.events.eventDrag ||
       !!this.ik.ikTargetDrag ||
       this.graphEditActive ||
       this.rootMotion.rootMotionDragActive ||
@@ -1251,7 +1178,7 @@ export class AnimationEditorState {
     this.ik.cancelIKTargetDrag();
     ++this.animationSessions;
     this.keyframeCommands.resetSession();
-    this.events.resetSession();
+    this.eventCommands.resetSession();
     this.selection.resetAnimation();
     if (clearBone) this.selection.selectBone(null);
     this.playback.reset();

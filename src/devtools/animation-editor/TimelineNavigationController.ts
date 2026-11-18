@@ -223,7 +223,7 @@ export class TimelineNavigationController {
   private selectedTimes(): number[] {
     const state = this.getState();
     if (state.ik.selectedIKKeyframe) return [state.ik.selectedIKKeyframe.time];
-    if (state.selectedEventData) return [toSeconds(state.selectedEventData.time)];
+    if (state.events.selectedEventData) return [toSeconds(state.events.selectedEventData.time)];
     return state.selectedKeys.map((key) => key.time);
   }
 

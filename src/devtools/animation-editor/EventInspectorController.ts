@@ -4,10 +4,16 @@ import type { AnimationEditorState } from './AnimationEditorState.js';
 import { ANIMATION_IDS } from './elementIds.js';
 import { toSeconds } from './timeUnits.js';
 
+/** The inspector edits through the events handle and reads the clip and its issues. */
+type EventInspectorState = Pick<
+  AnimationEditorState,
+  'events' | 'selectedEvent' | 'duration' | 'validationIssues' | 'workingAnimation' | 'pause'
+>;
+
 /** Local text drafts commit once on blur/Enter; authored snapshots remain authoritative. */
 export class EventInspectorController {
   private readonly abort = new AbortController();
-  private event: AnimationEditorState['selectedEventData'];
+  private event: AnimationEditorState['events']['selectedEventData'];
   private ref: AnimationEditorState['selectedEvent'] | undefined;
   private readonly time: HTMLInputElement;
   private readonly name: HTMLInputElement;
@@ -18,7 +24,7 @@ export class EventInspectorController {
 
   constructor(
     private readonly app: HTMLElement,
-    private readonly getState: () => AnimationEditorState,
+    private readonly getState: () => EventInspectorState,
   ) {
     this.time = requireElement(app, ANIMATION_IDS.eventTime, HTMLInputElement);
     this.name = requireElement(app, ANIMATION_IDS.eventName, HTMLInputElement);
@@ -31,7 +37,7 @@ export class EventInspectorController {
       'click',
       () => {
         // Commit tab visibility before focusing the newly created event field.
-        const created = flushSync(() => this.getState().createAnimationEvent());
+        const created = flushSync(() => this.getState().events.createAnimationEvent());
         if (created) {
           this.name.focus();
           this.name.select();
@@ -50,7 +56,7 @@ export class EventInspectorController {
     this.remove.addEventListener(
       'click',
       () => {
-        if (this.getState().deleteSelectedEvent()) this.add.focus({ preventScroll: true });
+        if (this.getState().events.deleteSelectedEvent()) this.add.focus({ preventScroll: true });
       },
       options,
     );
@@ -78,29 +84,29 @@ export class EventInspectorController {
   private commit(field: HTMLInputElement | HTMLTextAreaElement): void {
     const state = this.getState();
     const ref = state.selectedEvent;
-    const event = state.selectedEventData;
+    const event = state.events.selectedEventData;
     // A field belonging to a replaced selection/session cannot author a different event.
     if (!event || !ref || ref !== this.ref) return;
     const ok =
       field === this.time
-        ? state.moveSelectedEvent(field.value.trim() ? Number(field.value) : NaN)
+        ? state.events.moveSelectedEvent(field.value.trim() ? Number(field.value) : NaN)
         : field === this.name
-          ? state.updateAnimationEvent(ref, { ...event, name: field.value })
-          : state.setSelectedEventDataJson(field.value);
+          ? state.events.updateAnimationEvent(ref, { ...event, name: field.value })
+          : state.events.setSelectedEventDataJson(field.value);
     this.error.textContent = ok ? '' : state.validationIssues.map(({ message }) => message).join('\n');
     if (ok) this.reset(state);
   }
 
-  private reset(state: AnimationEditorState): void {
-    const event = state.selectedEventData;
+  private reset(state: EventInspectorState): void {
+    const event = state.events.selectedEventData;
     this.time.value = event ? String(toSeconds(event.time)) : '';
     this.name.value = event?.name ?? '';
     this.data.value = event && Object.hasOwn(event, 'data') ? JSON.stringify(event.data, null, 2) : '';
     this.error.textContent = '';
   }
 
-  render(state: AnimationEditorState): void {
-    const event = state.selectedEventData;
+  render(state: EventInspectorState): void {
+    const event = state.events.selectedEventData;
     const eventPanel = requireElement(this.app, ANIMATION_IDS.eventInspector, HTMLElement);
     if (eventPanel.hidden !== !event) eventPanel.hidden = !event;
     this.add.disabled = !state.workingAnimation;

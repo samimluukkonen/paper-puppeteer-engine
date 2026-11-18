@@ -110,7 +110,7 @@ test('toolbar availability and deletion follow bone, hidden, IK, event and empty
     state.clearTimelineSelection();
     assert.isNull(state.ik.selectedIKKeyframe);
     assert.isTrue(query('#timeline-delete-key').disabled);
-    state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
+    state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
     assert.isTrue(query('#animation-retime-open').disabled);
     assert.include(query('#animation-retime-open').getAttribute('title')!, 'Events cannot');
     assert.equal(query('#timeline-delete-key').textContent, 'Delete Event');
@@ -150,8 +150,10 @@ test('mixed authored commands each publish one coherent history entry and export
   state.ik.setTemporaryIKProperty('y', 65);
   commit(() => state.ik.commitIKTarget());
   commit(() => state.setAuthoredInterpolation('linear'));
-  const event = state.eventTimelineTrack.markers[0]!.ref;
-  commit(() => state.updateAnimationEvent(event, { time: 550, name: 'contact', data: { retain: [true, null] } }));
+  const event = state.events.eventTimelineTrack.markers[0]!.ref;
+  commit(() =>
+    state.events.updateAnimationEvent(event, { time: 550, name: 'contact', data: { retain: [true, null] } }),
+  );
   state.selectKeyframes([0, 0.4, 0.8].map((time) => ({ boneId: 'leftArm', property: 'rotation', time })));
   commit(() => state.keyframes.mirrorSelectedKeyframes('left-to-right'));
   state.setTimelineFilters({ search: 'no matching row', showIK: false, showEvents: false });

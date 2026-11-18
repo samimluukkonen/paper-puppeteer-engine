@@ -185,7 +185,7 @@ test('resize retains center time and zoom; playback follows only when enabled an
 
 test('event selection fits its timestamp and replacement session resets view and focused time drafts', () => {
   const { state, controller, query, replace } = fixture();
-  state.selectAnimationEvent(state.eventTimelineTrack.markers[0]!.ref);
+  state.events.selectAnimationEvent(state.events.eventTimelineTrack.markers[0]!.ref);
   controller.fitSelection();
   assert.closeTo(viewportXToTime(250, controller.view), 7.5, 1e-12);
   query('#timeline-time-input').value = 'uncommitted';

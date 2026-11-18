@@ -272,7 +272,7 @@ test('mode changes pause and cancel animation gestures/drafts without authoring 
   assert.isFalse(state.isPlaying);
   assert.isFalse(state.keyframes.setBonePropertyKeyframe('root', 'rotation', 1));
   assert.isFalse(state.deleteSelectedKeyframes());
-  assert.isFalse(state.createAnimationEvent());
+  assert.isFalse(state.events.createAnimationEvent());
   assert.isFalse(state.setAuthoredFPS(20));
   assert.isFalse(state.undo());
   assert.isFalse(state.keyframes.beginKeyframeDrag({ boneId: 'root', property: 'x', time: 0 }));
