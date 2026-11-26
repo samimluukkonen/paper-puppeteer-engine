@@ -58,6 +58,20 @@ Direct dependency versions are pinned in [package.json](../package.json), and `p
 
 The [dependency review](dependency-review.md) records the latest package update, upstream release sources and project-specific compatibility and feature decisions. Import Lucide components from the public `lucide-react/icons/<kebab-case-name>` exports to avoid processing the entire icon catalog.
 
+### Assistant skills and agents
+
+The repository includes Claude Code project skills and subagents that apply the [AGENTS.md](https://github.com/samimluukkonen/paper-puppeteer-engine/blob/master/AGENTS.md) rules. They load in local and cloud Claude Code sessions opened in this repository.
+
+| Name                 | File                                        | Use                                                                                                                                                                                                                                       |
+| -------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/implement-plan`    | `.claude/skills/implement-plan/SKILL.md`    | `/implement-plan plans/plan-v1.6.6.md` implements a plan with its changelog heading, upward-only version update, sequential checks, recorded decisions and final report. Only you can start it.                                           |
+| `/architecture-plan` | `.claude/skills/architecture-plan/SKILL.md` | Writes the next `plans/architecture-NN-<slug>.md` in the house format from a review finding. It writes the plan only.                                                                                                                     |
+| `/create-pr`         | `.claude/skills/create-pr/SKILL.md`         | Pushes the current branch and opens a pull request against `master` through `gh api`, with a description built from the commits, changelog entries and check results. Add a base branch, `--draft` or `--dry-run`. Only you can start it. |
+| `verifier`           | `.claude/agents/verifier.md`                | Runs format, lint, typecheck, unit tests and `build:lib` one at a time with one worker and reports only failures. Ask for it by name or with `@agent-verifier`.                                                                           |
+| `ui-style-reviewer`  | `.claude/agents/ui-style-reviewer.md`       | Read-only review of a UI diff against the [style guide](style-guide.md). Ask for it by name or with `@agent-ui-style-reviewer`.                                                                                                           |
+
+Edit these files directly; Claude Code picks up skill changes during a session.
+
 ## Architecture
 
 The [v1.4.1 rig constraints and deformation audit](rig-constraints-and-deformation.md) records current bone identities, effective rest transforms, affine coordinates, FK/IK evaluation order, authoring/history ownership and non-invasive extension points for optional mesh attachments. The [v1.4.3.1 mesh runtime](mesh-attachments.md) extends Rig Editor vertex/topology authoring and native Phaser Mesh2D rendering with validated bone influences and CPU skinning from final FK/IK matrices.
