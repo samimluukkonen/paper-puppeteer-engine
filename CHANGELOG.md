@@ -4,7 +4,7 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
-- Add Claude Code project skills and subagents under `.claude/`. `/implement-plan` applies the plan changelog, upward-only version and verification rules, and `/architecture-plan` writes the next architecture candidate in the house format. The `verifier` agent runs checks one at a time with one worker, and `ui-style-reviewer` reviews UI diffs against the style guide. They are documented in the development guide and are not part of the package.
+- Add Claude Code project skills and subagents under `.claude/`. `/implement-plan` applies the plan changelog, upward-only version and verification rules, `/architecture-plan` writes the next architecture candidate in the house format, and `/create-pr` pushes the branch and opens a pull request with a description built from its commits, changelog entries and check results. The `verifier` agent runs checks one at a time with one worker, and `ui-style-reviewer` reviews UI diffs against the style guide. They are documented in the development guide and are not part of the package.
 
 - Escape every interpolated attribute in the rig inspector's number fields (`value`, `placeholder`, `data-scope` and `data-field` in `src/devtools/rig-editor/InspectorController.ts`), as labels and ids already were. Before this, a field value was written into `innerHTML` unescaped. Schema validation keeps valid rigs numeric, so this is only a hardening change: if a non-numeric value ever reached the inspector, it would now show as text instead of becoming markup. Valid rigs render the same.
 
