@@ -69,8 +69,25 @@ The repository includes Claude Code project skills and subagents that apply the 
 | `/create-pr`         | `.claude/skills/create-pr/SKILL.md`         | Pushes the current branch and opens a pull request against `master` through `gh api`, with a description built from the commits, changelog entries and check results. Add a base branch, `--draft` or `--dry-run`. Only you can start it. |
 | `verifier`           | `.claude/agents/verifier.md`                | Runs format, lint, typecheck, unit tests and `build:lib` one at a time with one worker and reports only failures. Ask for it by name or with `@agent-verifier`.                                                                           |
 | `ui-style-reviewer`  | `.claude/agents/ui-style-reviewer.md`       | Read-only review of a UI diff against the [style guide](style-guide.md). Ask for it by name or with `@agent-ui-style-reviewer`.                                                                                                           |
+| `/plan-to-pr`        | `.claude/skills/plan-to-pr/SKILL.md`        | `/plan-to-pr v1.6.7 <goal>`, `/plan-to-pr <goal>` or `/plan-to-pr plans/<file>.md` runs the whole workflow from a goal or plan to a pull request, described below. Add `--base <branch>` or `--draft`. Only you can start it.             |
+| `/version-plan`      | `.claude/skills/version-plan/SKILL.md`      | `/version-plan v1.6.7 <goal>` writes `plans/plan-v1.6.7.md` in the version-plan format. It writes the plan only.                                                                                                                          |
+| `plan-reviewer`      | `.claude/agents/plan-reviewer.md`           | Read-only review of one plan against the current code, AGENTS.md and the plan format, ending with `VERDICT: ready` or `VERDICT: needs changes`.                                                                                           |
+| `code-reviewer`      | `.claude/agents/code-reviewer.md`           | Read-only review of a commit range against its plan and the AGENTS.md rules, with verified findings and `VERDICT: clean` or `VERDICT: findings`. It does not run checks.                                                                  |
 
-Edit these files directly; Claude Code picks up skill changes during a session.
+Edit these files directly. Claude Code picks up skill changes during a session, but new or changed agents load only when the next session starts.
+
+#### Plan to pull request
+
+`/plan-to-pr` runs these stages in the main conversation and stops at two checkpoints: plan approval and code-review findings.
+
+1. Write the plan with `/version-plan` when you give a milestone version, otherwise with `/architecture-plan`. An existing plan file skips this step.
+2. Review the plan with a new `plan-reviewer`, revise it for up to three rounds, and wait for your approval. A plan you wrote yourself is not edited without your choice.
+3. Create a branch from `origin/master` (or the branch a cloud session assigns), commit the plan, and implement it with the `/implement-plan` rules.
+4. Run the plan's checks with `verifier`, one at a time, and fix failures.
+5. Review the branch with a new `code-reviewer`, plus `ui-style-reviewer` when UI files changed. You choose which findings to fix; the fixes are committed and verified, and a new reviewer runs the next round. The rounds end when a review finds nothing or you choose no fixes.
+6. Open the pull request with the `/create-pr` procedure. Declined findings are listed in its Notes.
+
+Every review round starts a new reviewer with only the plan path, the commit range and the findings you declined, so it does not see the conversation that wrote the code.
 
 ## Architecture
 
