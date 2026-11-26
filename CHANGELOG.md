@@ -4,6 +4,8 @@ Versions use package SemVer; for example, milestone `0.5.2.8.3` is packaged as `
 
 ## Unreleased
 
+- Add Claude Code project skills and subagents under `.claude/`. `/implement-plan` applies the plan changelog, upward-only version and verification rules, and `/architecture-plan` writes the next architecture candidate in the house format. The `verifier` agent runs checks one at a time with one worker, and `ui-style-reviewer` reviews UI diffs against the style guide. They are documented in the development guide and are not part of the package.
+
 - Escape every interpolated attribute in the rig inspector's number fields (`value`, `placeholder`, `data-scope` and `data-field` in `src/devtools/rig-editor/InspectorController.ts`), as labels and ids already were. Before this, a field value was written into `innerHTML` unescaped. Schema validation keeps valid rigs numeric, so this is only a hardening change: if a non-numeric value ever reached the inspector, it would now show as text instead of becoming markup. Valid rigs render the same.
 
 - Fix a failed animation-editor character load leaving local autosave polling the previous character, or the project's character guard bound. The load can fail after the editor reported the character ready, for example when the environment preview camera throws. The autosave then kept polling, reported `No character is loaded.` as a storage error and renewed the old draft's storage lease. The editor now opens one scope per loaded character in `src/devtools/animation-editor/characterScope.ts`, built on a small `Scope` in `src/devtools/shared/scope.ts`. Every per-character binding registers its release there. The next load, a failed load and page teardown each close the scope instead of keeping their own release lists.
